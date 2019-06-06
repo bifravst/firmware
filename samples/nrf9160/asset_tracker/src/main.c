@@ -16,10 +16,27 @@
 
 LOG_MODULE_REGISTER(MODULE);
 
+#if defined(CONFIG_DK_LIBRARY)
+static void button_handler(u32_t button_state, u32_t has_changed)
+{
+	uint32_t button = button_state & has_changed;
+
+	if (button == DK_BTN1) {
+		printk("BUTTON 1 on the dk was pressed\n");
+	}
+
+}
+#endif /* defined(CONFIG_DK_LIBRARY) */
+
 static void buttons_leds_init(void)
 {
 	#if defined(CONFIG_DK_LIBRARY)
 		int err;
+
+		err = dk_buttons_init(button_handler);
+		if (err) {
+			printk("Could not initialize buttons, err code: %d\n", err);
+		}
 
 		err = dk_leds_init();
 		if (err) {
