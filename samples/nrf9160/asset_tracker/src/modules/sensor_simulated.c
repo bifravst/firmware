@@ -1,4 +1,5 @@
 #include <measurement_event.h>
+#include <gps_func.h>
 
 
 #define MODULE GPS_management
@@ -11,8 +12,8 @@ static bool GPS_event_handler(const struct event_header *eh)    //function is ca
 
         switch (event->type) { //eh->type
             case GPS_REQ_DATA:
-                printk("GPS_REQ_DATA EVENT triggered in the GPS module\n");
-                //print gps data under this section
+                //printk("GPS_REQ_DATA EVENT triggered in the GPS module\n");
+                dummy_function_gps();
                 break;
             default:
                 printk("RECIEVED UNKNOWN EVENT");

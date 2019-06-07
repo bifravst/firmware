@@ -12,6 +12,7 @@
 #include <event_manager.h>
 #include <logging/log.h>
 #include <measurement_event.h>
+#include <gps_func.h>
 
 LOG_MODULE_REGISTER(MODULE);
 
@@ -63,5 +64,8 @@ void main(void)
 	printk("The application has started\n");
 	buttons_leds_init();
 	event_manager_init();
-	
+
+
+	//The following sections contains data used by the GPS module//
+
 }
