@@ -23,5 +23,8 @@ target_sources(app PRIVATE
 		src/modules/sensor_simulated.c
 )
 
+target_sources(app PRIVATE src/dependencies/gps_func.c)
 
 # NORDIC SDK APP END
+
+include_directories(src/dependencies)
