@@ -9,12 +9,19 @@
 #include <stdio.h>
 #include <uart.h>
 #include <string.h>
-
 #include <event_manager.h>
 #include <logging/log.h>
 #include <measurement_event.h>
 
 LOG_MODULE_REGISTER(MODULE);
+
+static void generate_event(void) {
+	struct measurement_event *event = new_measurement_event();
+
+	event->type = GPS_REQ_DATA; //this value should be replace by actual GPS data
+
+	EVENT_SUBMIT(event);
+}
 
 #if defined(CONFIG_DK_LIBRARY)
 static void button_handler(u32_t button_state, u32_t has_changed)
@@ -22,11 +29,12 @@ static void button_handler(u32_t button_state, u32_t has_changed)
 	uint32_t button = button_state & has_changed;
 
 	if (button == DK_BTN1) {
-		printk("BUTTON 1 on the dk was pressed\n");
+		printk("BUTTON 1 on the dk was pressed, GPS data requested\n");
+		generate_event();
 	}
 
 }
-#endif /* defined(CONFIG_DK_LIBRARY) */
+#endif
 
 static void buttons_leds_init(void)
 {
@@ -50,20 +58,10 @@ static void buttons_leds_init(void)
 	#endif
 }
 
-static void generate_event(void) {
-	struct measurement_event *event = new_measurement_event();
-
-	event->value1 = 1; //this value should be replace by actual GPS data
-
-	EVENT_SUBMIT(event);
-}
-
 void main(void)
 {
 	printk("The application has started\n");
 	buttons_leds_init();
-	//gps_init();
 	event_manager_init();
-	generate_event();
 	
 }
