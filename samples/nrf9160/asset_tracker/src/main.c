@@ -14,6 +14,8 @@
 #include <measurement_event.h>
 #include <gps_func.h>
 
+//#include <sensor_simulated.h>
+
 LOG_MODULE_REGISTER(MODULE);
 
 static void generate_event(void) {
@@ -64,6 +66,12 @@ void main(void)
 	printk("The application has started\n");
 	buttons_leds_init();
 	event_manager_init();
+
+	// if (init_app() != 0) {
+	// 	//gps_init = true;
+	// 	//return -1;
+	// 	printk("Failed to initilize gps");
+	// }	
 
 
 	//The following sections contains data used by the GPS module//
