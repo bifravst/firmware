@@ -4,6 +4,7 @@
 #include <nrf_socket.h>
 #include <net/socket.h>
 #include <stdio.h>
+//#include <sensor_simulated.h>
 
 
 #define MODULE GPS_management
@@ -25,6 +26,8 @@ static const char     at_commands[][31]  = {
 
 static int            fd;
 
+//static bool gps_init = false;
+
 static char           nmea_strings[10][NRF_GNSS_NMEA_MAX_LEN];
 static u32_t          nmea_string_cnt;
 
@@ -32,16 +35,6 @@ static bool           got_first_fix;
 static bool           update_terminal;
 static u64_t          fix_timestamp;
 nrf_gnss_data_frame_t last_fix;
-
-void bsd_recoverable_error_handler(uint32_t error)
-{
-	printf("Err: %lu\n", error);
-}
-
-void bsd_irrecoverable_error_handler(uint32_t error)
-{
-	printf("Irrecoverable: %lu\n", error);
-}
 
 static int enable_gps(void)
 {
@@ -91,7 +84,7 @@ static int init_app(void)
 	int   retval;
 
 	if (enable_gps() != 0) {
-		printk("Failed to enable GPS\n");
+		printk("Failed to enable GPS, GPS already initialized or busy\n");
 		return -1;
 	}
 
@@ -258,9 +251,16 @@ static void get_gps_data(void)
 
 	printk("Staring GPS application\n");
 
+	// if (gps_init == false) {
+
+	// 	return -1;		
+	// }
+
 	if (init_app() != 0) {
+		//gps_init = true;
 		return -1;
-	}
+	}	
+
 
 	printk("Getting GPS data...\n");
 
@@ -275,12 +275,12 @@ static void get_gps_data(void)
 		// printk(".\n");
         got_first_fix = true;
 		if (got_first_fix) {
-		//print_satellite_stats(&gps_data);
+			//print_satellite_stats(&gps_data);
 
 		// 	printk("---------------------------------\n");
-		// 	print_pvt_data(&last_fix);
-		// 	printk("\n");
-			print_nmea_data();
+			print_pvt_data(&last_fix);
+			// printk("\n");
+			// print_nmea_data();
 		// 	printk("---------------------------------\n");
 			break;
 		}
@@ -301,7 +301,7 @@ static bool GPS_event_handler(const struct event_header *eh)    //function is ca
                 //printk("GPS_REQ_DATA EVENT triggered in the GPS module\n");
                 //connect, poll and print gps data. Dummy data for the time being
                 get_gps_data();
-                //printk("kommer hit ja");
+                printk("kommer hit ja");
                 break;
             default:
                 printk("RECIEVED UNKNOWN EVENT");
