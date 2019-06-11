@@ -4,7 +4,6 @@
 #include <nrf_socket.h>
 #include <net/socket.h>
 #include <stdio.h>
-//#include <sensor_simulated.h>
 
 
 #define MODULE GPS_management
@@ -15,7 +14,6 @@
 #define AT_MAGPIO      "AT\%XMAGPIO=1,0,0,1,1,1574,1577"
 #endif
 
-static const char     update_indicator[] = {'\\', '|', '/', '-'};
 static const char     at_commands[][31]  = {
 				AT_XSYSTEMMODE,
 #ifdef CONFIG_BOARD_NRF9160_PCA10090NS
@@ -26,7 +24,7 @@ static const char     at_commands[][31]  = {
 
 static int            fd;
 
-//static bool gps_init = false;
+static int gps_init = false;
 
 static char           nmea_strings[10][NRF_GNSS_NMEA_MAX_LEN];
 static u32_t          nmea_string_cnt;
@@ -144,39 +142,6 @@ static int init_app(void)
 	return 0;
 }
 
-static void print_satellite_stats(nrf_gnss_data_frame_t *pvt_data)
-{
-	u8_t  tracked          = 0;
-	u8_t  in_fix           = 0;
-	u8_t  unhealthy        = 0;
-
-	for (int i = 0; i < NRF_GNSS_MAX_SATELLITES; ++i) {
-
-		if ((pvt_data->pvt.sv[i].sv > 0) &&
-		    (pvt_data->pvt.sv[i].sv < 33)) {
-
-			tracked++;
-
-			if (pvt_data->pvt.sv[i].flags &
-					NRF_GNSS_PVT_FLAG_FIX_VALID_BIT) {
-				in_fix++;
-			}
-
-			if (pvt_data->pvt.sv[i].flags &
-					NRF_GNSS_SV_FLAG_UNHEALTHY) {
-				unhealthy++;
-			}
-		}
-	}
-
-	printk("Tracking: %d Using: %d Unhealthy: %d", tracked,
-						       in_fix,
-						       unhealthy);
-
-	printk("\nSeconds since last fix %lld\n",
-			(k_uptime_get() - fix_timestamp) / 1000);
-}
-
 static void print_pvt_data(nrf_gnss_data_frame_t *pvt_data)
 {
 	printf("Longitude:  %f\n", pvt_data->pvt.longitude);
@@ -190,15 +155,6 @@ static void print_pvt_data(nrf_gnss_data_frame_t *pvt_data)
 	printk("Time (UTC): %02u:%02u:%02u\n", pvt_data->pvt.datetime.hour,
 					       pvt_data->pvt.datetime.minute,
 					      pvt_data->pvt.datetime.seconds);
-}
-
-static void print_nmea_data(void)
-{
-	printk("NMEA strings:\n");
-
-	for (int i = 0; i < nmea_string_cnt; ++i) {
-		printk("%s\n", nmea_strings[i]);
-	}
 }
 
 int process_gps_data(nrf_gnss_data_frame_t *gps_data)
@@ -244,64 +200,60 @@ int process_gps_data(nrf_gnss_data_frame_t *gps_data)
 	return retval;
 }
 
-static void get_gps_data(void)
+static void last_fix_dummy_data(nrf_gnss_data_frame_t *pvt_data) {
+	pvt_data->pvt.longitude = 1.123456;
+	pvt_data->pvt.latitude = 1.123456;
+	pvt_data->pvt.altitude = 1.123456;
+	pvt_data->pvt.speed = 1.123456;
+	pvt_data->pvt.heading = 1.123456;
+	// pvt_data->pvt.datetime.month;
+	// pvt_data->pvt.datetime.year;
+	// pvt_data->pvt.datetime.minute;
+	// pvt_data->pvt.datetime.seconds;
+}
+
+static int get_gps_data(void)
 {
-    nrf_gnss_data_frame_t gps_data;
-	u8_t		      cnt = 0;
+    nrf_gnss_data_frame_t gps_data; //gps_data local for this function
 
-	printk("Staring GPS application\n");
-
-	// if (gps_init == false) {
-
-	// 	return -1;		
-	// }
-
-	if (init_app() != 0) {
-		//gps_init = true;
-		return -1;
-	}	
-
-
-	printk("Getting GPS data...\n");
-
-	while (1) {
+	if (gps_init == false) {
+		init_app();	//this function should be checked for upon initialization
+		gps_init = true;
+		printk("initialize gps en gang\n");
+	}
+	
+	while (1) {	//this while loops waits for ready gps data and breaks when ready
 
 		do {
 			/* Loop until we don't have more
 			 * data to read
 			 */
 		} while (process_gps_data(&gps_data) > 0);
+			got_first_fix = true;
 
-		// printk(".\n");
-        got_first_fix = true;
-		if (got_first_fix) {
-			//print_satellite_stats(&gps_data);
+			last_fix_dummy_data(&last_fix);
 
-		// 	printk("---------------------------------\n");
-			print_pvt_data(&last_fix);
-			// printk("\n");
-			// print_nmea_data();
-		// 	printk("---------------------------------\n");
-			break;
-		}
-
-		// printk("..\n");
-
+			if (got_first_fix) {
+				print_pvt_data(&last_fix);
+				break;
+			}
 	}
+	return 0;
 }
 
 static bool GPS_event_handler(const struct event_header *eh)    //function is called whenever the subscribed events is being processed
 {
+	int err;
 
 	if (is_measurement_event(eh)) {
 		struct measurement_event *event = cast_measurement_event(eh);
 
         switch (event->type) { //eh->type
             case GPS_REQ_DATA:
-                //printk("GPS_REQ_DATA EVENT triggered in the GPS module\n");
-                //connect, poll and print gps data. Dummy data for the time being
-                get_gps_data();
-                printk("kommer hit ja");
+                err = get_gps_data();
+				if (err != 0) {
+					printk("gps socket busy or unable to initialize");
+				}
                 break;
             default:
                 printk("RECIEVED UNKNOWN EVENT");

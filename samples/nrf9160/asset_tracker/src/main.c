@@ -11,10 +11,7 @@
 #include <string.h>
 #include <event_manager.h>
 #include <logging/log.h>
-#include <measurement_event.h>
-#include <gps_func.h>
-
-//#include <sensor_simulated.h>
+#include <measurement_event.h> //configuration file for event manager
 
 LOG_MODULE_REGISTER(MODULE);
 
@@ -61,19 +58,15 @@ static void buttons_leds_init(void)
 	#endif
 }
 
-void main(void)
+int main(void)
 {
+
 	printk("The application has started\n");
 	buttons_leds_init();
 	event_manager_init();
 
-	// if (init_app() != 0) {
-	// 	//gps_init = true;
-	// 	//return -1;
-	// 	printk("Failed to initilize gps");
-	// }	
-
-
-	//The following sections contains data used by the GPS module//
-
+	while(1) {
+		//this section needs to include some sort of power saving, we will get to that
+	}	
+	return 0;
 }
