@@ -31,9 +31,10 @@ static struct sockaddr_storage broker;
 /* Connected flag */
 static bool connected;
 
+static struct pollfd fds;
+
 LOG_MODULE_REGISTER(MODULE);
 
-#if defined(CONFIG_BSD_LIBRARY)
 void bsd_recoverable_error_handler(uint32_t err)
 {
 	printk("bsdlib recoverable error: %u\n", err);
@@ -46,7 +47,23 @@ void bsd_irrecoverable_error_handler(uint32_t err)
 
 	__ASSERT_NO_MSG(false);
 }
+
+static int fds_init(struct mqtt_client *c)
+{
+	if (c->transport.type == MQTT_TRANSPORT_NON_SECURE) {
+		fds.fd = c->transport.tcp.sock;
+	} else {
+#if defined(CONFIG_MQTT_LIB_TLS)
+		fds.fd = c->transport.tls.sock;
+#else
+		return -ENOTSUP;
 #endif
+	}
+
+	fds.events = POLLIN;
+
+	return 0;
+}
 
 static void data_print(u8_t *prefix, u8_t *data, size_t len)
 {
@@ -71,7 +88,7 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	param.message.payload.len = len;
 	param.message_id = sys_rand32_get();
 	param.dup_flag = 0;
-	param.retain_flag = 0;
+	param.retain_flag = 0; //Retain message by the broker
 
 	data_print("Publishing: ", data, len);
 	printk("to topic: %s len: %u\n",
@@ -92,10 +109,9 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			printk("MQTT connect failed %d\n", evt->result);
 			break;
 		}
-
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
-		//subscribe(); //nessecary to subscribe?
+		//subscribe(); //nessecary to subscribe if data is only to be sent one way
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -105,31 +121,8 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		connected = false;
 		break;
 
-	case MQTT_EVT_PUBLISH: 
-	//{
-	// 	const struct mqtt_publish_param *p = &evt->param.publish;
-
-	// 	printk("[%s:%d] MQTT PUBLISH result=%d len=%d\n", __func__,
-	// 	       __LINE__, evt->result, p->message.payload.len);
-	// 	err = publish_get_payload(c, p->message.payload.len);
-	// 	if (err >= 0) {
-	// 		data_print("Received: ", payload_buf,
-	// 			p->message.payload.len);
-	// 		/* Echo back received data */
-	// 		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-	// 			payload_buf, p->message.payload.len);
-	// 	} else {
-	// 		printk("mqtt_read_publish_payload: Failed! %d\n", err);
-	// 		printk("Disconnecting MQTT client...\n");
-
-	// 		err = mqtt_disconnect(c);
-	// 		if (err) {
-	// 			printk("Could not disconnect: %d\n", err);
-	// 		}
-	// 	}
-	// }
-
-	break;
+	// case MQTT_EVT_PUBLISH:
+	// 	break;
 
 	case MQTT_EVT_PUBACK:
 		if (evt->result != 0) {
@@ -141,15 +134,15 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 				evt->param.puback.message_id);
 		break;
 
-	case MQTT_EVT_SUBACK:
-		if (evt->result != 0) {
-			printk("MQTT SUBACK error %d\n", evt->result);
-			break;
-		}
+	// case MQTT_EVT_SUBACK:
+	// 	if (evt->result != 0) {
+	// 		printk("MQTT SUBACK error %d\n", evt->result);
+	// 		break;
+	// 	}
 
-		printk("[%s:%d] SUBACK packet id: %u\n", __func__, __LINE__,
-				evt->param.suback.message_id);
-		break;
+	// 	printk("[%s:%d] SUBACK packet id: %u\n", __func__, __LINE__,
+	// 			evt->param.suback.message_id);
+	// 	break;
 
 	default:
 		printk("[%s:%d] default: %d\n", __func__, __LINE__,
@@ -221,7 +214,7 @@ static void client_init(struct mqtt_client *client)
 {
 	mqtt_client_init(client);
 
-	broker_init();
+	broker_init(); //is it nessecary to initialize boker?
 
 	/* MQTT client configuration */
 	client->broker = &broker;
@@ -276,6 +269,17 @@ static void button_handler(u32_t button_state, u32_t has_changed)
 	if (button == DK_BTN1) {
 		printk("BUTTON 1 on the dk was pressed, GPS data requested\n");
 		generate_event();
+
+		// const struct mqtt_publish_param *p = &evt->param.publish;
+
+		// payload_buffer = "helloWorld";
+
+		// u8_t test_data = '$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40';
+		// size_t test_data_len = sizeof(test_data);
+		
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			payload_buf, p->message.payload.len);
+
 	}
 
 }
@@ -291,15 +295,15 @@ static void buttons_leds_init(void)
 			printk("Could not initialize buttons, err code: %d\n", err);
 		}
 
-		err = dk_leds_init();
-		if (err) {
-			printk("Could not initialize leds, err code: %d\n", err);
-		}
+		// err = dk_leds_init();
+		// if (err) {
+		// 	printk("Could not initialize leds, err code: %d\n", err);
+		// }
 
-		err = dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
-		if (err) {
-			printk("Could not set leds state, err code: %d\n", err);
-		}
+		// err = dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+		// if (err) {
+		// 	printk("Could not set leds state, err code: %d\n", err);
+		// }
 	#endif
 }
 
@@ -308,7 +312,7 @@ void main(void)
 
 	int err;
 
-	printk("The application has started\n");
+	printk("The phoenix tracker has started\n");
 	buttons_leds_init();
 	event_manager_init();
 	modem_configure();
@@ -319,17 +323,50 @@ void main(void)
 	if (err != 0) {
 		printk("ERROR: mqtt_connect %d\n", err);
 		return;
+	}
+
+	err = fds_init(&client);
+	if (err != 0) {
+		printk("ERROR: fds_init %d\n", err);
+		return;
+	}
+
+		while (1) {
+		err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+		if (err < 0) {
+			printk("ERROR: poll %d\n", errno);
+			break;
+		}
+
+		err = mqtt_live(&client);
+		if (err != 0) {
+			printk("ERROR: mqtt_live %d\n", err);
+			break;
+		}
+
+		if ((fds.revents & POLLIN) == POLLIN) {
+			err = mqtt_input(&client);
+			if (err != 0) {
+				printk("ERROR: mqtt_input %d\n", err);
+				break;
+			}
+		}
+
+		if ((fds.revents & POLLERR) == POLLERR) {
+			printk("POLLERR\n");
+			break;
+		}
+
+		if ((fds.revents & POLLNVAL) == POLLNVAL) {
+			printk("POLLNVAL\n");
+			break;
+		}
+	}
+
+	printk("Disconnecting MQTT client...\n");
+
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect MQTT client. Error: %d\n", err);
 	}	
-
-	// u8_t *test_data = 8;
-	// u8_t *test_length = sizeof(test_data);
-
-	// data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, test_data, test_length);
-
-	while(1) {
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, test_data, test_length);
-		//this section needs to include some sort of power saving, we will get to that
-		k_busy_wait(10000);
-	}	
-	//return 0;
 }
