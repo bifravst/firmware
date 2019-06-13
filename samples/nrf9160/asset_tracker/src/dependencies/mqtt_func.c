@@ -83,7 +83,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
-		//subscribe(); //nessecary to subscribe if data is only to be sent one way
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -92,9 +91,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 		connected = false;
 		break;
-
-	// case MQTT_EVT_PUBLISH:
-	// 	break;
 
 	case MQTT_EVT_PUBACK:
 		if (evt->result != 0) {
@@ -105,16 +101,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		printk("[%s:%d] PUBACK packet id: %u\n", __func__, __LINE__,
 				evt->param.puback.message_id);
 		break;
-
-	// case MQTT_EVT_SUBACK:
-	// 	if (evt->result != 0) {
-	// 		printk("MQTT SUBACK error %d\n", evt->result);
-	// 		break;
-	// 	}
-
-	// 	printk("[%s:%d] SUBACK packet id: %u\n", __func__, __LINE__,
-	// 			evt->param.suback.message_id);
-	// 	break;
 
 	default:
 		printk("[%s:%d] default: %d\n", __func__, __LINE__,
@@ -205,4 +191,69 @@ void client_init(struct mqtt_client *client)
 
 	/* MQTT transport configuration */
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
+}
+
+void mqtt_enable() {
+	client_init(&client);
+
+    int err;
+
+	err = mqtt_connect(&client);
+	if (err != 0) {
+		printk("ERROR: mqtt_connect %d\n", err);
+		return;
+	}
+
+	err = fds_init(&client);
+	if (err != 0) {
+		printk("ERROR: fds_init %d\n", err);
+		return;
+	}
+
+		while (1) {
+		err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+		if (err < 0) {
+			printk("ERROR: poll %d\n", errno);
+			break;
+		}
+
+		err = mqtt_live(&client);
+		if (err != 0) {
+			printk("ERROR: mqtt_live %d\n", err);
+			break;
+		}
+
+		if ((fds.revents & POLLIN) == POLLIN) {
+			err = mqtt_input(&client);
+			if (err != 0) {
+				printk("ERROR: mqtt_input %d\n", err);
+				break;
+			}
+		}
+
+		if ((fds.revents & POLLERR) == POLLERR) {
+			printk("POLLERR\n");
+			break;
+		}
+
+		if ((fds.revents & POLLNVAL) == POLLNVAL) {
+			printk("POLLNVAL\n");
+			break;
+		}
+	}
+
+	printk("Disconnecting MQTT client...\n");
+
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect MQTT client. Error: %d\n", err);
+	}	
+}
+
+void publish_gps_data() {
+    u8_t test_data = 'a';
+    size_t test_data_len = sizeof(test_data);
+
+    data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+        &test_data, test_data_len);
 }

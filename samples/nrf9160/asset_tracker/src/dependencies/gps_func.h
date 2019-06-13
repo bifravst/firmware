@@ -6,10 +6,6 @@
 #include <nrf_socket.h>
 #include <net/socket.h>
 
-//gps header file for help functions
-
-
-
 int enable_gps(void);
 
 int init_app(void);
