@@ -7,7 +7,7 @@
 // /* Buffers for MQTT client. */
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-// //static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
+//static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 
 // /* The mqtt client struct */
 static struct mqtt_client client;
@@ -251,9 +251,13 @@ void mqtt_enable() {
 }
 
 void publish_gps_data() {
-    u8_t test_data = 'a';
-    size_t test_data_len = sizeof(test_data);
+    // u8_t test_data = 'a';
+    // size_t test_data_len = sizeof(test_data);
+
+	static char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
+	size_t test_data_len = sizeof(gps_dummy_string);
+	u8_t *test_data = gps_dummy_string;
 
     data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-        &test_data, test_data_len);
+        test_data, test_data_len);
 }
