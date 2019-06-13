@@ -198,19 +198,30 @@ int process_gps_data(nrf_gnss_data_frame_t *gps_data)
 	return retval;
 }
 
-static void last_fix_dummy_data(nrf_gnss_data_frame_t *pvt_data) {
-	pvt_data->pvt.longitude = 1.123456;
-	pvt_data->pvt.latitude = 1.123456;
-	pvt_data->pvt.altitude = 1.123456;
-	pvt_data->pvt.speed = 1.123456;
-	pvt_data->pvt.heading = 1.123456;
-	// pvt_data->pvt.datetime.month;
-	// pvt_data->pvt.datetime.year;
-	// pvt_data->pvt.datetime.minute;
-	// pvt_data->pvt.datetime.seconds;
+void print_nmea_data(void)
+{
+	printk("NMEA strings:\n");
+
+	for (int i = 0; i < nmea_string_cnt; ++i) {
+		printk("%s\n", nmea_strings[i]);
+	}
 }
 
-int get_gps_data(void)
+// static void last_fix_dummy_data(nrf_gnss_data_frame_t *pvt_data) {	//comment out for use of gps
+// 	pvt_data->pvt.longitude = 1.123456;
+// 	pvt_data->pvt.latitude = 1.123456;
+// 	pvt_data->pvt.altitude = 1.123456;
+// 	pvt_data->pvt.speed = 1.123456;
+// 	pvt_data->pvt.heading = 1.123456;
+// 	// pvt_data->pvt.datetime.month;
+// 	// pvt_data->pvt.datetime.year;
+// 	// pvt_data->pvt.datetime.minute;
+// 	// pvt_data->pvt.datetime.seconds;
+// }
+
+char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
+
+void get_gps_data(void)
 {
     nrf_gnss_data_frame_t gps_data; //gps_data local for this function
 
@@ -220,21 +231,27 @@ int get_gps_data(void)
 		printk("initialize gps en gang\n");
 	}
 	
-	while (1) {	//this while loops waits for ready gps data and breaks when ready
+	while (1) {	//this while loops waits for ready gps data and breaks when ready, nested loop nessecary?
 
 		do {
 			/* Loop until we don't have more
 			 * data to read
 			 */
 		} while (process_gps_data(&gps_data) > 0);
-			got_first_fix = true;
+			got_first_fix = true; //comment out for use of gps
 
-			last_fix_dummy_data(&last_fix);
+			printk("Got gps fix\n");
 
-			if (got_first_fix) {
-				print_pvt_data(&last_fix);
+			if (((k_uptime_get() - fix_timestamp) >= 1) &&
+		     (got_first_fix)) {
+
+				memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); //nmea_strings contains the gps string
+
+				//printk("%s\n", nmea_strings);
+
 				break;
 			}
+			k_sleep(K_MSEC(500));
 	}
-	return 0;
+	//return 0;
 }

@@ -55,8 +55,8 @@ static void button_handler(u32_t button_state, u32_t has_changed)
 
 	if (button == DK_BTN1) {
 		printk("BUTTON PRESSED\n");
-		get_gps_data();
-		//publish_gps_data();
+		//get_gps_data();
+		publish_gps_data();
 
 	}
 
