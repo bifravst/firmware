@@ -32,6 +32,8 @@ static bool           update_terminal;
 static u64_t          fix_timestamp;
 static nrf_gnss_data_frame_t last_fix;
 
+char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40"; //comment out for real data
+
 int enable_gps(void)
 {
 	int  at_sock;
@@ -207,51 +209,34 @@ void print_nmea_data(void)
 	}
 }
 
-// static void last_fix_dummy_data(nrf_gnss_data_frame_t *pvt_data) {	//comment out for use of gps
-// 	pvt_data->pvt.longitude = 1.123456;
-// 	pvt_data->pvt.latitude = 1.123456;
-// 	pvt_data->pvt.altitude = 1.123456;
-// 	pvt_data->pvt.speed = 1.123456;
-// 	pvt_data->pvt.heading = 1.123456;
-// 	// pvt_data->pvt.datetime.month;
-// 	// pvt_data->pvt.datetime.year;
-// 	// pvt_data->pvt.datetime.minute;
-// 	// pvt_data->pvt.datetime.seconds;
-// }
-
-char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
-
-void get_gps_data(void)
+u8_t *get_gps_data(void)
 {
-    nrf_gnss_data_frame_t gps_data; //gps_data local for this function
+    nrf_gnss_data_frame_t gps_data;
 
 	if (gps_init == false) {
-		init_app();	//this function should be checked for upon initialization
+		init_app();
 		gps_init = true;
 		printk("initialize gps en gang\n");
 	}
 	
-	while (1) {	//this while loops waits for ready gps data and breaks when ready, nested loop nessecary?
+	while (1) {
 
 		do {
 			/* Loop until we don't have more
 			 * data to read
 			 */
 		} while (process_gps_data(&gps_data) > 0);
-			got_first_fix = true; //comment out for use of gps
+			//got_first_fix = true; //comment out for use of gps data
 
 			printk("Got gps fix\n");
 
 			if (((k_uptime_get() - fix_timestamp) >= 1) &&
 		     (got_first_fix)) {
 
-				memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); //nmea_strings contains the gps string
+				//memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); comment out for use of gps data
 
-				//printk("%s\n", nmea_strings);
-
-				break;
+				return nmea_strings[10];
 			}
 			k_sleep(K_MSEC(500));
 	}
-	//return 0;
 }
