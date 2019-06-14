@@ -55,11 +55,10 @@ static void button_handler(u32_t button_state, u32_t has_changed)
 
 	if (button == DK_BTN1) {
 		printk("BUTTON PRESSED\n");
-		//get_gps_data();
-		publish_gps_data();
-
+		// get_gps_data();
+		//"$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40"
+		publish_gps_data(get_gps_data());
 	}
-
 }
 
 
