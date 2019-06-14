@@ -226,14 +226,14 @@ u8_t *get_gps_data(void)
 			 * data to read
 			 */
 		} while (process_gps_data(&gps_data) > 0);
-			//got_first_fix = true; //comment out for use of gps data
+			got_first_fix = true; //comment out for use of gps data
 
 			printk("Got gps fix\n");
 
 			if (((k_uptime_get() - fix_timestamp) >= 1) &&
 		     (got_first_fix)) {
 
-				//memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); comment out for use of gps data
+				memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); //comment out for use of gps data
 
 				return nmea_strings[10];
 			}
