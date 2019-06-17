@@ -34,13 +34,12 @@ static void modem_configure(void)
 		printk("LTE Link Connected!\n");
 	}
 
-	//remember to set spm
+	//remember to set spm and the desired settings in config file
 
 }
 #endif
 
 #if defined(CONFIG_DK_LIBRARY)
-
 static void leds_init(void)
 {
 	int err;
@@ -55,7 +54,6 @@ static void leds_init(void)
 		printk("Could not set leds state, err code: %d\n", err);
 	}
 }
-#endif
 
 static void led_notification(void)
 {
@@ -63,41 +61,26 @@ static void led_notification(void)
 	k_sleep(100);
 	dk_set_led_off(DK_BTN1);
 }
+#endif
 
-static void my_work_handler(struct k_work *work)
-{
-	publish_gps_data(ptr_gps_head_stream, gps_data_len);
-	led_notification();
-	printk("1 second timer");
-}
 
-K_WORK_DEFINE(my_work, my_work_handler);
-
-static void my_timer_handler(struct k_timer *dummy)
-{
-	k_work_submit(&my_work);
-}
-
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 void main(void)
 {
-	//int err;
-
 	printk("The phoenix tracker has started\n");
 	leds_init();
 
+	//int err;
 	// err = gps_init();
 	// if (!err) {
 	// 	printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
 	// }
 
 	modem_configure();
-	//mqtt_enable();
-	//k_timer_init();
-	k_timer_start(&my_timer, K_SECONDS(30), K_SECONDS(30));
 
-	// while(1) {
-	// 	k_cpu_idle();
-	// }
+	while (1) {
+		publish_gps_data(ptr_gps_head_stream, gps_data_len);
+		led_notification();
+		k_sleep(10000);
+	}
 }

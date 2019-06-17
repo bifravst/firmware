@@ -4,6 +4,9 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
+
+#define APP_SLEEP 500
+
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 
@@ -14,6 +17,8 @@ static struct sockaddr_storage broker;
 static struct pollfd fds;
 
 static bool connected;
+
+static int nfds;
 
 void data_print(u8_t *prefix, u8_t *data, size_t len)
 {
@@ -56,6 +61,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			printk("MQTT connect failed %d\n", evt->result);
 			break;
 		}
+		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 		break;
 
@@ -63,6 +69,8 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		printk("[%s:%d] MQTT client disconnected %d\n", __func__,
 		       __LINE__, evt->result);
 
+		connected = false;
+		clear_fds();
 		break;
 
 	case MQTT_EVT_PUBACK:
@@ -155,37 +163,108 @@ void client_init(struct mqtt_client *client)
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 }
 
-void mqtt_enable(void) {
-	client_init(&client);
+void clear_fds(void)
+{
+	nfds = 0;
+}
+
+void wait(int timeout)
+{
+	if (nfds > 0) {
+		if (poll(&fds, nfds, timeout) < 0) {
+			printk("poll error: %d\n", errno);
+		}
+	}
+}
+
+int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
+{
+	s64_t remaining = timeout;
+	s64_t start_time = k_uptime_get();
+	int err;
+
+	while (remaining > 0 && connected) {
+		wait(remaining);
+
+		err = mqtt_live(client);
+		if (err != 0) {
+			printk("mqtt_live error\n");
+			return err;
+		}
+
+		err = mqtt_input(client);
+		if (err != 0) {
+			printk("mqtt_input error\n");
+			return err;
+		}
+
+		remaining = timeout + start_time - k_uptime_get();
+	}
+
+	return 0;
+}
+
+int mqtt_enable(struct mqtt_client *client) {
+
+	int err;
+
+	while(!connected) {
+		client_init(client);
+		
+		err = mqtt_connect(client);
+		if (err != 0) {
+			printk("ERROR: mqtt_connect %d\n", err);
+			return err;
+		}
+
+		fds.fd = client->transport.tcp.sock;
+		fds.events = ZSOCK_POLLIN;
+		nfds = 1;
+
+		wait(APP_SLEEP);
+		mqtt_input(client);
+
+		if (!connected) {
+			mqtt_abort(client);
+		}	
+	}
+
+	if (connected) {
+		return 0;
+	}
+
+	return 0;
 }
 
 void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
-
 	int err;
-	
-	err = mqtt_connect(&client);
-	if (err != 0) {
-		printk("ERROR: mqtt_connect %d\n", err);
-		return;
+
+	err = mqtt_enable(&client);
+	if (err) {
+		printk("Could not connect to client\n");
 	}
 
-	fds.fd = client.transport.tcp.sock;
-	fds.events = ZSOCK_POLLIN;
-	poll(&fds, 1, K_SECONDS(15));
-
-	mqtt_input(&client);
-
-	if (!connected) {
-		mqtt_abort(&client);
-		printk("Mqtt connection aborted\n");
+	err = mqtt_ping(&client);
+	if (err) {
+		printk("Could not ping server\n");
 	}
 
     data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
         gps_publish_data_stream_head, gps_data_len);
 
-	err = mqtt_disconnect(&client);
+	err = process_mqtt_and_sleep(&client, APP_SLEEP);
 	if (err) {
-		printk("Could not disconnect MQTT client. Error: %d\n", err);
+		printk("mqtt processing failed\n");
 	}
 
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect\n");
+	}
+
+	wait(APP_SLEEP);
+	err = mqtt_input(&client);
+	if (err) {
+		printk("Could not input data\n");
+	}
 }
