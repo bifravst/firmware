@@ -34,6 +34,7 @@ static void modem_configure(void)
 		printk("LTE Link Connected!\n");
 	}
 
+	//lte_lc_psm_req(true);
 	//remember to set spm and the desired settings in config file
 
 }
