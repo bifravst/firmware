@@ -220,6 +220,8 @@ u8_t *get_gps_data(void)
 			if (((k_uptime_get() - fix_timestamp) >= 1) &&
 		     (got_first_fix)) {
 
+				 printk("Got gps fix\n");
+
 				return nmea_strings[10];
 			}
 			k_sleep(K_MSEC(500)); //nessecary to sleep here?
