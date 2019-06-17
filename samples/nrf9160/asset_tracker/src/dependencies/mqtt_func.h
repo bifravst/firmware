@@ -19,7 +19,13 @@ void broker_init(void);
 
 void client_init(struct mqtt_client *client);
 
-void mqtt_enable();
+int mqtt_enable(struct mqtt_client *client);
+
+void clear_fds();
+
+void wait();
+
+int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
 void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len);
 
