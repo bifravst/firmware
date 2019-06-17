@@ -21,6 +21,6 @@ void client_init(struct mqtt_client *client);
 
 void mqtt_enable();
 
-void publish_gps_data(u8_t *gps_publish_data_stream_head);
+void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len);
 
 #endif

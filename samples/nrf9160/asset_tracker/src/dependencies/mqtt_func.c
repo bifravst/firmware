@@ -4,37 +4,16 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
-// /* Buffers for MQTT client. */
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 
-// /* The mqtt client struct */
 static struct mqtt_client client;
 
-// /* MQTT Broker details. */
 static struct sockaddr_storage broker;
-
-// /* Connected flag */
-static bool connected;
 
 static struct pollfd fds;
 
-int fds_init(struct mqtt_client *c)
-{
-	if (c->transport.type == MQTT_TRANSPORT_NON_SECURE) {
-		fds.fd = c->transport.tcp.sock;
-	} else {
-#if defined(CONFIG_MQTT_LIB_TLS)
-		fds.fd = c->transport.tls.sock;
-#else
-		return -ENOTSUP;
-#endif
-	}
-
-	fds.events = POLLIN;
-
-	return 0;
-}
+static bool connected;
 
 void data_print(u8_t *prefix, u8_t *data, size_t len)
 {
@@ -45,8 +24,6 @@ void data_print(u8_t *prefix, u8_t *data, size_t len)
 	printk("%s%s\n", prefix, buf);
 }
 
-/**@brief Function to publish data on the configured topic
- */
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	u8_t *data, size_t len)
 {
@@ -55,11 +32,11 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	param.message.topic.qos = qos;
 	param.message.topic.topic.utf8 = CONFIG_MQTT_PUB_TOPIC;
 	param.message.topic.topic.size = strlen(CONFIG_MQTT_PUB_TOPIC);
-	param.message.payload.data = data; //possible entry point for data written to broker
+	param.message.payload.data = data;
 	param.message.payload.len = len;
 	param.message_id = sys_rand32_get();
 	param.dup_flag = 0;
-	param.retain_flag = 0; //Retain message by the broker
+	param.retain_flag = 0; //Retain message by the broker, needs to be set eventually
 
 	data_print("Publishing: ", data, len);
 	printk("to topic: %s len: %u\n",
@@ -72,7 +49,6 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 void mqtt_evt_handler(struct mqtt_client *const c,
 		      const struct mqtt_evt *evt)
 {
-	//int err;
 
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
@@ -80,7 +56,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			printk("MQTT connect failed %d\n", evt->result);
 			break;
 		}
-		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 		break;
 
@@ -88,7 +63,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		printk("[%s:%d] MQTT client disconnected %d\n", __func__,
 		       __LINE__, evt->result);
 
-		connected = false;
 		break;
 
 	case MQTT_EVT_PUBACK:
@@ -108,9 +82,6 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 	}
 }
 
-/**@brief Resolves the configured hostname and
- * initializes the MQTT broker structure
- */
 void broker_init(void)
 {
 	int err;
@@ -161,19 +132,15 @@ void broker_init(void)
 		break;
 	}
 
-	/* Free the address. */
 	freeaddrinfo(result);
 }
 
-/**@brief Initialize the MQTT client structure
- */
 void client_init(struct mqtt_client *client)
 {
 	mqtt_client_init(client);
 
-	broker_init(); //is it nessecary to initialize boker?
+	broker_init();
 
-	/* MQTT client configuration */
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
 	client->client_id.utf8 = (u8_t *)CONFIG_MQTT_CLIENT_ID;
@@ -181,75 +148,44 @@ void client_init(struct mqtt_client *client)
 	client->password = NULL;
 	client->user_name = NULL;
 	client->protocol_version = MQTT_VERSION_3_1_1;
-
-	/* MQTT buffers configuration */
 	client->rx_buf = rx_buffer;
 	client->rx_buf_size = sizeof(rx_buffer);
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
-
-	/* MQTT transport configuration */
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 }
 
-void mqtt_enable() {
+void mqtt_enable(void) {
 	client_init(&client);
+}
 
-    int err;
+void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 
+	int err;
+	
 	err = mqtt_connect(&client);
 	if (err != 0) {
 		printk("ERROR: mqtt_connect %d\n", err);
 		return;
 	}
 
-	err = fds_init(&client);
-	if (err != 0) {
-		printk("ERROR: fds_init %d\n", err);
-		return;
+	fds.fd = client.transport.tcp.sock;
+	fds.events = ZSOCK_POLLIN;
+	poll(&fds, 1, K_SECONDS(15));
+
+	mqtt_input(&client);
+
+	if (!connected) {
+		mqtt_abort(&client);
+		printk("Mqtt connection aborted\n");
 	}
 
-		while (1) {
-		err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
-		if (err < 0) {
-			printk("ERROR: poll %d\n", errno);
-			break;
-		}
-
-		err = mqtt_live(&client);
-		if (err != 0) {
-			printk("ERROR: mqtt_live %d\n", err);
-			break;
-		}
-
-		if ((fds.revents & POLLIN) == POLLIN) {
-			err = mqtt_input(&client);
-			if (err != 0) {
-				printk("ERROR: mqtt_input %d\n", err);
-				break;
-			}
-		}
-
-		if ((fds.revents & POLLERR) == POLLERR) {
-			printk("POLLERR\n");
-			break;
-		}
-
-		if ((fds.revents & POLLNVAL) == POLLNVAL) {
-			printk("POLLNVAL\n");
-			break;
-		}
-	}
-
-	printk("Disconnecting MQTT client...\n");
+    data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+        gps_publish_data_stream_head, gps_data_len);
 
 	err = mqtt_disconnect(&client);
 	if (err) {
 		printk("Could not disconnect MQTT client. Error: %d\n", err);
-	}	
-}
+	}
 
-void publish_gps_data(u8_t *gps_publish_data_stream_head) {
-    data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-        gps_publish_data_stream_head, 90);
 }

@@ -14,6 +14,10 @@
 #include <mqtt_func.h>
 #include <gps_func.h>
 
+static char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
+static size_t gps_data_len = sizeof(gps_dummy_string);
+static u8_t *ptr_gps_head_stream = gps_dummy_string;
+
 #if defined(CONFIG_LTE_LINK_CONTROL)
 static void modem_configure(void)
 {
@@ -30,46 +34,16 @@ static void modem_configure(void)
 		printk("LTE Link Connected!\n");
 	}
 
-}
-#endif
+	//remember to set spm
 
-#if defined(CONFIG_BSD_LIBRARY)
-void bsd_recoverable_error_handler(uint32_t err)
-{
-	printk("bsdlib recoverable error: %u\n", err);
-}
-
-/**@brief Irrecoverable BSD library error. */
-void bsd_irrecoverable_error_handler(uint32_t err)
-{
-	printk("bsdlib irrecoverable error: %u\n", err);
-
-	__ASSERT_NO_MSG(false);
 }
 #endif
 
 #if defined(CONFIG_DK_LIBRARY)
-static void button_handler(u32_t button_state, u32_t has_changed)
-{
-	uint32_t button = button_state & has_changed;
 
-	if (button == DK_BTN1) {
-		printk("BUTTON PRESSED\n");
-		// get_gps_data();
-		//"$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40"
-		publish_gps_data(get_gps_data());
-	}
-}
-
-
-static void buttons_leds_init(void)
+static void leds_init(void)
 {
 	int err;
-
-	err = dk_buttons_init(button_handler);
-	if (err) {
-		printk("Could not initialize buttons, err code: %d\n", err);
-	}
 
 	err = dk_leds_init();
 	if (err) {
@@ -83,12 +57,47 @@ static void buttons_leds_init(void)
 }
 #endif
 
+static void led_notification(void)
+{
+	dk_set_led_on(DK_BTN1);
+	k_sleep(100);
+	dk_set_led_off(DK_BTN1);
+}
+
+static void my_work_handler(struct k_work *work)
+{
+	publish_gps_data(ptr_gps_head_stream, gps_data_len);
+	led_notification();
+	printk("1 second timer");
+}
+
+K_WORK_DEFINE(my_work, my_work_handler);
+
+static void my_timer_handler(struct k_timer *dummy)
+{
+	k_work_submit(&my_work);
+}
+
+K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
+
 void main(void)
 {
+	//int err;
 
 	printk("The phoenix tracker has started\n");
-	buttons_leds_init();
-	modem_configure();
-	mqtt_enable();
+	leds_init();
 
+	// err = gps_init();
+	// if (!err) {
+	// 	printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
+	// }
+
+	modem_configure();
+	//mqtt_enable();
+	//k_timer_init();
+	k_timer_start(&my_timer, K_SECONDS(30), K_SECONDS(30));
+
+	// while(1) {
+	// 	k_cpu_idle();
+	// }
 }

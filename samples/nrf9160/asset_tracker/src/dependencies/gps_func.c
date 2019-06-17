@@ -22,8 +22,6 @@ static const char     at_commands[][31]  = {
 
 static int            fd;
 
-static int gps_init = false;
-
 static char           nmea_strings[10][NRF_GNSS_NMEA_MAX_LEN];
 static u32_t          nmea_string_cnt;
 
@@ -31,8 +29,6 @@ static bool           got_first_fix;
 static bool           update_terminal;
 static u64_t          fix_timestamp;
 static nrf_gnss_data_frame_t last_fix;
-
-char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40"; //comment out for real data
 
 int enable_gps(void)
 {
@@ -70,7 +66,7 @@ int enable_gps(void)
 	return 0;
 }
 
-int init_app(void)
+int gps_init(void)
 {
 	u16_t fix_retry     = 0;
 	u16_t fix_interval  = 1;
@@ -211,32 +207,21 @@ void print_nmea_data(void)
 
 u8_t *get_gps_data(void)
 {
-    nrf_gnss_data_frame_t gps_data;
+    nrf_gnss_data_frame_t gps_data; //this could be moved further up in the module
 
-	if (gps_init == false) {
-		init_app();
-		gps_init = true;
-		printk("initialize gps en gang\n");
-	}
-	
-	while (1) {
+	while (1) { //this while is pointless
 
 		do {
 			/* Loop until we don't have more
 			 * data to read
 			 */
 		} while (process_gps_data(&gps_data) > 0);
-			got_first_fix = true; //comment out for use of gps data
-
-			printk("Got gps fix\n");
 
 			if (((k_uptime_get() - fix_timestamp) >= 1) &&
 		     (got_first_fix)) {
 
-				memcpy(nmea_strings, gps_dummy_string, sizeof(gps_dummy_string)); //comment out for use of gps data
-
 				return nmea_strings[10];
 			}
-			k_sleep(K_MSEC(500));
+			k_sleep(K_MSEC(500)); //nessecary to sleep here?
 	}
 }
