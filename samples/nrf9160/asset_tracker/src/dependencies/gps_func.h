@@ -8,7 +8,7 @@
 
 int enable_gps(void);
 
-int init_app(void);
+int gps_init(void);
 
 void print_pvt_data(nrf_gnss_data_frame_t *pvt_data);
 
