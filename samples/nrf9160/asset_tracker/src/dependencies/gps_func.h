@@ -16,6 +16,6 @@ int process_gps_data(nrf_gnss_data_frame_t *gps_data);
 
 void print_nmea_data(void);
 
-u8_t *get_gps_data(void);
+void get_gps_data(void);
 
 #endif

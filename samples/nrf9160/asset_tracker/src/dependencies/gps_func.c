@@ -12,6 +12,8 @@
 #define AT_MAGPIO      "AT\%XMAGPIO=1,0,0,1,1,1574,1577"
 #endif
 
+static const char     update_indicator[] = {'\\', '|', '/', '-'};
+
 static const char     at_commands[][31]  = {
 				AT_XSYSTEMMODE,
 #ifdef CONFIG_BOARD_NRF9160_PCA10090NS
@@ -138,6 +140,39 @@ int gps_init(void)
 	return 0;
 }
 
+static void print_satellite_stats(nrf_gnss_data_frame_t *pvt_data)
+{
+	u8_t  tracked          = 0;
+	u8_t  in_fix           = 0;
+	u8_t  unhealthy        = 0;
+
+	for (int i = 0; i < NRF_GNSS_MAX_SATELLITES; ++i) {
+
+		if ((pvt_data->pvt.sv[i].sv > 0) &&
+		    (pvt_data->pvt.sv[i].sv < 33)) {
+
+			tracked++;
+
+			if (pvt_data->pvt.sv[i].flags &
+					NRF_GNSS_PVT_FLAG_FIX_VALID_BIT) {
+				in_fix++;
+			}
+
+			if (pvt_data->pvt.sv[i].flags &
+					NRF_GNSS_SV_FLAG_UNHEALTHY) {
+				unhealthy++;
+			}
+		}
+	}
+
+	printk("Tracking: %d Using: %d Unhealthy: %d", tracked,
+						       in_fix,
+						       unhealthy);
+
+	printk("\nSeconds since last fix %lld\n",
+			(k_uptime_get() - fix_timestamp) / 1000);
+}
+
 void print_pvt_data(nrf_gnss_data_frame_t *pvt_data)
 {
 	printf("Longitude:  %f\n", pvt_data->pvt.longitude);
@@ -205,11 +240,12 @@ void print_nmea_data(void)
 	}
 }
 
-u8_t *get_gps_data(void)
+void get_gps_data(void)
 {
     nrf_gnss_data_frame_t gps_data; //this could be moved further up in the module
+	u8_t		      cnt = 0;
 
-	while (1) { //this while is pointless
+	while (1) {
 
 		do {
 			/* Loop until we don't have more
@@ -217,13 +253,31 @@ u8_t *get_gps_data(void)
 			 */
 		} while (process_gps_data(&gps_data) > 0);
 
-			if (((k_uptime_get() - fix_timestamp) >= 1) &&
+		if (!got_first_fix) {
+			cnt++;
+			printk("\033[1;1H");
+			printk("\033[2J");
+			print_satellite_stats(&gps_data);
+			printk("\nScanning [%c] ",
+					update_indicator[cnt%4]);
+		}
+
+		if (((k_uptime_get() - fix_timestamp) >= 1) &&
 		     (got_first_fix)) {
+			printk("\033[1;1H");
+			printk("\033[2J");
 
-				 printk("Got gps fix\n");
+			print_satellite_stats(&gps_data);
 
-				return nmea_strings[10];
-			}
-			k_sleep(K_MSEC(500)); //nessecary to sleep here?
+			printk("---------------------------------\n");
+			print_pvt_data(&last_fix);
+			printk("\n");
+			print_nmea_data();
+			printk("---------------------------------");
+			break;
+			update_terminal = false;
+		}
+
+		k_sleep(K_MSEC(500));
 	}
 }

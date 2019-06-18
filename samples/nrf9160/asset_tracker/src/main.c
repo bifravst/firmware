@@ -15,9 +15,18 @@
 #include <gps_func.h>
 #include <batstat.h>
 
+#define PUBLISH_INTERVAL 30000
+
 static char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
 static size_t gps_data_len = sizeof(gps_dummy_string);
 static u8_t *ptr_gps_head_stream = gps_dummy_string;
+
+// static struct mqtt_data_type {
+// 	nrf_gnss_data_frame_t	gps_fix;
+// 	int						battery_percentage;
+// };
+
+// static struct mqtt_data_type mqtt_gps_bat_data;
 
 #if defined(CONFIG_LTE_LINK_CONTROL)
 static void modem_configure(void)
@@ -67,24 +76,26 @@ static void led_notification(void)
 
 void main(void)
 {
+	int err;
+
 	printk("The phoenix tracker has started\n");
 	leds_init();
 	modem_configure();
 	
-	// err = gps_init();
-	// if (!err) {
-	// 	printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
-	// }
+	err = gps_init();
+	if (err != 0) {
+		printk("gps could not be initialized\n");
+	}
 
 	while (1) {
 
-		// printk("%s\n", request_battery_status());
+		//get_gps_data();
 
-		request_battery_status();
+		//request_battery_status();
 
 		publish_gps_data(ptr_gps_head_stream, gps_data_len);
 
 		led_notification();
-		k_sleep(5000);
+		k_sleep(PUBLISH_INTERVAL);
 	}
 }
