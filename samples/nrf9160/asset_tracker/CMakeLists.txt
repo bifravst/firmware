@@ -18,7 +18,7 @@ target_sources(app PRIVATE src/dependencies/mqtt_func.c)
 
 target_sources(app PRIVATE src/dependencies/accelerometer.c)
 
-target_sources(app PRIVATE src/dependencies/battery.c)
+target_sources(app PRIVATE src/dependencies/batstat.c)
 
 # NORDIC SDK APP END
 

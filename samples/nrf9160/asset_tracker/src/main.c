@@ -13,7 +13,7 @@
 #include <misc/reboot.h>
 #include <mqtt_func.h>
 #include <gps_func.h>
-#include <battery.h>
+#include <batstat.h>
 
 static char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
 static size_t gps_data_len = sizeof(gps_dummy_string);
@@ -67,22 +67,21 @@ static void led_notification(void)
 
 void main(void)
 {
-	int err;
-	u8_t ptr_temp_gps;
-
 	printk("The phoenix tracker has started\n");
 	leds_init();
 	modem_configure();
-
+	
 	// err = gps_init();
 	// if (!err) {
 	// 	printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
 	// }
 
-	//ptr _temp _gps = get_gps_data();
-
 	while (1) {
+		
+		request_battery_status();
+
 		publish_gps_data(ptr_gps_head_stream, gps_data_len);
+
 		led_notification();
 		k_sleep(10000);
 	}
