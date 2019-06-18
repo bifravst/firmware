@@ -6,6 +6,7 @@
 
 
 #define APP_SLEEP 500
+#define APP_CONNECT_TRIES 10
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -206,15 +207,16 @@ int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
 
 int mqtt_enable(struct mqtt_client *client) {
 
-	int err;
+	int err, i = 0;
 
-	while(!connected) {
+	while (i++ < APP_CONNECT_TRIES && !connected) {
 		client_init(client);
 		
 		err = mqtt_connect(client);
 		if (err != 0) {
 			printk("ERROR: mqtt_connect %d\n", err);
-			return err;
+			k_sleep(APP_SLEEP);
+			continue;
 		}
 
 		fds.fd = client->transport.tcp.sock;
