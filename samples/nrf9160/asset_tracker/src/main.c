@@ -74,10 +74,10 @@ void main(void)
 	leds_init();
 	modem_configure();
 
-	err = gps_init();
-	if (!err) {
-		printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
-	}
+	// err = gps_init();
+	// if (!err) {
+	// 	printk("gps could not be initialized"); //	if (init_app() != 0) { return -1; } //should prolly reboot in case
+	// }
 
 	//ptr _temp _gps = get_gps_data();
 
