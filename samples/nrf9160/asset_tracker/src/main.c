@@ -77,12 +77,14 @@ void main(void)
 	// }
 
 	while (1) {
-		
+
+		// printk("%s\n", request_battery_status());
+
 		request_battery_status();
 
 		publish_gps_data(ptr_gps_head_stream, gps_data_len);
 
 		led_notification();
-		k_sleep(10000);
+		k_sleep(5000);
 	}
 }
