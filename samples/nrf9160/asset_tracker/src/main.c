@@ -15,18 +15,9 @@
 #include <gps_func.h>
 #include <batstat.h>
 
-#define PUBLISH_INTERVAL 30000
+#define PUBLISH_INTERVAL 5000
 
-static char gps_dummy_string[] = "$GPGGA,181908.00,3404.7041778,N,07044.3966270,W,4,13,1.00,495.144,M,29.200,M,0.10,0000*40";
-static size_t gps_data_len = sizeof(gps_dummy_string);
-static u8_t *ptr_gps_head_stream = gps_dummy_string;
-
-// static struct mqtt_data_type {
-// 	nrf_gnss_data_frame_t	gps_fix;
-// 	int						battery_percentage;
-// };
-
-// static struct mqtt_data_type mqtt_gps_bat_data;
+static char gps_dummy_string[] = "\0";
 
 #if defined(CONFIG_LTE_LINK_CONTROL)
 static void modem_configure(void)
@@ -44,8 +35,7 @@ static void modem_configure(void)
 		printk("LTE Link Connected!\n");
 	}
 
-	//lte_lc_psm_req(true);
-	//remember to set spm and the desired settings in config file
+	lte_lc_psm_req(true);
 
 }
 #endif
@@ -77,25 +67,28 @@ static void led_notification(void)
 void main(void)
 {
 	int err;
-
 	printk("The phoenix tracker has started\n");
 	leds_init();
 	modem_configure();
-	
-	err = gps_init();
-	if (err != 0) {
-		printk("gps could not be initialized\n");
-	}
+	gps_init();
 
 	while (1) {
+		
+		request_battery_status(gps_dummy_string);
 
-		//get_gps_data();
+		err = get_gps_data(gps_dummy_string);
+		if (err) {
+			printk("failed getting gps data\n");
+		}
 
-		//request_battery_status();
+		//publish_gps_data(gps_dummy_string, sizeof(gps_dummy_string));
 
-		publish_gps_data(ptr_gps_head_stream, gps_data_len);
+		printk("printed gps string: %s\n", gps_dummy_string);
+
+		memset(gps_dummy_string,0,strlen(gps_dummy_string));
 
 		led_notification();
 		k_sleep(PUBLISH_INTERVAL);
+		break;
 	}
 }
