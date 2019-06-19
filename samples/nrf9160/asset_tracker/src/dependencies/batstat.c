@@ -42,10 +42,9 @@ int convert_to_percentage(int bat_voltage_roof, int bat_voltage_floor, int curre
 void request_battery_status(char *gps_dummy_string) {
 	int err;
 	char buf[100]; //magic
-	char temp[2];
+	char temp[2]; //magic
 	size_t buf_len = sizeof(buf); //magic
 	char battery_level[4]; //magic
-	
 	
 	at_cmd_set_notification_handler(at_cmd_handler);
 

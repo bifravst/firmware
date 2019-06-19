@@ -15,11 +15,11 @@
 static const char     update_indicator[] = {'\\', '|', '/', '-'};
 
 static const char     at_commands[][31]  = {
-				AT_XSYSTEMMODE,
+				//AT_XSYSTEMMODE, //comment out
 #ifdef CONFIG_BOARD_NRF9160_PCA10090NS
 				AT_MAGPIO,
 #endif
-				AT_CFUN
+				//AT_CFUN	//comment out
 			};
 
 static int            fd;
@@ -244,8 +244,8 @@ int get_gps_data(char *gps_dummy_string)
 {
     nrf_gnss_data_frame_t gps_data; //this could be moved further up in the module
 	u8_t		      cnt = 0;
-	char temp[] = "";
-	char temp2[] = "";
+	// char temp[] = "";
+	// char temp2[] = "";
 
 	while (1) {
 
@@ -275,15 +275,17 @@ int get_gps_data(char *gps_dummy_string)
 			print_pvt_data(&last_fix);
 			printk("\n");
 			print_nmea_data();
-			printk("---------------------------------");
+			printk("---------------------------------\n");
 
-			sprintf(temp, "%f", last_fix.pvt.longitude);
-			strcat(gps_dummy_string, temp);
+			/*The following actions adds to the publish string */
+			//printk("longitude: %lf\n", last_fix.pvt.longitude);
+			// sprintf(temp, "%f", last_fix.pvt.longitude);
+			// strcat(gps_dummy_string, temp);
 
-			sprintf(temp2, "%f", last_fix.pvt.latitude);
-			strcat(gps_dummy_string, temp2);
+			// sprintf(temp2, "%f", last_fix.pvt.latitude);
+			// strcat(gps_dummy_string, temp2);
 
-			return 0;
+			//return 0;
 			update_terminal = false;
 			//break;
 		}
