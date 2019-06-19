@@ -240,10 +240,12 @@ void print_nmea_data(void)
 	}
 }
 
-void get_gps_data(void)
+int get_gps_data(char *gps_dummy_string)
 {
     nrf_gnss_data_frame_t gps_data; //this could be moved further up in the module
 	u8_t		      cnt = 0;
+	char temp[] = "";
+	char temp2[] = "";
 
 	while (1) {
 
@@ -274,10 +276,20 @@ void get_gps_data(void)
 			printk("\n");
 			print_nmea_data();
 			printk("---------------------------------");
-			break;
+
+			sprintf(temp, "%f", last_fix.pvt.longitude);
+			strcat(gps_dummy_string, temp);
+
+			sprintf(temp2, "%f", last_fix.pvt.latitude);
+			strcat(gps_dummy_string, temp2);
+
+			return 0;
 			update_terminal = false;
+			//break;
 		}
 
 		k_sleep(K_MSEC(500));
 	}
+
+
 }

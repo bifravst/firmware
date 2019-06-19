@@ -269,4 +269,5 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 	if (err) {
 		printk("Could not input data\n");
 	}
+	
 }
