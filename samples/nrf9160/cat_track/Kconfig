@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-menu "MQTT simple sample"
+menu "Cat Tracker"
 config MQTT_PUB_TOPIC
 	string "MQTT publish topic"
 	default "my/publish/topic"

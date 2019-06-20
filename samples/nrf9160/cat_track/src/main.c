@@ -15,9 +15,10 @@
 #include <gps_func.h>
 #include <batstat.h>
 
-#define PUBLISH_INTERVAL 10000
+#define PUBLISH_INTERVAL	10000
+#define PAYLOAD_LENGTH		20
 
-static char gps_dummy_string[20] = "\0"; //magic
+static char gps_dummy_string[PAYLOAD_LENGTH] = "\0";
 
 #if defined(CONFIG_LTE_LINK_CONTROL)
 static void modem_configure(void)
