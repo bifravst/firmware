@@ -7,7 +7,7 @@
 cmake_minimum_required(VERSION 3.8.2)
 
 include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(cat_track)
+project(cat_tracker)
 
 # NORDIC SDK APP START
 target_sources(app PRIVATE src/main.c)
