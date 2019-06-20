@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define AT_BATSTAT	"AT%XVBAT"
-#define BAT_ROOF	5500
+#define BAT_ROOF	4500
 #define BAT_FLOOR	3000
 
 static const char     cmd[] = AT_BATSTAT;
