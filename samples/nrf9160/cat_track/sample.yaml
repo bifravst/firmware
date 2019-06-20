@@ -1,5 +1,5 @@
 sample:
-  name: asset_tracker Sample
+  name: Cat Track Sample
 tests:
   test_build:
     build_only: true
