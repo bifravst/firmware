@@ -75,7 +75,7 @@ void main(void)
 	printk("The cat tracker has started\n");
 	leds_init();
 
-	//accel_enable();
+	//accel_enable(); //needs to be implemented correctly
 
 	// err = gps_init();
 	// if (err != 0) {
