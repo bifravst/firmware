@@ -12,7 +12,7 @@
 
 static const char     cmd[] = AT_BATSTAT;
 static enum at_cmd_state state;
-static int battery_percentage;
+static unsigned short battery_percentage;
 
 void at_cmd_handler(char *state) {
 
@@ -42,9 +42,9 @@ int convert_to_percentage(int bat_voltage_roof, int bat_voltage_floor, int curre
 void request_battery_status(char *gps_dummy_string) {
 	int err;
 	char buf[100]; //magic
-	char temp[2]; //magic
+	char temp[25]; //magic
 	size_t buf_len = sizeof(buf); //magic
-	char battery_level[4]; //magic
+	char battery_level[100]; //magic
 	
 	at_cmd_set_notification_handler(at_cmd_handler);
 
@@ -60,7 +60,7 @@ void request_battery_status(char *gps_dummy_string) {
 
 	battery_percentage = convert_to_percentage(BAT_ROOF, BAT_FLOOR, atoi(battery_level));
 	
-	sprintf(temp, "%d", battery_percentage);
+	sprintf(temp, "%hu", battery_percentage);
 
 	strcat(gps_dummy_string, temp);
 
