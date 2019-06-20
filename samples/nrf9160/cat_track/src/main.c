@@ -75,30 +75,32 @@ void main(void)
 	printk("The phoenix tracker has started\n");
 	leds_init();
 
+	accel_enable();
+
 	// err = gps_init();
 	// if (err != 0) {
 	// 	printk("The GPS initialized successfully\n");
 	// }
 
-	modem_configure();
+	// modem_configure();
 
-	while (1) {
+	// while (1) {
 		
-		request_battery_status(gps_dummy_string);
-		insert_gps_data(gps_dummy_string);
+	// 	request_battery_status(gps_dummy_string);
+	// 	insert_gps_data(gps_dummy_string);
 
-		// err = get_gps_data(gps_dummy_string);
-		// if (err) {
-		// 	printk("failed getting gps data\n");
-		// }
+	// 	// err = get_gps_data(gps_dummy_string);
+	// 	// if (err) {
+	// 	// 	printk("failed getting gps data\n");
+	// 	// }
 
-		publish_gps_data(gps_dummy_string, sizeof(gps_dummy_string));
+	// 	publish_gps_data(gps_dummy_string, sizeof(gps_dummy_string));
 
-		//printk("printed gps string: %s\n", gps_dummy_string);
+	// 	//printk("printed gps string: %s\n", gps_dummy_string);
 
-		memset(gps_dummy_string,0,strlen(gps_dummy_string)); //reset string sequence
+	// 	memset(gps_dummy_string,0,strlen(gps_dummy_string)); //reset string sequence
 
-		led_notification();
-		k_sleep(PUBLISH_INTERVAL);
-	}
+	// 	led_notification();
+	// 	k_sleep(PUBLISH_INTERVAL);
+	// }
 }
