@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define AT_BATSTAT	"AT%XVBAT"
-#define BAT_ROOF	4500
+#define BAT_ROOF	5500
 #define BAT_FLOOR	3000
 
 static const char     cmd[] = AT_BATSTAT;
@@ -64,5 +64,6 @@ void request_battery_status(char *gps_dummy_string) {
 
 	strcat(gps_dummy_string, temp);
 
-	//printk("battery addition%s\n", gps_dummy_string);
+	printk("battery addition%s\n", gps_dummy_string);
+	printk("length of battery addition: %d\n", sizeof(gps_dummy_string));
 }
