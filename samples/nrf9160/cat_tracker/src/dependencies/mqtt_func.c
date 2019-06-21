@@ -5,7 +5,7 @@
 #include <lte_lc.h>
 
 
-#define APP_SLEEP 500
+#define APP_SLEEP 1000
 #define APP_CONNECT_TRIES 10
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -269,5 +269,8 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 	if (err) {
 		printk("Could not input data\n");
 	}
+
+	printk("kommer vi hit?\n");
+	//legge inn sleep her?
 	
 }
