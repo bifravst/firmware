@@ -46,7 +46,7 @@ void request_battery_status(char *gps_dummy_string) {
 	size_t buf_len = sizeof(buf); //magic
 	char battery_level[100]; //magic
 	
-	at_cmd_set_notification_handler(at_cmd_handler);
+	// at_cmd_set_notification_handler(at_cmd_handler);
 
 	err = at_cmd_write(cmd, buf, buf_len, &state);
 	if (err != 0) {
