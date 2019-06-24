@@ -11,11 +11,12 @@ project(cat_tracker)
 
 # NORDIC SDK APP START
 target_sources(app PRIVATE src/main.c)
-
-target_sources(app PRIVATE src/dependencies/mqtt_func.c)
-
-target_sources(app PRIVATE src/dependencies/batstat.c)
-
 # NORDIC SDK APP END
 
-include_directories(src/dependencies)
+# Include source directory
+zephyr_include_directories(src)
+
+# Application directories
+add_subdirectory(src/batstat)
+add_subdirectory(src/mqtt_func)
+add_subdirectory(src/gps_controller)
