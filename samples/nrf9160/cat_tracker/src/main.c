@@ -12,7 +12,6 @@
 #include <logging/log.h>
 #include <misc/reboot.h>
 #include <mqtt_func.h>
-#include <gps_func.h>
 #include <batstat.h>
 #include <device.h>
 #include <sensor.h>
@@ -36,7 +35,7 @@ static void insert_gps_data(char *gps_dummy_string) {
 
 static struct k_work request_battery_status_work;
 static struct k_work insert_gps_data_work;
-static struct k_work get_gps_data_work;
+// static struct k_work get_gps_data_work;
 static struct k_work publish_gps_data_work;
 static struct k_work delete_publish_string_and_set_led_work;
 
@@ -50,10 +49,10 @@ static void insert_gps_data_work_fn(struct k_work *work)
 	insert_gps_data(gps_dummy_string);
 }
 
-static void get_gps_data_work_fn(struct k_work *work)
-{
-	get_gps_data(gps_dummy_string);
-}
+// static void get_gps_data_work_fn(struct k_work *work)
+// {
+// 	get_gps_data(gps_dummy_string);
+// }
 
 static void publish_gps_data_work_fn(struct k_work *work)
 {
@@ -62,14 +61,14 @@ static void publish_gps_data_work_fn(struct k_work *work)
 
 static void delete_publish_string_and_set_led_work_fn(struct k_work *work)
 {
-	memset(gps_dummy_string,0,strlen(gps_dummy_string)); //reset string sequence
+	memset(gps_dummy_string,0,strlen(gps_dummy_string));
 	led_notification();
 }
 
 static void work_init() {
 	k_work_init(&request_battery_status_work, request_battery_status_work_fn);
 	k_work_init(&insert_gps_data_work, insert_gps_data_work_fn);
-	k_work_init(&get_gps_data_work, get_gps_data_work_fn);
+	// k_work_init(&get_gps_data_work, get_gps_data_work_fn);
 	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
 	k_work_init(&delete_publish_string_and_set_led_work, delete_publish_string_and_set_led_work_fn);
 }
@@ -141,22 +140,17 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 
-	//lte_lc_psm_req(true);
+	lte_lc_psm_req(true);
 
 }
 
 void main(void)
 {
-	//int err;
+
 	printk("The cat tracker has started\n");
 	work_init();
 	leds_init();
 	lte_connect();
 	adxl362_init();
-
-	// err = gps_init();
-	// if (err != 0) {
-	// 	printk("The GPS initialized successfully\n");
-	// }
 
 }
