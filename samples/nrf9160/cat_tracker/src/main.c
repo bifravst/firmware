@@ -19,8 +19,9 @@
 // #include <gps.h>
 
 #define PUBLISH_INTERVAL	5000
-#define PAYLOAD_LENGTH		100
+#define PAYLOAD_LENGTH		90
 #define NUMBER_OF_PACKAGES	1
+#define GPS_DELAYED_TIME	0
 
 static char gps_dummy_string[PAYLOAD_LENGTH] = "\0";
 
@@ -29,6 +30,18 @@ static struct gps_data gps_data;
 static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
 static struct k_work delete_publish_string_and_set_led_work;
+static struct k_work gps_control_start_work;
+static struct k_work gps_control_stop_work;
+
+static void gps_control_start_work_fn(struct k_work *work)
+{
+	gps_control_start(GPS_DELAYED_TIME);
+}
+
+static void gps_control_stop_work_fn(struct k_work *work)
+{
+	gps_control_stop(GPS_DELAYED_TIME);
+}
 
 static void request_battery_status_work_fn(struct k_work *work)
 {
@@ -49,6 +62,8 @@ static void work_init() {
 	k_work_init(&request_battery_status_work, request_battery_status_work_fn);
 	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
 	k_work_init(&delete_publish_string_and_set_led_work, delete_publish_string_and_set_led_work_fn);
+	k_work_init(&gps_control_start_work, gps_control_start_work_fn);
+	k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
 }
 
 static void trigger_handler(struct device *dev, struct sensor_trigger *trig)
@@ -57,9 +72,8 @@ static void trigger_handler(struct device *dev, struct sensor_trigger *trig)
 	case SENSOR_TRIG_THRESHOLD:
 		printk("The cat has awoken, send cat data to the broker\n");
 		
-		// k_work_submit(&request_battery_status_work);
-		// k_work_submit(&publish_gps_data_work);
-		// k_work_submit(&delete_publish_string_and_set_led_work);
+		k_work_submit(&request_battery_status_work);
+		k_work_submit(&gps_control_start_work);
 
 		break;
 	default:
@@ -105,6 +119,10 @@ static void lte_connect(void)
 
 }
 
+static void insert_gps_data(char *gps_dummy_string, char buf[83]) {
+	strcat(gps_dummy_string, buf);
+}
+
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
 
 			ARG_UNUSED(trigger);
@@ -117,9 +135,14 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 
 			printf("Longitude:  %s\n", gps_data.nmea.buf);
 
-			strcat(gps_dummy_string, gps_data.nmea.buf);
+			insert_gps_data(gps_dummy_string, gps_data.nmea.buf);
 
-			gps_control_stop(0);
+			/* */
+			k_work_submit(&publish_gps_data_work);
+			k_work_submit(&delete_publish_string_and_set_led_work);
+			/* */
+
+			k_work_submit(&gps_control_stop_work);
 
 }
 
@@ -131,13 +154,5 @@ void main(void)
 	lte_connect();
 	adxl362_init();
 	gps_control_init(gps_control_handler);
-
-	while(1) {
-		k_work_submit(&request_battery_status_work);
-		gps_control_start(0);
-		k_work_submit(&publish_gps_data_work);
-		k_work_submit(&delete_publish_string_and_set_led_work);
-		k_sleep(PUBLISH_INTERVAL);
-	}
 
 }
