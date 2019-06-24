@@ -5,8 +5,8 @@
 #include <lte_lc.h>
 
 
-#define APP_SLEEP 1000
-#define APP_CONNECT_TRIES 10
+#define APP_SLEEP 70000
+#define APP_CONNECT_TRIES 5
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -215,7 +215,7 @@ int mqtt_enable(struct mqtt_client *client) {
 		err = mqtt_connect(client);
 		if (err != 0) {
 			printk("ERROR: mqtt_connect %d\n", err);
-			k_sleep(APP_SLEEP);
+			//k_sleep(APP_SLEEP); why sleep here?
 			continue;
 		}
 

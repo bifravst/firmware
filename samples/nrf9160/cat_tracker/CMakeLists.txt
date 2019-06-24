@@ -12,8 +12,6 @@ project(cat_tracker)
 # NORDIC SDK APP START
 target_sources(app PRIVATE src/main.c)
 
-target_sources(app PRIVATE src/dependencies/gps_func.c)
-
 target_sources(app PRIVATE src/dependencies/mqtt_func.c)
 
 target_sources(app PRIVATE src/dependencies/batstat.c)
