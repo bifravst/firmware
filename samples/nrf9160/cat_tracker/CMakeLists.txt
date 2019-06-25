@@ -17,6 +17,7 @@ target_sources(app PRIVATE src/main.c)
 zephyr_include_directories(src)
 
 # Application directories
-add_subdirectory(src/batstat)
-add_subdirectory(src/mqtt_func)
+add_subdirectory(src/modem_stats)
+add_subdirectory(src/mqtt_behaviour)
 add_subdirectory(src/gps_controller)
+add_subdirectory(src/accelerometer)
