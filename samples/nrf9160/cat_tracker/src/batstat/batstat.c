@@ -46,8 +46,6 @@ void request_battery_status(char *gps_dummy_string) {
 	size_t buf_len = sizeof(buf); //magic
 	char battery_level[100]; //magic
 	
-	// at_cmd_set_notification_handler(at_cmd_handler);
-
 	err = at_cmd_write(cmd, buf, buf_len, &state);
 	if (err != 0) {
 		printk("Error in response from modem\n");
@@ -64,6 +62,4 @@ void request_battery_status(char *gps_dummy_string) {
 
 	strcat(gps_dummy_string, temp);
 
-	printk("battery addition%s\n", gps_dummy_string);
-	printk("length of battery addition: %d\n", sizeof(gps_dummy_string));
 }

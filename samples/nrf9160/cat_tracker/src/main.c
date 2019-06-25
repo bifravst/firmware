@@ -16,16 +16,24 @@
 #include <device.h>
 #include <sensor.h>
 #include <gps_controller.h>
-// #include <gps.h>
 
-#define PUBLISH_INTERVAL	5000
-#define PAYLOAD_LENGTH		90
+#define PUBLISH_INTERVAL	0
+#define PAYLOAD_LENGTH		75
 #define NUMBER_OF_PACKAGES	1
 #define GPS_DELAYED_TIME	0
+#define TRACKER_ID			"123456"
 
 static char gps_dummy_string[PAYLOAD_LENGTH] = "\0";
 
 static struct gps_data gps_data;
+
+K_SEM_DEFINE(my_sem, 0, 1);
+
+struct k_poll_event events[1] = {
+    K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
+                                    K_POLL_MODE_NOTIFY_ONLY,
+                                    &my_sem, 0)
+};
 
 static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
@@ -71,17 +79,13 @@ static void trigger_handler(struct device *dev, struct sensor_trigger *trig)
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
 		printk("The cat has awoken, send cat data to the broker\n");
-		
-		k_work_submit(&request_battery_status_work);
-		k_work_submit(&gps_control_start_work);
-
 		break;
 	default:
 		printk("Unknown trigger\n");
 	}	
 }
 
-void adxl362_init(void)
+static void adxl362_init(void)
 {
 	struct device *dev = device_get_binding(DT_ADI_ADXL362_0_LABEL);
 	if (dev == NULL) {
@@ -119,30 +123,37 @@ static void lte_connect(void)
 
 }
 
-static void insert_gps_data(char *gps_dummy_string, char buf[83]) {
-	strcat(gps_dummy_string, buf);
+static void publish_data(void) {
+
+	while(1) {
+		k_work_submit(&request_battery_status_work);
+		k_work_submit(&gps_control_start_work);
+
+		printk("Only to be executed once every search\n");
+
+		k_poll(events, 1, K_FOREVER);
+		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+			k_sem_take(events[0].sem, 0);
+			k_work_submit(&publish_gps_data_work);
+			k_work_submit(&delete_publish_string_and_set_led_work);
+		}
+        events[0].state = K_POLL_STATE_NOT_READY;
+		k_sleep(PUBLISH_INTERVAL);
+	}
 }
 
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
 
-			ARG_UNUSED(trigger);
+	ARG_UNUSED(trigger);
 
-			printk("Got gps fix\n");
+	gps_control_on_trigger();
+	gps_sample_fetch(dev);
+	gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
 
-			gps_control_on_trigger();
-			gps_sample_fetch(dev);
-			gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
-
-			printf("Longitude:  %s\n", gps_data.nmea.buf);
-
-			insert_gps_data(gps_dummy_string, gps_data.nmea.buf);
-
-			/* */
-			k_work_submit(&publish_gps_data_work);
-			k_work_submit(&delete_publish_string_and_set_led_work);
-			/* */
-
-			k_work_submit(&gps_control_stop_work);
+	strcat(gps_dummy_string, TRACKER_ID);
+	strcat(gps_dummy_string, gps_data.nmea.buf);
+	k_work_submit(&gps_control_stop_work);
+	k_sem_give(events[0].sem);
 
 }
 
@@ -154,5 +165,6 @@ void main(void)
 	lte_connect();
 	adxl362_init();
 	gps_control_init(gps_control_handler);
+	publish_data();
 
 }
