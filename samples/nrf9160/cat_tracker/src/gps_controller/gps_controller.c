@@ -79,13 +79,16 @@ static void gps_work_handler(struct k_work *work)
 			return;
 		}
 
-		printk("The device will try to get fix again in %d seconds\n",
-			CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL);
+		//something needs to happen if the gps data is not found, probably the last fix needs to be hold,
+		//implement a watchdog timer or semaphore based timer to send old value if nessecary
 
-		gps_work.type = GPS_WORK_START;
+		// printk("The device will try to get fix again in %d seconds\n",
+		// 	CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL);
 
-		k_delayed_work_submit(&gps_work.work,
-			K_SECONDS(CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL));
+		// gps_work.type = GPS_WORK_START;
+
+		// k_delayed_work_submit(&gps_work.work,
+		// 	K_SECONDS(CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL));
 		return;
 	}
 #endif
