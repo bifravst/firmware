@@ -47,20 +47,22 @@ static void gps_work_handler(struct k_work *work)
 
 		err = gps_start(gps_work.dev);
 		if (err) {
-			printk("GPS could not be started, error: %d\n", err);
+			printk("GPS could not be started, try again in 30 seconds, error: %d\n", err);
+			gps_work.type = GPS_WORK_START;
+			k_delayed_work_submit(&gps_work.work, 30000); //this is recursive and must be changed, makes sure the gps starts
 			return;
 		}
 
 		printk("GPS started successfully.\nSearching for satellites ");
 		printk("to get position fix. This may take several minutes.\n");
-		printk("The device will attempt to get a fix for %d seconds, ",
-		       CONFIG_GPS_CONTROL_FIX_TRY_TIME);
-		printk("before the GPS is shut down.\n");
+		// printk("The device will attempt to get a fix for %d seconds, ",
+		//        CONFIG_GPS_CONTROL_FIX_TRY_TIME);
+		// printk("before the GPS is shut down.\n");
 
-		gps_work.type = GPS_WORK_STOP;
+		// gps_work.type = GPS_WORK_STOP;
 
-		k_delayed_work_submit(&gps_work.work,
-				K_SECONDS(CONFIG_GPS_CONTROL_FIX_TRY_TIME));
+		// k_delayed_work_submit(&gps_work.work,
+		// 		K_SECONDS(CONFIG_GPS_CONTROL_FIX_TRY_TIME));
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
