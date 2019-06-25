@@ -1,4 +1,4 @@
-#include <mqtt_func.h>
+#include <mqtt_behaviour.h>
 
 #include <net/mqtt.h>
 #include <net/socket.h>

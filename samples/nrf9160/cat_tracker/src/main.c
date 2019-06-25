@@ -11,19 +11,17 @@
 #include <string.h>
 #include <logging/log.h>
 #include <misc/reboot.h>
-#include <mqtt_func.h>
-#include <batstat.h>
+#include <mqtt_behaviour.h>
+#include <modem_stats.h>
 #include <device.h>
 #include <sensor.h>
 #include <gps_controller.h>
 
 #define PUBLISH_INTERVAL	0
-#define PAYLOAD_LENGTH		80
-#define NUMBER_OF_PACKAGES	1
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
 
-static char gps_dummy_string[PAYLOAD_LENGTH];
+static char mqtt_assembly_line_d[] = "";
 
 static struct gps_data gps_data;
 
@@ -39,26 +37,26 @@ static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
 static struct k_work delete_publish_string_and_set_led_work;
 
-static void base_string_set(char *gps_dummy_string) {
-	strcat(gps_dummy_string, TRACKER_ID);	
-	strcat(gps_dummy_string, ",");
+static void base_string_set(char *mqtt_assembly_line_d) {
+	strcat(mqtt_assembly_line_d, TRACKER_ID);	
+	strcat(mqtt_assembly_line_d, ",");
 }
 
 static void request_battery_status_work_fn(struct k_work *work)
 {
-	request_battery_status(gps_dummy_string);
-	strcat(gps_dummy_string, ",");
+	request_battery_status(mqtt_assembly_line_d);
+	strcat(mqtt_assembly_line_d, ",");
 }
 
 static void publish_gps_data_work_fn(struct k_work *work)
 {
-	publish_gps_data(gps_dummy_string, sizeof(gps_dummy_string));
+	publish_gps_data(mqtt_assembly_line_d, sizeof(mqtt_assembly_line_d));
 }
 
 static void delete_publish_string_and_set_led_work_fn(struct k_work *work)
 {
-	memset(gps_dummy_string,0,strlen(gps_dummy_string));
-	base_string_set(gps_dummy_string);
+	memset(mqtt_assembly_line_d,0,strlen(mqtt_assembly_line_d));
+	base_string_set(mqtt_assembly_line_d);
 }
 
 static void work_init() {
@@ -142,7 +140,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	gps_sample_fetch(dev);
 	gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
 
-	strcat(gps_dummy_string, gps_data.nmea.buf);
+	strcat(mqtt_assembly_line_d, gps_data.nmea.buf);
 
 	k_sem_give(events[0].sem);
 
@@ -155,7 +153,7 @@ void main(void)
 	work_init();
 	lte_connect();
 	adxl362_init();
-	base_string_set(gps_dummy_string);
+	base_string_set(mqtt_assembly_line_d);
 	gps_control_init(gps_control_handler);
 	publish_data();
 

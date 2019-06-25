@@ -1,4 +1,4 @@
-#include <batstat.h>
+#include <modem_stats.h>
 #include <stdio.h>
 #include <zephyr.h>
 #include <kernel.h>
@@ -9,6 +9,7 @@
 #define AT_BATSTAT	"AT%XVBAT"
 #define BAT_ROOF	5500
 #define BAT_FLOOR	3000
+#define MILLIVOLT_N 4
 
 static const char     cmd[] = AT_BATSTAT;
 static enum at_cmd_state state;
@@ -41,10 +42,10 @@ int convert_to_percentage(int bat_voltage_roof, int bat_voltage_floor, int curre
 
 void request_battery_status(char *gps_dummy_string) {
 	int err;
-	char buf[100]; //magic
-	char temp[25]; //magic
+	char buf[50]; //magic
+	char temp[50]; //magic
 	size_t buf_len = sizeof(buf); //magic
-	char battery_level[100]; //magic
+	char battery_level[MILLIVOLT_N]; //magic
 	
 	err = at_cmd_write(cmd, buf, buf_len, &state);
 	if (err != 0) {
