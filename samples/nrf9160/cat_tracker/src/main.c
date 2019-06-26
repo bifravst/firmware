@@ -21,7 +21,7 @@
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
 
-static char mqtt_assembly_line_d[] = "";
+static char mqtt_assembly_line_d[100] = {0};
 
 static struct gps_data gps_data;
 
@@ -92,7 +92,7 @@ static void adxl362_init(void)
 			printk("Trigger set error\n");
 			return;
 		}
-	}
+	}	
 }
 
 static void lte_connect(void)
@@ -114,7 +114,34 @@ static void lte_connect(void)
 	
 }
 
-static void publish_data(void) {
+static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
+
+	switch(trigger->type) {
+		case GPS_TRIG_FIX:
+			printk("Does this happen consek\n");
+			gps_control_on_trigger();
+			gps_control_stop(GPS_DELAYED_TIME);
+			gps_sample_fetch(dev);
+			gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
+			strcat(mqtt_assembly_line_d, gps_data.nmea.buf);
+			k_sem_give(events[0].sem);
+		break;
+
+		default:
+		break;
+	}
+
+}
+
+void main(void)
+{
+
+	printk("The cat tracker has started\n");
+	work_init();
+	lte_connect();
+	adxl362_init();
+	base_string_set(mqtt_assembly_line_d);
+	gps_control_init(gps_control_handler);
 
 	while(1) {
 		k_work_submit(&request_battery_status_work);
@@ -129,32 +156,5 @@ static void publish_data(void) {
         events[0].state = K_POLL_STATE_NOT_READY;
 		k_sleep(PUBLISH_INTERVAL);
 	}
-}
-
-static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
-
-	ARG_UNUSED(trigger);
-
-	gps_control_stop(GPS_DELAYED_TIME);
-
-	gps_sample_fetch(dev);
-	gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
-
-	strcat(mqtt_assembly_line_d, gps_data.nmea.buf);
-
-	k_sem_give(events[0].sem);
-
-}
-
-void main(void)
-{
-
-	printk("The cat tracker has started\n");
-	work_init();
-	lte_connect();
-	adxl362_init();
-	base_string_set(mqtt_assembly_line_d);
-	gps_control_init(gps_control_handler);
-	publish_data();
 
 }

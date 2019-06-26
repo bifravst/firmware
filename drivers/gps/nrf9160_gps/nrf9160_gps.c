@@ -555,10 +555,14 @@ static int channel_get(struct device *dev, enum gps_channel chan,
 
 static int stop(struct device *dev)
 {
+
 	struct gps_drv_data *drv_data = dev->driver_data;
 	int retval;
+	
+	if (!gps_stopped) {
+		LOG_DBG("Stopping GPS");
 
-	LOG_DBG("Stopping GPS");
+		atomic_set(&drv_data->gps_is_active, 0);
 
 	atomic_set(&drv_data->gps_is_active, 0);
 
