@@ -21,7 +21,7 @@
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
 
-static char mqtt_assembly_line_d[100] = {0};
+static char mqtt_assembly_line_d[100] = "\0";
 
 static struct gps_data gps_data;
 
@@ -118,7 +118,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 
 	switch(trigger->type) {
 		case GPS_TRIG_FIX:
-			printk("Does this happen consek\n");
+			printk("gps control handler triggered!\n");
 			gps_control_on_trigger();
 			gps_control_stop(GPS_DELAYED_TIME);
 			gps_sample_fetch(dev);
