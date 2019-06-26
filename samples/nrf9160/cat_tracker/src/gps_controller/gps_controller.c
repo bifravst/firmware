@@ -33,23 +33,21 @@ static void gps_work_handler(struct k_work *work)
 	int err;
 
 	if (gps_work.type == GPS_WORK_START) {
-		if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_ENABLE_ON_START)) {
-			printk("Enabling PSM\n");
+		// if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_ENABLE_ON_START)) {
+		// 	printk("Enabling PSM\n");
 
-			err = lte_lc_psm_req(true);
-			if(err) {
-				printk("PSM mode could not be enabled");
-				printk(" or was already enabled\n.");
-			} else {
-				printk("PSM enabled\n");
-			}
-		}
+		// 	err = lte_lc_psm_req(true);
+		// 	if(err) {
+		// 		printk("PSM mode could not be enabled");
+		// 		printk(" or was already enabled\n.");
+		// 	} else {
+		// 		printk("PSM enabled\n");
+		// 	}
+		// }
 
 		err = gps_start(gps_work.dev);
 		if (err) {
-			printk("GPS could not be started, try again in 30 seconds, error: %d\n", err);
-			gps_work.type = GPS_WORK_START;
-			k_delayed_work_submit(&gps_work.work, 30000); //this is recursive and must be changed, makes sure the gps starts
+			printk("GPS could not be started, error: %d\n", err);
 			return;
 		}
 
@@ -66,14 +64,14 @@ static void gps_work_handler(struct k_work *work)
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
-		if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_DISABLE_ON_STOP)) {
-			printk("Disabling PSM\n");
+		// if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_DISABLE_ON_STOP)) {
+		// 	printk("Disabling PSM\n");
 
-			err = lte_lc_psm_req(false);
-			if(err) {
-				printk("PSM mode could not be disabled\n");
-			}
-		}
+		// 	err = lte_lc_psm_req(false);
+		// 	if(err) {
+		// 		printk("PSM mode could not be disabled\n");
+		// 	}
+		// }
 
 		err = gps_stop(gps_work.dev);
 		if (err) {
