@@ -20,7 +20,7 @@
 #define PUBLISH_INTERVAL	60000
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	180000
+#define GPS_SEARCH_TIMEOUT	360000
 
 static char mqtt_assembly_line_d[100] = "";
 
