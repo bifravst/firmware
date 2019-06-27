@@ -4,9 +4,10 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
-
-#define APP_SLEEP 70000
-#define APP_CONNECT_TRIES 5
+#define APP_SLEEP					70000
+#define APP_CONNECT_TRIES			5
+#define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
+#define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -21,6 +22,27 @@ static struct pollfd fds;
 static bool connected;
 
 static int nfds;
+
+static bool real_time_tracking = false;
+
+void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len)
+{
+	char buf[len + 1];
+
+	memcpy(buf, data, len);
+	buf[len] = 0;
+
+	/*This code section checks if incomming is a know commando */
+	if (strcmp(buf, CMDT_ENABLE_REAL_TIME_T)) {
+		real_time_tracking = true;
+		printk("%s%s -> Real time tracking mode set\n", prefix, buf);
+	} else if (strcmp(buf, CMDT_DISABLE_REAL_TIME_T)) {
+		real_time_tracking = false;
+		printk("%s%s -> Real time tracking mode disabled\n", prefix, buf);
+	} else {
+		printk("%s%s -> Could not identify commando\n", prefix, buf);
+	}
+}
 
 void data_print(u8_t *prefix, u8_t *data, size_t len)
 {
@@ -141,8 +163,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		       __LINE__, evt->result, p->message.payload.len);
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err >= 0) {
-			data_print("Received: ", payload_buf,
-				   p->message.payload.len);
+			data_print_set_mode("Received: ", payload_buf, p->message.payload.len);
 		} else {
 			printk("mqtt_read_publish_payload: Failed! %d\n", err);
 			printk("Disconnecting MQTT client...\n");
