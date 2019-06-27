@@ -33,17 +33,6 @@ static void gps_work_handler(struct k_work *work)
 	int err;
 
 	if (gps_work.type == GPS_WORK_START) {
-		// if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_ENABLE_ON_START)) {
-		// 	printk("Enabling PSM\n");
-
-		// 	err = lte_lc_psm_req(true);
-		// 	if(err) {
-		// 		printk("PSM mode could not be enabled");
-		// 		printk(" or was already enabled\n.");
-		// 	} else {
-		// 		printk("PSM enabled\n");
-		// 	}
-		// }
 
 		err = gps_start(gps_work.dev);
 		if (err) {
@@ -53,25 +42,9 @@ static void gps_work_handler(struct k_work *work)
 
 		printk("GPS started successfully.\nSearching for satellites ");
 		printk("to get position fix. This may take several minutes.\n");
-		// printk("The device will attempt to get a fix for %d seconds, ",
-		//        CONFIG_GPS_CONTROL_FIX_TRY_TIME);
-		// printk("before the GPS is shut down.\n");
-
-		// gps_work.type = GPS_WORK_STOP;
-
-		// k_delayed_work_submit(&gps_work.work,
-		// 		K_SECONDS(CONFIG_GPS_CONTROL_FIX_TRY_TIME));
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
-		// if (IS_ENABLED(CONFIG_GPS_CONTROL_PSM_DISABLE_ON_STOP)) {
-		// 	printk("Disabling PSM\n");
-
-		// 	err = lte_lc_psm_req(false);
-		// 	if(err) {
-		// 		printk("PSM mode could not be disabled\n");
-		// 	}
-		// }
 
 		err = gps_stop(gps_work.dev);
 		if (err) {
@@ -79,16 +52,6 @@ static void gps_work_handler(struct k_work *work)
 			return;
 		}
 
-		//something needs to happen if the gps data is not found, probably the last fix needs to be hold,
-		//implement a watchdog timer or semaphore based timer to send old value if nessecary
-
-		// printk("The device will try to get fix again in %d seconds\n",
-		// 	CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL);
-
-		// gps_work.type = GPS_WORK_START;
-
-		// k_delayed_work_submit(&gps_work.work,
-		// 	K_SECONDS(CONFIG_GPS_CONTROL_FIX_CHECK_INTERVAL));
 		return;
 	}
 #endif
