@@ -14,6 +14,8 @@
 #include <mqtt_behaviour.h>
 #include <modem_stats.h>
 #include <accelerometer.h>
+#include <device.h>
+#include <sensor.h>
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
@@ -21,6 +23,10 @@
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
 #define GPS_SEARCH_TIMEOUT	360000
+
+K_MUTEX_DEFINE(my_mutex);
+
+extern bool real_time_tracking;
 
 static char mqtt_assembly_line_d[100] = "";
 
@@ -75,6 +81,36 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 	lte_lc_psm_req(true);
+}
+
+static void adxl362_trigger_handler(struct device *dev, struct sensor_trigger *trig)
+{
+	switch (trig->type) {
+	case SENSOR_TRIG_THRESHOLD:
+		printk("The cat has awoken, send cat data to the broker\n");
+		break;
+	default:
+		printk("Unknown trigger\n");
+	}
+}
+
+static void adxl362_init(void)
+{
+	struct device *dev = device_get_binding(DT_INST_0_ADI_ADXL362_LABEL);
+	if (dev == NULL) {
+		printk("Device get binding device\n");
+		return;
+	}
+
+	if (IS_ENABLED(CONFIG_ADXL362_TRIGGER)) {
+		struct sensor_trigger trig = { .chan = SENSOR_CHAN_ACCEL_XYZ };
+
+		trig.type = SENSOR_TRIG_THRESHOLD;
+		if (sensor_trigger_set(dev, &trig, adxl362_trigger_handler)) {
+			printk("Trigger set error\n");
+			return;
+		}
+	}
 }
 
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {

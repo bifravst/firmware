@@ -7,6 +7,8 @@
 
 int fds_init(struct mqtt_client *c);
 
+void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len);
+
 void data_print(u8_t *prefix, u8_t *data, size_t len);
 
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
