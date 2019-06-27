@@ -10,6 +10,7 @@
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
+static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 
 static struct mqtt_client client;
 
@@ -52,9 +53,67 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	return mqtt_publish(c, &param);
 }
 
+int subscribe(void)
+{
+	struct mqtt_topic subscribe_topic = {
+		.topic = { .utf8 = CONFIG_MQTT_SUB_TOPIC,
+			   .size = strlen(CONFIG_MQTT_SUB_TOPIC) },
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE
+	};
+
+	const struct mqtt_subscription_list subscription_list = {
+		.list = &subscribe_topic, .list_count = 1, .message_id = 1234
+	};
+
+	printk("Subscribing to: %s len %u\n", CONFIG_MQTT_SUB_TOPIC,
+	       (unsigned int)strlen(CONFIG_MQTT_SUB_TOPIC));
+
+	return mqtt_subscribe(&client, &subscription_list);
+}
+
+int publish_get_payload(struct mqtt_client *c, size_t length)
+{
+	u8_t *buf = payload_buf;
+	u8_t *end = buf + length;
+
+	if (length > sizeof(payload_buf)) {
+		return -EMSGSIZE;
+	}
+
+	while (buf < end) {
+		int ret = mqtt_read_publish_payload(c, buf, end - buf);
+
+		if (ret < 0) {
+			int err;
+
+			if (ret != -EAGAIN) {
+				return ret;
+			}
+
+			printk("mqtt_read_publish_payload: EAGAIN\n");
+
+			err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+			if (err > 0 && (fds.revents & POLLIN) == POLLIN) {
+				continue;
+			} else {
+				return -EIO;
+			}
+		}
+
+		if (ret == 0) {
+			return -EIO;
+		}
+
+		buf += ret;
+	}
+
+	return 0;
+}
+
 void mqtt_evt_handler(struct mqtt_client *const c,
 		      const struct mqtt_evt *evt)
 {
+	int err;
 
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
@@ -64,6 +123,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
+		subscribe();
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -74,6 +134,26 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		clear_fds();
 		break;
 
+	case MQTT_EVT_PUBLISH: {
+		const struct mqtt_publish_param *p = &evt->param.publish;
+
+		printk("[%s:%d] MQTT PUBLISH result=%d len=%d\n", __func__,
+		       __LINE__, evt->result, p->message.payload.len);
+		err = publish_get_payload(c, p->message.payload.len);
+		if (err >= 0) {
+			data_print("Received: ", payload_buf,
+				   p->message.payload.len);
+		} else {
+			printk("mqtt_read_publish_payload: Failed! %d\n", err);
+			printk("Disconnecting MQTT client...\n");
+
+			err = mqtt_disconnect(c);
+			if (err) {
+				printk("Could not disconnect: %d\n", err);
+			}
+		}
+	} break;
+
 	case MQTT_EVT_PUBACK:
 		if (evt->result != 0) {
 			printk("MQTT PUBACK error %d\n", evt->result);
@@ -82,6 +162,16 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 		printk("[%s:%d] PUBACK packet id: %u\n", __func__, __LINE__,
 				evt->param.puback.message_id);
+		break;
+
+	case MQTT_EVT_SUBACK:
+		if (evt->result != 0) {
+			printk("MQTT SUBACK error %d\n", evt->result);
+			break;
+		}
+
+		printk("[%s:%d] SUBACK packet id: %u\n", __func__, __LINE__,
+		       evt->param.suback.message_id);
 		break;
 
 	default:
