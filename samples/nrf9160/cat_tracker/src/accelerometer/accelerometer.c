@@ -16,7 +16,7 @@ void adxl362_trigger_handler(struct device *dev,
 
 void adxl362_init(void)
 {
-	struct device *dev = device_get_binding(DT_ADI_ADXL362_0_LABEL);
+	struct device *dev = device_get_binding(DT_INST_0_ADI_ADXL362_LABEL);
 	if (dev == NULL) {
 		printk("Device get binding device\n");
 		return;

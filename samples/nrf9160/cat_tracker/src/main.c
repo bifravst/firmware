@@ -17,10 +17,10 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	0
+#define PUBLISH_INTERVAL	60000
 #define GPS_DELAYED_TIME	0
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	60000
+#define GPS_SEARCH_TIMEOUT	180000
 
 static char mqtt_assembly_line_d[100] = "";
 
@@ -99,12 +99,15 @@ void publish_custom_data(void) {
 	while (1) {
 		k_work_submit(&request_battery_status_work);
 		gps_control_start(GPS_DELAYED_TIME);
-
-		k_poll(events, 1, K_FOREVER);
+		k_poll(events, 1, GPS_SEARCH_TIMEOUT);
 		if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 			k_sem_take(events[0].sem, 0);
 			k_work_submit(&publish_gps_data_work);
 			k_work_submit(&delete_publish_data_work);
+		} else {
+			gps_control_stop(GPS_DELAYED_TIME);
+			k_work_submit(&delete_publish_data_work);
+			printk("GPS data could not be found, deleting assembly string\n");
 		}
 		events[0].state = K_POLL_STATE_NOT_READY;
 		k_sleep(PUBLISH_INTERVAL);
