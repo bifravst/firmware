@@ -62,8 +62,6 @@ void request_battery_status(char *mqtt_assembly_line_d) {
 	
 	sprintf(battery_percentage_s, "%hu", battery_percentage);
 
-	printk("battery percentage in string format: %s\n", battery_percentage_s);
-
 	concat_structure(mqtt_assembly_line_d, battery_percentage_s);
 
 }
