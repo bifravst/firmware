@@ -19,14 +19,16 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	30
+#define PUBLISH_INTERVAL	15
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	30
-#define SLEEP_ACCEL_THRES	30
+#define GPS_SEARCH_TIMEOUT	360
+#define SLEEP_ACCEL_THRES	240
 
 static char mqtt_assembly_line_d[100] = "";
 
 static struct gps_data gps_data;
+
+static bool grant = true;
 
 K_SEM_DEFINE(my_sem, 0, 1);
 K_SEM_DEFINE(my_sem2, 0, 1);
@@ -83,9 +85,22 @@ static void lte_connect(void)
 
 /* experimental */
 static void my_work_handler(struct k_work *work) {
+	
 	//k_timer_stop(&my_timer); possible to stop timer somehow
-	k_sem_take(events[1].sem, 0);
-	gps_control_stop(0);
+
+	// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+
+	k_sem_take(events[1].sem, 0);	
+
+	gps_control_stop(0);	
+	// }
+	
+	// if (grant) {
+	// 	grant = false;
+	// }
+	
+	//events[1].state = K_POLL_STATE_NOT_READY; //requested use, but nessecary
+	//gps_control_stop(0); //remove this for possible fix, send before go to sleep
 	printk("The cat has been idle for quite some time, go to sleep\n");
 }
 
@@ -104,7 +119,13 @@ static void adxl362_trigger_handler(struct device *dev, struct sensor_trigger *t
 	case SENSOR_TRIG_THRESHOLD:
 		printk("The cat has moved, grant publish access \n");
 
-		k_sem_give(events[1].sem); //give semaphore when cat has awoken
+		if (events[0].state == K_POLL_STATE_NOT_READY) {
+			k_sem_give(events[1].sem); //give semaphore when cat has awoken
+		}
+
+		
+
+		//grant = true; //giving access to publish information
 
 		k_timer_start(&my_timer, K_SECONDS(SLEEP_ACCEL_THRES),
 			      K_SECONDS(SLEEP_ACCEL_THRES)); //start timer which stops the publishing after a while
@@ -168,11 +189,18 @@ void main(void)
 	while (1) {
 		k_poll(events, 2, K_FOREVER); //wait for cat to wake
 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-			k_work_submit(&request_battery_status_work);
+			k_sem_take(events[1].sem, 0);
+
 			gps_control_start(0);
+
 			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
 			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[0].sem, 0);
+
+				k_work_submit(&request_battery_status_work);
+
+
+
 				k_work_submit(&publish_gps_data_work);
 				k_work_submit(&delete_publish_data_work);
 			} else {
@@ -186,6 +214,7 @@ void main(void)
 		} else {
 			printk("publish not granted, semaphore not released\n");
 		}
+		// events[0].state = K_POLL_STATE_NOT_READY;
 		events[1].state = K_POLL_STATE_NOT_READY; //requested use, but nessecary
 	}
 }
