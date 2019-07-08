@@ -19,9 +19,9 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	60
+#define PUBLISH_INTERVAL	30
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	360
+#define GPS_SEARCH_TIMEOUT	30
 #define SLEEP_ACCEL_THRES	30
 
 static bool grant = true;
@@ -86,6 +86,7 @@ static void lte_connect(void)
 /* experimental */
 static void my_work_handler(struct k_work *work) {
 	grant = false;
+	gps_control_stop(0);
 	printk("The cat has been idle for quite some time, go to sleep\n");
 }
 
@@ -181,6 +182,9 @@ void main(void)
 			}
 			events[0].state = K_POLL_STATE_NOT_READY;
 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+			printk("finished a publish cycle\n");
+		} else {
+			printk("publish not granted\n");
 		}
 	}
 }
