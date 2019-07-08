@@ -24,8 +24,6 @@
 #define GPS_SEARCH_TIMEOUT	30
 #define SLEEP_ACCEL_THRES	30
 
-static bool grant = true;
-
 static char mqtt_assembly_line_d[100] = "";
 
 static struct gps_data gps_data;
@@ -85,7 +83,8 @@ static void lte_connect(void)
 
 /* experimental */
 static void my_work_handler(struct k_work *work) {
-	grant = false;
+	//k_timer_stop(&my_timer); possible to stop timer somehow
+	k_sem_take(events[1].sem, 0);
 	gps_control_stop(0);
 	printk("The cat has been idle for quite some time, go to sleep\n");
 }
@@ -105,10 +104,10 @@ static void adxl362_trigger_handler(struct device *dev, struct sensor_trigger *t
 	case SENSOR_TRIG_THRESHOLD:
 		printk("The cat has moved, grant publish access \n");
 
-		grant = true;
+		k_sem_give(events[1].sem); //give semaphore when cat has awoken
 
 		k_timer_start(&my_timer, K_SECONDS(SLEEP_ACCEL_THRES),
-			      K_SECONDS(SLEEP_ACCEL_THRES));
+			      K_SECONDS(SLEEP_ACCEL_THRES)); //start timer which stops the publishing after a while
 
 		break;
 	default:
@@ -167,7 +166,8 @@ void main(void)
 		      K_SECONDS(SLEEP_ACCEL_THRES));
 
 	while (1) {
-		if (grant) {
+		k_poll(events, 2, K_FOREVER); //wait for cat to wake
+		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			k_work_submit(&request_battery_status_work);
 			gps_control_start(0);
 			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
@@ -184,7 +184,8 @@ void main(void)
 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
 			printk("finished a publish cycle\n");
 		} else {
-			printk("publish not granted\n");
+			printk("publish not granted, semaphore not released\n");
 		}
+		events[1].state = K_POLL_STATE_NOT_READY; //requested use, but nessecary
 	}
 }
