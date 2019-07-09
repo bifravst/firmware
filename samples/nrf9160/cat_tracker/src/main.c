@@ -19,7 +19,7 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	5	//1min
+#define PUBLISH_INTERVAL	5 //1min
 #define TRACKER_ID			"CT3001"
 #define GPS_SEARCH_TIMEOUT	720 //12min
 #define SLEEP_ACCEL_THRES	300 //5min
@@ -170,6 +170,7 @@ void main(void)
 	printk("The cat tracker has started\n");
 	leds_init();
 	work_init();
+	provision_certificate();
 	lte_connect();
 	#if defined(CONFIG_ADXL362)
 	adxl362_init();
