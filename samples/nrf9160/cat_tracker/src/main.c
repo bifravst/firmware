@@ -19,9 +19,9 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	60	//1min
+#define PUBLISH_INTERVAL	5	//1min
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	180 //3min
+#define GPS_SEARCH_TIMEOUT	720 //12min
 #define SLEEP_ACCEL_THRES	300 //5min
 
 static char mqtt_assembly_line_d[100] = "";
@@ -64,6 +64,35 @@ static void work_init() {
 	k_work_init(&delete_assembly_data_work, delete_assembly_data_work_fn);
 }
 
+#if defined(CONFIG_DK_LIBRARY)
+static void leds_init(void)
+{
+	int err;
+
+	err = dk_leds_init();
+	if (err) {
+		printk("Could not initialize leds, err code: %d\n", err);
+	}
+
+	err = dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+	if (err) {
+		printk("Could not set leds state, err code: %d\n", err);
+	}
+}
+
+static void led_notification_publish_data(void)
+{
+	dk_set_led_on(DK_BTN1);
+	k_sleep(1000);
+	dk_set_led_off(DK_BTN1);
+}
+
+static void led_notification_lte_connected(void) {
+	dk_set_led_on(DK_BTN2);
+}
+
+#endif
+
 static void lte_connect(void)
 {
 	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
@@ -79,6 +108,7 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 	lte_lc_psm_req(true);
+	led_notification_lte_connected();
 }
 
 #if defined(CONFIG_ADXL362)
@@ -138,6 +168,7 @@ void main(void)
 {
 
 	printk("The cat tracker has started\n");
+	leds_init();
 	work_init();
 	lte_connect();
 	#if defined(CONFIG_ADXL362)
@@ -158,6 +189,7 @@ void main(void)
 			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[0].sem, 0);
 				k_work_submit(&publish_gps_data_work);
+				led_notification_publish_data();
 				k_work_submit(&delete_assembly_data_work);
 			} else {
 				gps_control_stop(0);
@@ -169,8 +201,7 @@ void main(void)
 			printk("finished a publish cycle\n");
 		#if defined(CONFIG_ADXL362)
 		}
-		
 		events[1].state = K_POLL_STATE_NOT_READY;
 		#endif
-	}	
+	}
 }

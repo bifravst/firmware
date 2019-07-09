@@ -4,7 +4,7 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
-#define APP_SLEEP					70000 //default 70 seconds
+#define APP_SLEEP					10000 //default 70 seconds
 #define APP_CONNECT_TRIES			5
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
 #define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
