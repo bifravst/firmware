@@ -5,6 +5,10 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int fds_init(struct mqtt_client *c);
 
 void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len);
@@ -34,5 +38,9 @@ void wait();
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
 void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
