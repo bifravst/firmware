@@ -4,7 +4,7 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
-#define APP_SLEEP					70000
+#define APP_SLEEP					70000 //default 70 seconds
 #define APP_CONNECT_TRIES			5
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
 #define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
@@ -145,7 +145,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
-		subscribe();
+		//subscribe();
 		break;
 
 	case MQTT_EVT_DISCONNECT:
