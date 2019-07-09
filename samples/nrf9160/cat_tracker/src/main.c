@@ -81,6 +81,7 @@ static void lte_connect(void)
 	lte_lc_psm_req(true);
 }
 
+#if defined(CONFIG_ADXL362)
 static void adxl362_trigger_handler(struct device *dev, struct sensor_trigger *trig)
 {
 	switch (trig->type) {
@@ -113,6 +114,7 @@ static void adxl362_init(void)
 		}
 	}
 }
+#endif
 
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
 
@@ -138,14 +140,18 @@ void main(void)
 	printk("The cat tracker has started\n");
 	work_init();
 	lte_connect();
+	#if defined(CONFIG_ADXL362)
 	adxl362_init();
+	#endif
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
 	gps_control_init(gps_control_handler);
 
 	while (1) {
+		#if defined(CONFIG_ADXL362)
 		k_poll(events, 2, K_FOREVER);
 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			k_sem_take(events[1].sem, 0);
+		#endif
 			k_work_submit(&request_battery_status_work);
 			gps_control_start(0);
 			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
@@ -161,7 +167,10 @@ void main(void)
 			events[0].state = K_POLL_STATE_NOT_READY;
 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
 			printk("finished a publish cycle\n");
+		#if defined(CONFIG_ADXL362)
 		}
+		
 		events[1].state = K_POLL_STATE_NOT_READY;
-	}
+		#endif
+	}	
 }
