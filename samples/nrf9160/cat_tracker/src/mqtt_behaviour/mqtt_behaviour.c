@@ -3,9 +3,10 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
+#include "certificates.h"
 
-#define APP_SLEEP					70000 //default 70 seconds
-#define APP_CONNECT_TRIES			5
+#define APP_SLEEP_MS					500 //default 70 seconds
+#define APP_CONNECT_TRIES			10
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
 #define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
 
@@ -17,7 +18,7 @@
 #endif
 
 #if defined(CONFIG_MQTT_LIB_TLS)
-static sec_tag_t sec_tag_list[] = { CONFIG_SEC_TAG };
+	static sec_tag_t sec_tag_list[] = { CONFIG_SEC_TAG };
 #endif
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -36,8 +37,7 @@ static int nfds;
 
 static bool real_time_tracking = false;
 
-void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len)
-{
+void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len) {
 	char buf[len + 1];
 
 	memcpy(buf, data, len);
@@ -55,8 +55,7 @@ void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len)
 	}
 }
 
-void data_print(u8_t *prefix, u8_t *data, size_t len)
-{
+void data_print(u8_t *prefix, u8_t *data, size_t len) {
 	char buf[len + 1];
 
 	memcpy(buf, data, len);
@@ -65,8 +64,7 @@ void data_print(u8_t *prefix, u8_t *data, size_t len)
 }
 
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
-	u8_t *data, size_t len)
-{
+	u8_t *data, size_t len) {
 	struct mqtt_publish_param param;
 
 	param.message.topic.qos = qos;
@@ -86,8 +84,7 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	return mqtt_publish(c, &param);
 }
 
-int subscribe(void)
-{
+int subscribe(void) {
 	struct mqtt_topic subscribe_topic = {
 		.topic = { .utf8 = CONFIG_MQTT_SUB_TOPIC,
 			   .size = strlen(CONFIG_MQTT_SUB_TOPIC) },
@@ -104,8 +101,7 @@ int subscribe(void)
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-int publish_get_payload(struct mqtt_client *c, size_t length)
-{
+int publish_get_payload(struct mqtt_client *c, size_t length) {
 	u8_t *buf = payload_buf;
 	u8_t *end = buf + length;
 
@@ -144,8 +140,7 @@ int publish_get_payload(struct mqtt_client *c, size_t length)
 }
 
 void mqtt_evt_handler(struct mqtt_client *const c,
-		      const struct mqtt_evt *evt)
-{
+		      const struct mqtt_evt *evt) {
 	int err;
 
 	switch (evt->type) {
@@ -213,8 +208,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 	}
 }
 
-void broker_init(void)
-{
+void broker_init(void) {
 	int err;
 	struct addrinfo *result;
 	struct addrinfo *addr;
@@ -266,8 +260,7 @@ void broker_init(void)
 	freeaddrinfo(result);
 }
 
-void client_init(struct mqtt_client *client)
-{
+void client_init(struct mqtt_client *client) {
 	mqtt_client_init(client);
 
 	broker_init();
@@ -285,12 +278,11 @@ void client_init(struct mqtt_client *client)
 	client->tx_buf_size = sizeof(tx_buffer);
 
 	#if defined(CONFIG_MQTT_LIB_TLS)
-
 	client->transport.type = MQTT_TRANSPORT_SECURE;
 	client->transport.tls.config.peer_verify = 2;
 	client->transport.tls.config.cipher_count = 0;
 	client->transport.tls.config.cipher_list = NULL;
-	client->transport.tls.config.sec_tag_count = sizeof(sec_tag_list);
+	client->transport.tls.config.sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	client->transport.tls.config.sec_tag_list = sec_tag_list;
 	client->transport.tls.config.hostname = CONFIG_MQTT_BROKER_HOSTNAME;
 	#else
@@ -298,13 +290,11 @@ void client_init(struct mqtt_client *client)
 	#endif
 }
 
-void clear_fds(void)
-{
+void clear_fds(void) {
 	nfds = 0;
 }
 
-void wait(int timeout)
-{
+void wait(int timeout) {
 	if (nfds > 0) {
 		if (poll(&fds, nfds, timeout) < 0) {
 			printk("poll error: %d\n", errno);
@@ -312,8 +302,7 @@ void wait(int timeout)
 	}
 }
 
-int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
-{
+int process_mqtt_and_sleep(struct mqtt_client *client, int timeout) {
 	s64_t remaining = timeout;
 	s64_t start_time = k_uptime_get();
 	int err;
@@ -349,15 +338,25 @@ int mqtt_enable(struct mqtt_client *client) {
 		err = mqtt_connect(client);
 		if (err != 0) {
 			printk("ERROR: mqtt_connect %d\n", err);
-			//k_sleep(APP_SLEEP); why sleep here?
+			k_sleep(APP_SLEEP_MS);
 			continue;
 		}
 
-		fds.fd = client->transport.tcp.sock;
+
+		if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
+			fds.fd = client->transport.tcp.sock;
+		} else {
+			#if defined(CONFIG_MQTT_LIB_TLS)
+			fds.fd = client->transport.tls.sock;
+			#else
+				return -ENOTSUP
+			#endif
+		}
+
 		fds.events = ZSOCK_POLLIN;
 		nfds = 1;
 
-		wait(APP_SLEEP);
+		wait(APP_SLEEP_MS);
 		mqtt_input(client);
 
 		if (!connected) {
@@ -388,7 +387,7 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
     data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
         gps_publish_data_stream_head, gps_data_len);
 
-	err = process_mqtt_and_sleep(&client, APP_SLEEP);
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
 		printk("mqtt processing failed\n");
 	}
@@ -398,101 +397,61 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 		printk("Could not disconnect\n");
 	}
 
-	wait(APP_SLEEP);
+	wait(APP_SLEEP_MS);
 	err = mqtt_input(&client);
 	if (err) {
 		printk("Could not input data\n");
 	}
-	
+
 }
 
-int provision_certificate(void)
-{
+int provision_certificate(void) {
 #if defined(CONFIG_PROVISION_CERTIFICATES)
-#if defined(CONFIG_BSD_LIBRARY)
-	{
-		int err;
+	int err;
 
-		/* Delete certificates */
-		nrf_sec_tag_t sec_tag = (nrf_sec_tag_t)sec_tag_list[0];
+	/* Delete certificates */
+	nrf_sec_tag_t sec_tag = (nrf_sec_tag_t)sec_tag_list[0];
 
-		for (nrf_key_mgnt_cred_type_t type = 0; type < 5; type++) {
-			printk("Deleting certs sec_tag: %d\n", sec_tag);
-			err = nrf_inbuilt_key_delete(sec_tag, type);
-			printk("nrf_inbuilt_key_delete(%u, %d) => result=%d\n",
-			       sec_tag, type, err);
-		}
-
-#if defined(CA_CERTIFICATE)
-		/* Provision CA Certificate. */
-		printk("Write ca certs sec_tag: %d\n", sec_tag);
-		err = nrf_inbuilt_key_write(sec_tag,
-					    NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-					    CA_CERTIFICATE,
-					    strlen(CA_CERTIFICATE));
-		if (err) {
-			printk("CA_CERTIFICATE err: %d\n", err);
-			return err;
-		}
-#endif
-#if defined(CLIENT_PRIVATE_KEY)
-		/* Provision Private Certificate. */
-		printk("Write private cert sec_tag: %d\n", sec_tag);
-		err = nrf_inbuilt_key_write(sec_tag,
-					    NRF_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
-					    CLIENT_PRIVATE_KEY,
-					    strlen(CLIENT_PRIVATE_KEY));
-		if (err) {
-			printk("CLIENT_PRIVATE_KEY err: %d\n", err);
-			return err;
-		}
-#endif
-#if defined(CLIENT_PUBLIC_CERTIFICATE)
-		/* Provision Public Certificate. */
-		printk("Write public cert sec_tag: %d\n", sec_tag);
-		err = nrf_inbuilt_key_write(sec_tag,
-					    NRF_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
-					    CLIENT_PUBLIC_CERTIFICATE,
-					    strlen(CLIENT_PUBLIC_CERTIFICATE));
-		if (err) {
-			printk("CLIENT_PUBLIC_CERTIFICATE err: %d\n", err);
-			return err;
-		}
+	for (nrf_key_mgnt_cred_type_t type = 0; type < 5; type++) {
+		printk("Deleting certs sec_tag: %d\n", sec_tag);
+		err = nrf_inbuilt_key_delete(sec_tag, type);
+		printk("nrf_inbuilt_key_delete(%u, %d) => result=%d\n",
+				sec_tag, type, err);
 	}
-#endif
-#else
-	{
-		int err;
 
-		err = tls_credential_add(CONFIG_SEC_TAG,
-					 TLS_CREDENTIAL_CA_CERTIFICATE,
-					 NRF_CLOUD_CA_CERTIFICATE,
-					 sizeof(NRF_CLOUD_CA_CERTIFICATE));
-		if (err < 0) {
-			printk("Failed to register ca certificate: %d\n", err);
-			return err;
-		}
-		err = tls_credential_add(CONFIG_SEC_TAG,
-					 TLS_CREDENTIAL_PRIVATE_KEY,
-					 NRF_CLOUD_CLIENT_PRIVATE_KEY,
-					 sizeof(NRF_CLOUD_CLIENT_PRIVATE_KEY));
-		if (err < 0) {
-			printk("Failed to register private key: %d\n", err);
-			return err;
-		}
-		err = tls_credential_add(
-			CONFIG_SEC_TAG, TLS_CREDENTIAL_SERVER_CERTIFICATE,
-			NRF_CLOUD_CLIENT_PUBLIC_CERTIFICATE,
-			sizeof(NRF_CLOUD_CLIENT_PUBLIC_CERTIFICATE));
-		if (err < 0) {
-			printk("Failed to register public certificate: %d\n",
-			       err);
-			return err;
-		}
+	/* Provision CA Certificate. */
+	printk("Write ca certs sec_tag: %d\n", sec_tag);
+	err = nrf_inbuilt_key_write(sec_tag,
+					NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+					CA_CERTIFICATE,
+					strlen(CA_CERTIFICATE));
+	if (err) {
+		printk("CA_CERTIFICATE err: %d\n", err);
+		return err;
 	}
-#endif /* defined(CONFIG_BSD_LIBRARY) */
-#endif /* defined(CONFIG_PROVISION_CERTIFICATES) */
+
+	/* Provision Private Certificate. */
+	printk("Write private cert sec_tag: %d\n", sec_tag);
+	err = nrf_inbuilt_key_write(sec_tag,
+					NRF_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
+					CLIENT_PRIVATE_KEY,
+					strlen(CLIENT_PRIVATE_KEY));
+	if (err) {
+		printk("CLIENT_PRIVATE_KEY err: %d\n", err);
+		return err;
+	}
+
+	/* Provision Public Certificate. */
+	printk("Write public cert sec_tag: %d\n", sec_tag);
+	err = nrf_inbuilt_key_write(sec_tag,
+					NRF_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
+					CLIENT_PUBLIC_CERTIFICATE,
+					strlen(CLIENT_PUBLIC_CERTIFICATE));
+	if (err) {
+		printk("CLIENT_PUBLIC_CERTIFICATE err: %d\n", err);
+		return err;
+	}
 
 	return 0;
-}
+#endif
 }
