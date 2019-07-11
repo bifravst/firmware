@@ -39,7 +39,7 @@ int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
 void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len);
 
-int provision_certificate(void);
+int provision_certificates(void);
 
 #ifdef __cplusplus
 }

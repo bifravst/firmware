@@ -28,3 +28,5 @@ void concat_structure(char *mqtt_assembly_line_d, char *addition)
 void delete_publish_data(char *mqtt_assembly_line_d) {
 	memset(mqtt_assembly_line_d, 0, strlen(mqtt_assembly_line_d));
 }
+
+//this module must be modified to schred the strings for unwanted data, only sending absolutely nessecary data information. Basically just concatinate

@@ -171,7 +171,7 @@ void main(void)
 	printk("The cat tracker has started\n");
 	leds_init();
 	work_init();
-	provision_certificate();
+	provision_certificates();
 	lte_connect();
 	adxl362_init();
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
@@ -197,8 +197,8 @@ void main(void)
 			//	printk("GPS data could not be found within %d seconds, deleting assembly string\n", GPS_SEARCH_TIMEOUT);
 			//}
 			//events[0].state = K_POLL_STATE_NOT_READY;
-			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-			printk("finished a publish cycle\n");
+			// k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+			//printk("finished a publish cycle\n");
 		#if defined(CONFIG_ADXL362)
 		}
 		events[1].state = K_POLL_STATE_NOT_READY;

@@ -3,23 +3,14 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
-#include "certificates.h"
 
-#define APP_SLEEP_MS					500 //default 70 seconds
+#define APP_SLEEP_MS					10000 //default 70 seconds
 #define APP_CONNECT_TRIES			10
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
 #define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
 
-#if defined(CONFIG_PROVISION_CERTIFICATES)
-#if defined(CONFIG_BSD_LIBRARY)
 #include "nrf_inbuilt_key.h"
-#endif
-#include CONFIG_CERTIFICATES_FILE
-#endif
-
-#if defined(CONFIG_MQTT_LIB_TLS)
-	static sec_tag_t sec_tag_list[] = { CONFIG_SEC_TAG };
-#endif
+#include "certificates.h"
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -276,18 +267,17 @@ void client_init(struct mqtt_client *client) {
 	client->rx_buf_size = sizeof(rx_buffer);
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
-
-	#if defined(CONFIG_MQTT_LIB_TLS)
 	client->transport.type = MQTT_TRANSPORT_SECURE;
-	client->transport.tls.config.peer_verify = 2;
-	client->transport.tls.config.cipher_count = 0;
-	client->transport.tls.config.cipher_list = NULL;
-	client->transport.tls.config.sec_tag_count = ARRAY_SIZE(sec_tag_list);
-	client->transport.tls.config.sec_tag_list = sec_tag_list;
-	client->transport.tls.config.hostname = CONFIG_MQTT_BROKER_HOSTNAME;
-	#else
-	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
-	#endif
+
+	static sec_tag_t sec_tag_list[] = {CONFIG_CLOUD_CERT_SEC_TAG};
+	struct mqtt_sec_config *tls_config = &(client->transport).tls.config;
+
+	tls_config->peer_verify = 2;
+	tls_config->cipher_count = 0;
+	tls_config->cipher_list = NULL;
+	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
+	tls_config->sec_tag_list = sec_tag_list;
+	tls_config->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
 }
 
 void clear_fds(void) {
@@ -343,17 +333,17 @@ int mqtt_enable(struct mqtt_client *client) {
 		}
 
 
-		if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
-			fds.fd = client->transport.tcp.sock;
-		} else {
-			#if defined(CONFIG_MQTT_LIB_TLS)
+		// if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
+		// 	fds.fd = client->transport.tls.sock;
+		// } else {
+		// 	#if defined(CONFIG_MQTT_LIB_TLS)
 			fds.fd = client->transport.tls.sock;
-			#else
-				return -ENOTSUP
-			#endif
-		}
+		// 	#else
+		// 		return -ENOTSUP
+		// 	#endif
+		// }
 
-		fds.events = ZSOCK_POLLIN;
+		fds.events = POLLIN;
 		nfds = 1;
 
 		wait(APP_SLEEP_MS);
@@ -405,53 +395,53 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 
 }
 
-int provision_certificate(void) {
-#if defined(CONFIG_PROVISION_CERTIFICATES)
-	int err;
+int provision_certificates(void)
+{
+	{
+		int err;
 
-	/* Delete certificates */
-	nrf_sec_tag_t sec_tag = (nrf_sec_tag_t)sec_tag_list[0];
+		/* Delete certificates */
+		nrf_sec_tag_t sec_tag = CONFIG_CLOUD_CERT_SEC_TAG;
 
-	for (nrf_key_mgnt_cred_type_t type = 0; type < 5; type++) {
-		printk("Deleting certs sec_tag: %d\n", sec_tag);
-		err = nrf_inbuilt_key_delete(sec_tag, type);
-		printk("nrf_inbuilt_key_delete(%u, %d) => result=%d\n",
-				sec_tag, type, err);
+		for (nrf_key_mgnt_cred_type_t type = 0; type < 3; type++) {
+			err = nrf_inbuilt_key_delete(sec_tag, type);
+			printk("nrf_inbuilt_key_delete(%u, %d) => result=%d\n",
+			       sec_tag, type, err);
+		}
+
+		/* Provision CA Certificate. */
+		err = nrf_inbuilt_key_write(CONFIG_CLOUD_CERT_SEC_TAG,
+					    NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
+					    CLOUD_CA_CERTIFICATE,
+					    strlen(CLOUD_CA_CERTIFICATE));
+		printk("nrf_inbuilt_key_write => result=%d\n", err);
+		if (err) {
+			printk("CLOUD_CA_CERTIFICATE err: %d", err);
+			return err;
+		}
+
+		/* Provision Private Certificate. */
+		err = nrf_inbuilt_key_write(CONFIG_CLOUD_CERT_SEC_TAG,
+					    NRF_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
+					    CLOUD_CLIENT_PRIVATE_KEY,
+					    strlen(CLOUD_CLIENT_PRIVATE_KEY));
+		printk("nrf_inbuilt_key_write => result=%d\n", err);
+		if (err) {
+			printk("NRF_CLOUD_CLIENT_PRIVATE_KEY err: %d", err);
+			return err;
+		}
+
+		/* Provision Public Certificate. */
+		err = nrf_inbuilt_key_write(
+			CONFIG_CLOUD_CERT_SEC_TAG,
+			NRF_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
+			CLOUD_CLIENT_PUBLIC_CERTIFICATE,
+			strlen(CLOUD_CLIENT_PUBLIC_CERTIFICATE));
+		printk("nrf_inbuilt_key_write => result=%d\n", err);
+		if (err) {
+			printk("CLOUD_CLIENT_PUBLIC_CERTIFICATE err: %d", err);
+			return err;
+		}
 	}
-
-	/* Provision CA Certificate. */
-	printk("Write ca certs sec_tag: %d\n", sec_tag);
-	err = nrf_inbuilt_key_write(sec_tag,
-					NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-					CA_CERTIFICATE,
-					strlen(CA_CERTIFICATE));
-	if (err) {
-		printk("CA_CERTIFICATE err: %d\n", err);
-		return err;
-	}
-
-	/* Provision Private Certificate. */
-	printk("Write private cert sec_tag: %d\n", sec_tag);
-	err = nrf_inbuilt_key_write(sec_tag,
-					NRF_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
-					CLIENT_PRIVATE_KEY,
-					strlen(CLIENT_PRIVATE_KEY));
-	if (err) {
-		printk("CLIENT_PRIVATE_KEY err: %d\n", err);
-		return err;
-	}
-
-	/* Provision Public Certificate. */
-	printk("Write public cert sec_tag: %d\n", sec_tag);
-	err = nrf_inbuilt_key_write(sec_tag,
-					NRF_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
-					CLIENT_PUBLIC_CERTIFICATE,
-					strlen(CLIENT_PUBLIC_CERTIFICATE));
-	if (err) {
-		printk("CLIENT_PUBLIC_CERTIFICATE err: %d\n", err);
-		return err;
-	}
-
 	return 0;
-#endif
 }
