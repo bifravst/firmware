@@ -9,8 +9,10 @@
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
 #define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
 
+#if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
 #include "certificates.h"
+#endif
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -267,6 +269,8 @@ void client_init(struct mqtt_client *client) {
 	client->rx_buf_size = sizeof(rx_buffer);
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
+
+	#if defined(CONFIG_MQTT_LIB_TLS)
 	client->transport.type = MQTT_TRANSPORT_SECURE;
 
 	static sec_tag_t sec_tag_list[] = {CONFIG_CLOUD_CERT_SEC_TAG};
@@ -278,6 +282,9 @@ void client_init(struct mqtt_client *client) {
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
 	tls_config->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
+	#else
+	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
+	#endif
 }
 
 void clear_fds(void) {
@@ -332,16 +339,15 @@ int mqtt_enable(struct mqtt_client *client) {
 			continue;
 		}
 
-
-		// if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
-		// 	fds.fd = client->transport.tls.sock;
-		// } else {
-		// 	#if defined(CONFIG_MQTT_LIB_TLS)
+		if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
 			fds.fd = client->transport.tls.sock;
-		// 	#else
-		// 		return -ENOTSUP
-		// 	#endif
-		// }
+		} else {
+			#if defined(CONFIG_MQTT_LIB_TLS)
+			fds.fd = client->transport.tls.sock;
+			#else
+				return -ENOTSUP
+			#endif
+		}
 
 		fds.events = POLLIN;
 		nfds = 1;
@@ -397,6 +403,7 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 
 int provision_certificates(void)
 {
+#if defined(CONFIG_MQTT_LIB_TLS)
 	{
 		int err;
 
@@ -443,5 +450,6 @@ int provision_certificates(void)
 			return err;
 		}
 	}
+#endif
 	return 0;
 }

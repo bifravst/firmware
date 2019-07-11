@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+void removeChar(char *s, int c);
+
 void concat_structure(char *mqtt_assembly_line_d, char *addition);
 
 void delete_publish_data(char *mqtt_assembly_line_d);

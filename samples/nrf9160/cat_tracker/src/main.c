@@ -175,33 +175,32 @@ void main(void)
 	lte_connect();
 	adxl362_init();
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
-	//gps_control_init(gps_control_handler);
+	gps_control_init(gps_control_handler);
 
-	//while (1) {
+	while (1) {
 		#if defined(CONFIG_ADXL362)
 		k_poll(events, 2, K_FOREVER);
 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 			k_sem_take(events[1].sem, 0);
 		#endif
 			k_work_submit(&request_battery_status_work);
-			//gps_control_start(0);
-			//k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
-			//if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-				//k_sem_take(events[0].sem, 0);
+			gps_control_start(0);
+			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
+			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[0].sem, 0);
 				k_work_submit(&publish_gps_data_work);
-				//led_notification_publish_data();
+				led_notification_publish_data();
 				k_work_submit(&delete_assembly_data_work);
-			//} else {
-			//	gps_control_stop(0);
-			//	k_work_submit(&delete_assembly_data_work);
-			//	printk("GPS data could not be found within %d seconds, deleting assembly string\n", GPS_SEARCH_TIMEOUT);
-			//}
-			//events[0].state = K_POLL_STATE_NOT_READY;
-			// k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-			//printk("finished a publish cycle\n");
+			} else {
+				gps_control_stop(0);
+				k_work_submit(&delete_assembly_data_work);
+				printk("GPS data could not be found within %d seconds, deleting assembly string\n", GPS_SEARCH_TIMEOUT);
+			}
+			events[0].state = K_POLL_STATE_NOT_READY;
+			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
 		#if defined(CONFIG_ADXL362)
 		}
 		events[1].state = K_POLL_STATE_NOT_READY;
 		#endif
-	//}
+	}
 }
