@@ -10,7 +10,6 @@
 #define AT_BATSTAT	"AT%XVBAT"
 #define BAT_ROOF	5500
 #define BAT_FLOOR	3000
-#define MILLIVOLT_N 4
 
 static const char     cmd[] = AT_BATSTAT;
 static enum at_cmd_state state;
@@ -46,7 +45,7 @@ void request_battery_status(char *mqtt_assembly_line_d) {
 	char buf[50];
 	char battery_percentage_s[50];
 	size_t buf_len = sizeof(buf);
-	char battery_level[MILLIVOLT_N];
+	char battery_level[4];
 	
 	err = at_cmd_write(cmd, buf, buf_len, &state);
 	if (err != 0) {
