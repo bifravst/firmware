@@ -44,19 +44,8 @@ config GPS_TRIGGER
 
 endmenu	# GPS
 
-config PROVISION_CERTIFICATES
-	bool "Provision of certificate"
-	help
-		Enable run-time provisioning of certificates from the
-		certificates header file selected by using CERTIFICATES_FILE
-
-config CERTIFICATES_FILE
-	string "Certificates to use"
-	depends on PROVISION_CERTIFICATES
-	default "certificates.h"
-
-config SEC_TAG
-	int "Security tag to use for the connection"
+config CLOUD_CERT_SEC_TAG
+	int "Secure tag fo TLS credentials"
 	default 1
 
 config MQTT_PUB_TOPIC
