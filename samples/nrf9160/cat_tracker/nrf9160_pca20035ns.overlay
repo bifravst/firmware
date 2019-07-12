@@ -1,15 +1,15 @@
 &spi3 {
 	status = "ok";
-	sck-pin = <3>;
-	mosi-pin = <4>;
-	miso-pin = <5>;
-	cs-gpios = <&gpio0 8 0>, <&gpio0 7 0>;
+	sck-pin = <25>;
+	mosi-pin = <24>;
+	miso-pin = <23>;
+	cs-gpios = <&gpio0 22 0>, <&gpio0 7 0>;
 
 	adxl362@0 {
 		compatible = "adi,adxl362";
 		label = "ADXL362";
 		spi-max-frequency = <8000000>;
 		reg = <0>;
-		int1-gpios = <&gpio0 9 0>;
+		int1-gpios = <&gpio0 21 0>;
 	};
 };

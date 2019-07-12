@@ -19,10 +19,10 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	30 //1min
+#define PUBLISH_INTERVAL	15
 #define TRACKER_ID			"CT3001"
 #define GPS_SEARCH_TIMEOUT	720 //12min
-#define SLEEP_ACCEL_THRES	300 //5min
+#define SLEEP_ACCEL_THRES	30 //5min
 
 static char mqtt_assembly_line_d[100] = "";
 
