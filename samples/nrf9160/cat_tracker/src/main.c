@@ -190,13 +190,12 @@ void main(void)
 				k_sem_take(events[0].sem, 0);
 				k_work_submit(&publish_gps_data_work);
 				led_notification_publish_data();
-				k_work_submit(&delete_assembly_data_work);
 			} else {
 				gps_control_stop(0);
-				k_work_submit(&delete_assembly_data_work);
 				printk("GPS data could not be found within %d seconds, deleting assembly string\n", GPS_SEARCH_TIMEOUT);
 			}
 			events[0].state = K_POLL_STATE_NOT_READY;
+			k_work_submit(&delete_assembly_data_work);
 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
 		#if defined(CONFIG_ADXL362)
 		}
