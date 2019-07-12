@@ -7,12 +7,14 @@
 #define APP_SLEEP_MS					10000 //default 70 seconds
 #define APP_CONNECT_TRIES			10
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
-#define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"
+#define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"		//not like this
 
 #if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
 #include "certificates.h"
 #endif
+
+bool tracker_mode = true;
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -28,8 +30,6 @@ static bool connected;
 
 static int nfds;
 
-static bool real_time_tracking = false;
-
 void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len) {
 	char buf[len + 1];
 
@@ -38,10 +38,10 @@ void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len) {
 
 	/*This code section checks if incomming is a know commando */
 	if (strcmp(buf, CMDT_ENABLE_REAL_TIME_T)) {
-		real_time_tracking = true;
+		tracker_mode = true;
 		printk("%s%s -> Real time tracking mode set\n", prefix, buf);
 	} else if (strcmp(buf, CMDT_DISABLE_REAL_TIME_T)) {
-		real_time_tracking = false;
+		tracker_mode = false;
 		printk("%s%s -> Real time tracking mode disabled\n", prefix, buf);
 	} else {
 		printk("%s%s -> Could not identify commando\n", prefix, buf);
@@ -144,7 +144,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
-		//subscribe();
+		subscribe();
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -397,8 +397,7 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 
 }
 
-int provision_certificates(void)
-{
+int provision_certificates(void) {
 #if defined(CONFIG_MQTT_LIB_TLS)
 	{
 		int err;
