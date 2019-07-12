@@ -339,15 +339,11 @@ int mqtt_enable(struct mqtt_client *client) {
 			continue;
 		}
 
-		if (client->transport.type == MQTT_TRANSPORT_NON_SECURE) {
-			fds.fd = client->transport.tls.sock;
-		} else {
-			#if defined(CONFIG_MQTT_LIB_TLS)
-			fds.fd = client->transport.tls.sock;
-			#else
-				return -ENOTSUP
-			#endif
-		}
+		#if defined(CONFIG_MQTT_LIB_TLS)
+		fds.fd = client->transport.tls.sock;
+		#else
+		fds.fd = client->transport.tcp.sock;
+		#endif
 
 		fds.events = POLLIN;
 		nfds = 1;
