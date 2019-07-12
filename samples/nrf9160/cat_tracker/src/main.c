@@ -19,9 +19,9 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
-#define PUBLISH_INTERVAL	15
+#define PUBLISH_INTERVAL	30
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	720 //12min
+#define GPS_SEARCH_TIMEOUT	30 //12min
 #define SLEEP_ACCEL_THRES	30 //5min
 
 static char mqtt_assembly_line_d[100] = "";
@@ -175,31 +175,50 @@ void main(void)
 	lte_connect();
 	adxl362_init();
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
-	gps_control_init(gps_control_handler);
+	//gps_control_init(gps_control_handler);
 
 	while (1) {
-		#if defined(CONFIG_ADXL362)
-		k_poll(events, 2, K_FOREVER);
-		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-			k_sem_take(events[1].sem, 0);
-		#endif
+		if (tracker_mode) {
+			printk("We are in active mode\n");
 			k_work_submit(&request_battery_status_work);
-			gps_control_start(0);
-			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
-			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[0].sem, 0);
+			// gps_control_start(0);
+			// k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
+			// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+			//	k_sem_take(events[0].sem, 0);
 				k_work_submit(&publish_gps_data_work);
 				led_notification_publish_data();
-			} else {
-				gps_control_stop(0);
-				printk("GPS data could not be found within %d seconds, deleting assembly string\n", GPS_SEARCH_TIMEOUT);
-			}
-			events[0].state = K_POLL_STATE_NOT_READY;
+			// } else {
+			// 	gps_control_stop(0);
+			// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+			// 			GPS_SEARCH_TIMEOUT);
+			// }
+			// events[0].state = K_POLL_STATE_NOT_READY;
 			k_work_submit(&delete_assembly_data_work);
 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-		#if defined(CONFIG_ADXL362)
+		} else {
+			printk("We are in passive mode\n");
+			k_poll(events, 2, K_FOREVER);
+			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[1].sem, 0);
+				k_work_submit(&request_battery_status_work);
+				// gps_control_start(0);
+				// k_poll(events, 1,
+				//        K_SECONDS(GPS_SEARCH_TIMEOUT));
+				// if (events[0].state ==
+				//    K_POLL_STATE_SEM_AVAILABLE) {
+				//	k_sem_take(events[0].sem, 0);
+					k_work_submit(&publish_gps_data_work);
+					led_notification_publish_data();
+				// } else {
+				// 	gps_control_stop(0);
+				// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+				// 	       GPS_SEARCH_TIMEOUT);
+				// }
+				// events[0].state = K_POLL_STATE_NOT_READY;
+				k_work_submit(&delete_assembly_data_work);
+				k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+			}
+			events[1].state = K_POLL_STATE_NOT_READY;
 		}
-		events[1].state = K_POLL_STATE_NOT_READY;
-		#endif
 	}
 }
