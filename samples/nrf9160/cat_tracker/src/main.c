@@ -19,10 +19,12 @@
 #include <gps_controller.h>
 #include <string_manipulation.h>
 
+//these variables needs to be made dynamic in mqtt behaviour module
+
 #define PUBLISH_INTERVAL	30
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	30 //12min
-#define SLEEP_ACCEL_THRES	30 //5min
+#define GPS_SEARCH_TIMEOUT	30
+#define SLEEP_ACCEL_THRES	30
 
 static char mqtt_assembly_line_d[100] = "";
 
@@ -41,27 +43,30 @@ struct k_poll_event events[2] = {
 static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
 static struct k_work delete_assembly_data_work;
+static struct k_work sync_broker_work;
 
-static void request_battery_status_work_fn(struct k_work *work)
-{
+static void request_battery_status_work_fn(struct k_work *work) {
 	request_battery_status(mqtt_assembly_line_d);
 }
 
-static void publish_gps_data_work_fn(struct k_work *work)
-{
+static void publish_gps_data_work_fn(struct k_work *work) {
 	publish_gps_data(mqtt_assembly_line_d, sizeof(mqtt_assembly_line_d));
 }
 
-static void delete_assembly_data_work_fn(struct k_work *work)
-{
+static void delete_assembly_data_work_fn(struct k_work *work) {
 	delete_publish_data(mqtt_assembly_line_d);
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
+}
+
+static void sync_broker_work_fn(struct k_work *work) {
+	sync_broker();
 }
 
 static void work_init() {
 	k_work_init(&request_battery_status_work, request_battery_status_work_fn);
 	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
 	k_work_init(&delete_assembly_data_work, delete_assembly_data_work_fn);
+	k_work_init(&sync_broker_work, sync_broker_work_fn);
 }
 
 #if defined(CONFIG_DK_LIBRARY)
@@ -176,6 +181,8 @@ void main(void)
 	adxl362_init();
 	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
 	//gps_control_init(gps_control_handler);
+
+	k_work_submit(&sync_broker_work);
 
 	while (1) {
 		if (tracker_mode) {

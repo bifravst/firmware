@@ -14,7 +14,24 @@
 #include "certificates.h"
 #endif
 
+// /*Temporary configurations which should be placed in the static config file, start */
+
+#define CONFIG_MQTT_GET_TOPIC	"$aws/things/Cat-Tracker/shadow/get"
+#define CONFIG_MQTT_ACCEPTED_TOPIC	"$aws/things/Cat-Tracker/shadow/get/accepted"
+#define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
+
+// /*End */
+
 bool tracker_mode = true;
+
+/*further confiurations needed to be added start */
+int sleep_accel_thres = 30;
+int gps_search_timeout = 30;
+int publish_interval = 30;
+
+/*end */
+
+static char sync_update[50] = "{ \"state\": { \"reported\": { \"mode\": \"active\n }}}";
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -27,6 +44,8 @@ static struct sockaddr_storage broker;
 static struct pollfd fds;
 
 static bool connected;
+
+static bool initial_connection = false;
 
 static int nfds;
 
@@ -56,13 +75,12 @@ void data_print(u8_t *prefix, u8_t *data, size_t len) {
 	printk("%s%s\n", prefix, buf);
 }
 
-int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
-	u8_t *data, size_t len) {
+int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data, size_t len, u8_t *topic ) {
 	struct mqtt_publish_param param;
 
 	param.message.topic.qos = qos;
-	param.message.topic.topic.utf8 = CONFIG_MQTT_PUB_TOPIC;
-	param.message.topic.topic.size = strlen(CONFIG_MQTT_PUB_TOPIC);
+	param.message.topic.topic.utf8 = topic;
+	param.message.topic.topic.size = strlen(topic);
 	param.message.payload.data = data;
 	param.message.payload.len = len;
 	param.message_id = sys_rand32_get();
@@ -71,16 +89,15 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 
 	data_print("Publishing: ", data, len);
 	printk("to topic: %s len: %u\n",
-		CONFIG_MQTT_PUB_TOPIC,
-		(unsigned int)strlen(CONFIG_MQTT_PUB_TOPIC));
+		topic,
+		(unsigned int)strlen(topic));
 
 	return mqtt_publish(c, &param);
 }
 
-int subscribe(void) {
+int subscribe(u8_t *sub_topic) {
 	struct mqtt_topic subscribe_topic = {
-		.topic = { .utf8 = CONFIG_MQTT_SUB_TOPIC,
-			   .size = strlen(CONFIG_MQTT_SUB_TOPIC) },
+		.topic = { .utf8 = sub_topic, .size = strlen(sub_topic) },
 		.qos = MQTT_QOS_1_AT_LEAST_ONCE
 	};
 
@@ -88,8 +105,8 @@ int subscribe(void) {
 		.list = &subscribe_topic, .list_count = 1, .message_id = 1234
 	};
 
-	printk("Subscribing to: %s len %u\n", CONFIG_MQTT_SUB_TOPIC,
-	       (unsigned int)strlen(CONFIG_MQTT_SUB_TOPIC));
+	printk("Subscribing to: %s len %u\n", sub_topic,
+	       (unsigned int)strlen(sub_topic));
 
 	return mqtt_subscribe(&client, &subscription_list);
 }
@@ -144,7 +161,14 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
-		subscribe();
+
+		if (!initial_connection) {
+			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC); // this is the sync operation at the beginning
+			initial_connection = true;
+		} else {
+			subscribe(CONFIG_MQTT_SUB_TOPIC);
+		}
+
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -377,7 +401,7 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 	}
 
     data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-        gps_publish_data_stream_head, gps_data_len);
+        gps_publish_data_stream_head, gps_data_len, CONFIG_MQTT_PUB_TOPIC);
 
 	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
@@ -395,6 +419,39 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 		printk("Could not input data\n");
 	}
 
+}
+
+void sync_broker() {
+	int err;
+
+	err = mqtt_enable(&client);
+	if (err) {
+		printk("Could not ping server\n");
+	}
+
+	err = mqtt_ping(&client);
+	if (err) {
+		printk("Could not ping server\n");
+	}
+
+	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, sync_update,
+		     sizeof(sync_update), CONFIG_MQTT_GET_TOPIC);
+
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	if (err) {
+		printk("mqtt processing failed\n");
+	}
+
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect\n");
+	}
+
+	wait(APP_SLEEP_MS);
+	err = mqtt_input(&client);
+	if (err) {
+		printk("Could not input data\n");
+	}
 }
 
 int provision_certificates(void) {
