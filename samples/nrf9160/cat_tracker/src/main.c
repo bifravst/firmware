@@ -59,7 +59,11 @@ static void delete_assembly_data_work_fn(struct k_work *work) {
 }
 
 static void sync_broker_work_fn(struct k_work *work) {
-	sync_broker();
+	int err;
+	err = sync_broker();
+	if (err != 0) {
+		printk("Sync Error: %d", err);
+	}
 }
 
 static void work_init() {
@@ -184,48 +188,48 @@ void main(void)
 
 	k_work_submit(&sync_broker_work);
 
-	while (1) {
-		if (tracker_mode) {
-			printk("We are in active mode\n");
-			k_work_submit(&request_battery_status_work);
-			// gps_control_start(0);
-			// k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
-			// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-			//	k_sem_take(events[0].sem, 0);
-				k_work_submit(&publish_gps_data_work);
-				led_notification_publish_data();
-			// } else {
-			// 	gps_control_stop(0);
-			// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
-			// 			GPS_SEARCH_TIMEOUT);
-			// }
-			// events[0].state = K_POLL_STATE_NOT_READY;
-			k_work_submit(&delete_assembly_data_work);
-			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-		} else {
-			printk("We are in passive mode\n");
-			k_poll(events, 2, K_FOREVER);
-			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[1].sem, 0);
-				k_work_submit(&request_battery_status_work);
-				// gps_control_start(0);
-				// k_poll(events, 1,
-				//        K_SECONDS(GPS_SEARCH_TIMEOUT));
-				// if (events[0].state ==
-				//    K_POLL_STATE_SEM_AVAILABLE) {
-				//	k_sem_take(events[0].sem, 0);
-					k_work_submit(&publish_gps_data_work);
-					led_notification_publish_data();
-				// } else {
-				// 	gps_control_stop(0);
-				// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
-				// 	       GPS_SEARCH_TIMEOUT);
-				// }
-				// events[0].state = K_POLL_STATE_NOT_READY;
-				k_work_submit(&delete_assembly_data_work);
-				k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-			}
-			events[1].state = K_POLL_STATE_NOT_READY;
-		}
-	}
+	// while (1) {
+	// 	if (tracker_mode) {
+	// 		printk("We are in active mode\n");
+	// 		k_work_submit(&request_battery_status_work);
+	// 		// gps_control_start(0);
+	// 		// k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
+	// 		// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+	// 		//	k_sem_take(events[0].sem, 0);
+	// 			k_work_submit(&publish_gps_data_work);
+	// 			led_notification_publish_data();
+	// 		// } else {
+	// 		// 	gps_control_stop(0);
+	// 		// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+	// 		// 			GPS_SEARCH_TIMEOUT);
+	// 		// }
+	// 		// events[0].state = K_POLL_STATE_NOT_READY;
+	// 		k_work_submit(&delete_assembly_data_work);
+	// 		k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+	// 	} else {
+	// 		printk("We are in passive mode\n");
+	// 		k_poll(events, 2, K_FOREVER);
+	// 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+	// 			k_sem_take(events[1].sem, 0);
+	// 			k_work_submit(&request_battery_status_work);
+	// 			// gps_control_start(0);
+	// 			// k_poll(events, 1,
+	// 			//        K_SECONDS(GPS_SEARCH_TIMEOUT));
+	// 			// if (events[0].state ==
+	// 			//    K_POLL_STATE_SEM_AVAILABLE) {
+	// 			//	k_sem_take(events[0].sem, 0);
+	// 				k_work_submit(&publish_gps_data_work);
+	// 				led_notification_publish_data();
+	// 			// } else {
+	// 			// 	gps_control_stop(0);
+	// 			// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+	// 			// 	       GPS_SEARCH_TIMEOUT);
+	// 			// }
+	// 			// events[0].state = K_POLL_STATE_NOT_READY;
+	// 			k_work_submit(&delete_assembly_data_work);
+	// 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+	// 		}
+	// 		events[1].state = K_POLL_STATE_NOT_READY;
+	// 	}
+	// }
 }
