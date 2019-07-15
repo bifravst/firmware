@@ -18,9 +18,11 @@ void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len);
 void data_print(u8_t *prefix, u8_t *data, size_t len);
 
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
-	u8_t *data, size_t len);
+	u8_t *data, size_t len, u8_t *topic);
 
-int subscribe(void);
+void sync_broker(void);
+
+int subscribe(u8_t *sub_topic);
 
 int publish_get_payload(struct mqtt_client *c, size_t length);
 
