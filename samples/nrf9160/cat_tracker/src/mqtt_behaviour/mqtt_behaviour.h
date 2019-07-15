@@ -20,7 +20,7 @@ void data_print(u8_t *prefix, u8_t *data, size_t len);
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	u8_t *data, size_t len, u8_t *topic);
 
-void sync_broker(void);
+int sync_broker(void);
 
 int subscribe(u8_t *sub_topic);
 

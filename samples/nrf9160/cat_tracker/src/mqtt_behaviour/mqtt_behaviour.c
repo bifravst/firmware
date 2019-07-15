@@ -4,6 +4,15 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
+#include <stdbool.h>
+#include <string.h>
+
+#include <zephyr.h>
+#include <zephyr/types.h>
+
+#include <cJSON.h>
+#include <cJSON_os.h>
+
 #define APP_SLEEP_MS					10000 //default 70 seconds
 #define APP_CONNECT_TRIES			10
 #define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
@@ -19,6 +28,7 @@
 #define CONFIG_MQTT_GET_TOPIC	"$aws/things/Cat-Tracker/shadow/get"
 #define CONFIG_MQTT_ACCEPTED_TOPIC	"$aws/things/Cat-Tracker/shadow/get/accepted"
 #define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
+#define CONFIG_MQTT_DELTA_TOPIC	"$aws/thing/Cat-Tracker/shadow/update/delta"
 
 // /*End */
 
@@ -31,7 +41,10 @@ int publish_interval = 30;
 
 /*end */
 
-static char sync_update[50] = "{ \"state\": { \"reported\": { \"mode\": \"active\n }}}";
+static struct Sync_data {
+	char mode[];
+	int publish_interval;
+} sync_data ;
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -421,7 +434,26 @@ void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
 
 }
 
-void sync_broker() {
+static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
+{
+	cJSON_AddItemToObject(parent, str, item);
+
+	return 0;
+}
+
+static int json_add_str(cJSON *parent, const char *str, const char *item)
+{
+	cJSON *json_str;
+
+	json_str = cJSON_CreateString(item);
+	if (json_str == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_str);
+}
+
+int sync_broker() {
 	int err;
 
 	err = mqtt_enable(&client);
@@ -434,8 +466,47 @@ void sync_broker() {
 		printk("Could not ping server\n");
 	}
 
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, sync_update,
-		     sizeof(sync_update), CONFIG_MQTT_GET_TOPIC);
+//--//
+
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *state_obj = cJSON_CreateObject();
+	cJSON *reported_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		return -ENOMEM; //add error handling later
+	}
+
+	// ret = json_add_obj(reported_obj, channel_type_str[channel->type],
+	// 		   (cJSON *)channel->data.buf);
+
+	err = json_add_str(reported_obj, "mode", "inactive");
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		return -ENOMEM;
+	}
+
+	err = json_add_obj(state_obj, "reported", reported_obj);
+	err += json_add_obj(root_obj, "state", state_obj);
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		return -EAGAIN;
+	}
+
+	char *buffer;
+
+	buffer = cJSON_PrintUnformatted(root_obj);
+	cJSON_Delete(root_obj);
+
+	//--//
+	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer,
+		     strlen(buffer), CONFIG_MQTT_GET_TOPIC);
 
 	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
@@ -452,6 +523,8 @@ void sync_broker() {
 	if (err) {
 		printk("Could not input data\n");
 	}
+
+	return 0;
 }
 
 int provision_certificates(void) {
