@@ -26,7 +26,7 @@
 #define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
 #define CONFIG_MQTT_DELTA_TOPIC	"$aws/thing/Cat-Tracker/shadow/update/delta"
 
-bool tracker_mode = true;
+// bool tracker_mode = true;
 
 typedef struct Sync_data {
 	int batpercent;
@@ -35,11 +35,17 @@ typedef struct Sync_data {
 	int gps_search_timeout;
 	int sleep_accel_thres;
 	int publish_interval;
-	char mode[];
+	char mode[50];
 } Sync_data;
 
-/*Default values */
-Sync_data sync_data = {.mode = "active", .gps_search_timeout = 360, .sleep_accel_thres = 300, .publish_interval = 30};
+//default real time changable device parameters
+// Sync_data sync_data = { .mode = "inactive",
+// 			.gps_search_timeout = 360,
+// 			.sleep_accel_thres = 300,
+// 			.publish_interval = 30 };
+
+Sync_data sync_data;
+
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -56,6 +62,26 @@ static bool connected;
 static bool initial_connection = false;
 
 static int nfds;
+
+int check_mode(void) {
+
+	printk("SYNC_DATA_MODE %s\n", sync_data.mode);
+
+	int status;
+
+	if (strcmp(sync_data.mode, "active")) {
+		printk("CHECKMODE ACTIVE\n");
+		status = true;
+	} else if(strcmp(sync_data.mode, "inactive")) {
+		printk("CHECKMODE INACTIVE\n");
+		status = false;
+	} else {
+		printk("What the fuck\n");
+		status = true;
+	}
+
+	return status;
+}
 
 void insert_gps_data(double longitude, double latitude) {
 	sync_data.longitude = longitude;
@@ -148,6 +174,33 @@ int publish_get_payload(struct mqtt_client *c, size_t length) {
 	return 0;
 }
 
+static int decode_response(char const *input)
+{
+
+	cJSON *state = NULL;
+	cJSON *mode = NULL;
+
+	cJSON *parameters = cJSON_Parse(input);
+	if (parameters == NULL) {
+		return -ENOENT;
+	}
+
+	state = cJSON_GetObjectItem(parameters, "state");
+	mode = cJSON_GetObjectItem(state, "mode");
+
+	printk("THE MODE IS %s\n", mode->valuestring);
+
+	if (strcmp(mode->valuestring, "active") || (strcmp(mode->valuestring, "inactive"))) {
+		strcpy(sync_data.mode, mode->valuestring);
+		printk("MODE IS ACUTALLY GETTING CHANGES\n");
+	}
+
+
+	cJSON_Delete(parameters);
+
+	return 0;
+}
+
 void mqtt_evt_handler(struct mqtt_client *const c,
 		      const struct mqtt_evt *evt) {
 	int err;
@@ -185,7 +238,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		       __LINE__, evt->result, p->message.payload.len);
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err >= 0) {
-			data_print("Received: ", payload_buf, p->message.payload.len);
+			//data_print("Received: ", payload_buf, p->message.payload.len);
 		} else {
 			printk("mqtt_read_publish_payload: Failed! %d\n", err);
 			printk("Disconnecting MQTT client...\n");
@@ -195,6 +248,15 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 				printk("Could not disconnect: %d\n", err);
 			}
 		}
+
+		if (initial_connection) {
+			err = decode_response(payload_buf);
+			if (err != 0) {
+				printk("Error with resonse from modem\n%d",
+				       err);
+			}
+		}
+
 	} break;
 
 	case MQTT_EVT_PUBACK:
@@ -460,7 +522,6 @@ int publish_gps_data() {
 	int *ptr6 = &sync_data.sleep_accel_thres;
 
 	char *ptr7 = sync_data.mode;
-
 
 	/*Start of json configuration */
 	

@@ -184,7 +184,7 @@ void main(void)
 	k_work_submit(&sync_broker_work);
 
 	while (1) {
-		if (tracker_mode) { //tracker mode should be replaced by a function checking the mode
+		if (check_mode()) { //tracker mode should be replaced by a function checking the mode
 			printk("We are in active mode\n");
 			k_work_submit(&request_battery_status_work);
 			gps_control_start(0);
