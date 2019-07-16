@@ -13,20 +13,16 @@
 #include <misc/reboot.h>
 #include <mqtt_behaviour.h>
 #include <modem_stats.h>
-#include <accelerometer.h>
 #include <device.h>
 #include <sensor.h>
 #include <gps_controller.h>
-#include <string_manipulation.h>
 
 //these variables needs to be made dynamic in mqtt behaviour module
 
 #define PUBLISH_INTERVAL	30
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	30
+#define GPS_SEARCH_TIMEOUT	720
 #define SLEEP_ACCEL_THRES	30
-
-static char mqtt_assembly_line_d[100] = "";
 
 static struct gps_data gps_data;
 
@@ -42,20 +38,21 @@ struct k_poll_event events[2] = {
 
 static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
-static struct k_work delete_assembly_data_work;
 static struct k_work sync_broker_work;
 
 static void request_battery_status_work_fn(struct k_work *work) {
-	request_battery_status(mqtt_assembly_line_d);
+	int battery_percentage;
+	
+	battery_percentage = request_battery_status();
+	insert_battery_data(battery_percentage);
 }
 
 static void publish_gps_data_work_fn(struct k_work *work) {
-	publish_gps_data(mqtt_assembly_line_d, sizeof(mqtt_assembly_line_d));
-}
-
-static void delete_assembly_data_work_fn(struct k_work *work) {
-	delete_publish_data(mqtt_assembly_line_d);
-	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
+	int err;
+	err = publish_gps_data();
+	if (err != 0) {
+		printk("Error publishing data: %d", err);
+	}
 }
 
 static void sync_broker_work_fn(struct k_work *work) {
@@ -69,7 +66,6 @@ static void sync_broker_work_fn(struct k_work *work) {
 static void work_init() {
 	k_work_init(&request_battery_status_work, request_battery_status_work_fn);
 	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
-	k_work_init(&delete_assembly_data_work, delete_assembly_data_work_fn);
 	k_work_init(&sync_broker_work, sync_broker_work_fn);
 }
 
@@ -164,8 +160,8 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 			gps_control_on_trigger();
 			gps_control_stop(0);
 			gps_sample_fetch(dev);
-			gps_channel_get(dev, GPS_CHAN_NMEA, &gps_data);
-			concat_structure(mqtt_assembly_line_d, gps_data.nmea.buf);
+			gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
+			insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude);
 			k_sem_give(events[0].sem);
 		break;
 
@@ -183,53 +179,50 @@ void main(void)
 	provision_certificates();
 	lte_connect();
 	adxl362_init();
-	concat_structure(mqtt_assembly_line_d, TRACKER_ID);
-	//gps_control_init(gps_control_handler);
+	gps_control_init(gps_control_handler);
 
 	k_work_submit(&sync_broker_work);
 
-	// while (1) {
-	// 	if (tracker_mode) {
-	// 		printk("We are in active mode\n");
-	// 		k_work_submit(&request_battery_status_work);
-	// 		// gps_control_start(0);
-	// 		// k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
-	// 		// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-	// 		//	k_sem_take(events[0].sem, 0);
-	// 			k_work_submit(&publish_gps_data_work);
-	// 			led_notification_publish_data();
-	// 		// } else {
-	// 		// 	gps_control_stop(0);
-	// 		// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
-	// 		// 			GPS_SEARCH_TIMEOUT);
-	// 		// }
-	// 		// events[0].state = K_POLL_STATE_NOT_READY;
-	// 		k_work_submit(&delete_assembly_data_work);
-	// 		k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-	// 	} else {
-	// 		printk("We are in passive mode\n");
-	// 		k_poll(events, 2, K_FOREVER);
-	// 		if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-	// 			k_sem_take(events[1].sem, 0);
-	// 			k_work_submit(&request_battery_status_work);
-	// 			// gps_control_start(0);
-	// 			// k_poll(events, 1,
-	// 			//        K_SECONDS(GPS_SEARCH_TIMEOUT));
-	// 			// if (events[0].state ==
-	// 			//    K_POLL_STATE_SEM_AVAILABLE) {
-	// 			//	k_sem_take(events[0].sem, 0);
-	// 				k_work_submit(&publish_gps_data_work);
-	// 				led_notification_publish_data();
-	// 			// } else {
-	// 			// 	gps_control_stop(0);
-	// 			// 	printk("GPS data could not be found within %d seconds, deleting assembly string\n",
-	// 			// 	       GPS_SEARCH_TIMEOUT);
-	// 			// }
-	// 			// events[0].state = K_POLL_STATE_NOT_READY;
-	// 			k_work_submit(&delete_assembly_data_work);
-	// 			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-	// 		}
-	// 		events[1].state = K_POLL_STATE_NOT_READY;
-	// 	}
-	// }
+	while (1) {
+		if (tracker_mode) { //tracker mode should be replaced by a function checking the mode
+			printk("We are in active mode\n");
+			k_work_submit(&request_battery_status_work);
+			gps_control_start(0);
+			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
+			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[0].sem, 0);
+				k_work_submit(&publish_gps_data_work);
+				led_notification_publish_data();
+			} else {
+				gps_control_stop(0);
+				printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+						GPS_SEARCH_TIMEOUT);
+			}
+			events[0].state = K_POLL_STATE_NOT_READY;
+			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+		} else {
+			printk("We are in passive mode\n");
+			k_poll(events, 2, K_FOREVER);
+			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[1].sem, 0);
+				k_work_submit(&request_battery_status_work);
+				gps_control_start(0);
+				k_poll(events, 1,
+				       K_SECONDS(GPS_SEARCH_TIMEOUT));
+				if (events[0].state ==
+				   K_POLL_STATE_SEM_AVAILABLE) {
+					k_sem_take(events[0].sem, 0);
+					k_work_submit(&publish_gps_data_work);
+					led_notification_publish_data();
+				} else {
+					gps_control_stop(0);
+					printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+					       GPS_SEARCH_TIMEOUT);
+				}
+				events[0].state = K_POLL_STATE_NOT_READY;
+				k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+			}
+			events[1].state = K_POLL_STATE_NOT_READY;
+		}
+	}
 }

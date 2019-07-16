@@ -7,7 +7,7 @@ extern "C" {
 
 void at_cmd_handler(char *state);
 
-void request_battery_status(char *gps_dummy_string);
+int request_battery_status();
 
 #ifdef __cplusplus
 }

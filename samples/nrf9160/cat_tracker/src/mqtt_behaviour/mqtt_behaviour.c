@@ -15,36 +15,30 @@
 
 #define APP_SLEEP_MS					10000 //default 70 seconds
 #define APP_CONNECT_TRIES			10
-#define CMDT_ENABLE_REAL_TIME_T		"CMDT+ENBRTT"
-#define CMDT_DISABLE_REAL_TIME_T	"CMDT+DISBRTT"		//not like this
 
 #if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
 #include "certificates.h"
 #endif
 
-// /*Temporary configurations which should be placed in the static config file, start */
-
 #define CONFIG_MQTT_GET_TOPIC	"$aws/things/Cat-Tracker/shadow/get"
 #define CONFIG_MQTT_ACCEPTED_TOPIC	"$aws/things/Cat-Tracker/shadow/get/accepted"
 #define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
 #define CONFIG_MQTT_DELTA_TOPIC	"$aws/thing/Cat-Tracker/shadow/update/delta"
 
-// /*End */
-
 bool tracker_mode = true;
 
-/*further confiurations needed to be added start */
-int sleep_accel_thres = 30;
-int gps_search_timeout = 30;
-int publish_interval = 30;
-
-/*end */
-
-static struct Sync_data {
-	char mode[];
+typedef struct Sync_data {
+	int batpercent;
+	double longitude;
+	double latitude;
+	bool active_tracking;
+	int gps_search_timeout;
+	int sleep_accel_thres;
 	int publish_interval;
-} sync_data ;
+} Sync_data;
+
+Sync_data sync_data = {.active_tracking = true, .gps_search_timeout = 360, .sleep_accel_thres = 300, .publish_interval = 30};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -62,22 +56,13 @@ static bool initial_connection = false;
 
 static int nfds;
 
-void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len) {
-	char buf[len + 1];
+void insert_gps_data(double longitude, double latitude) {
+	sync_data.longitude = longitude;
+	sync_data.latitude = latitude;
+}
 
-	memcpy(buf, data, len);
-	buf[len] = 0;
-
-	/*This code section checks if incomming is a know commando */
-	if (strcmp(buf, CMDT_ENABLE_REAL_TIME_T)) {
-		tracker_mode = true;
-		printk("%s%s -> Real time tracking mode set\n", prefix, buf);
-	} else if (strcmp(buf, CMDT_DISABLE_REAL_TIME_T)) {
-		tracker_mode = false;
-		printk("%s%s -> Real time tracking mode disabled\n", prefix, buf);
-	} else {
-		printk("%s%s -> Could not identify commando\n", prefix, buf);
-	}
+void insert_battery_data(int battery_percentage) {
+	sync_data.batpercent = battery_percentage;
 }
 
 void data_print(u8_t *prefix, u8_t *data, size_t len) {
@@ -176,7 +161,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
 		if (!initial_connection) {
-			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC); // this is the sync operation at the beginning
+			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
 			initial_connection = true;
 		} else {
 			subscribe(CONFIG_MQTT_SUB_TOPIC);
@@ -199,7 +184,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		       __LINE__, evt->result, p->message.payload.len);
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err >= 0) {
-			data_print_set_mode("Received: ", payload_buf, p->message.payload.len);
+			data_print("Received: ", payload_buf, p->message.payload.len);
 		} else {
 			printk("mqtt_read_publish_payload: Failed! %d\n", err);
 			printk("Disconnecting MQTT client...\n");
@@ -400,40 +385,6 @@ int mqtt_enable(struct mqtt_client *client) {
 	return 0;
 }
 
-void publish_gps_data(u8_t *gps_publish_data_stream_head, size_t gps_data_len) {
-	int err;
-
-	err = mqtt_enable(&client);
-	if (err) {
-		printk("Could not connect to client\n");
-	}
-
-	err = mqtt_ping(&client);
-	if (err) {
-		printk("Could not ping server\n");
-	}
-
-    data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-        gps_publish_data_stream_head, gps_data_len, CONFIG_MQTT_PUB_TOPIC);
-
-	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-	if (err) {
-		printk("mqtt processing failed\n");
-	}
-
-	err = mqtt_disconnect(&client);
-	if (err) {
-		printk("Could not disconnect\n");
-	}
-
-	wait(APP_SLEEP_MS);
-	err = mqtt_input(&client);
-	if (err) {
-		printk("Could not input data\n");
-	}
-
-}
-
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
 	cJSON_AddItemToObject(parent, str, item);
@@ -453,12 +404,34 @@ static int json_add_str(cJSON *parent, const char *str, const char *item)
 	return json_add_obj(parent, str, json_str);
 }
 
-int sync_broker() {
+static int json_add_double(cJSON *parent, const char *str, double *item) {
+	cJSON *json_double;
+
+	json_double = cJSON_CreateDoubleArray(item, 1);
+	if (json_double == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_double);
+}
+
+static int json_add_int(cJSON *parent, const char *str, int *item) {
+	cJSON *json_int;
+
+	json_int = cJSON_CreateIntArray(item, 1);
+	if (json_int == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_int);
+}
+
+int publish_gps_data() {
 	int err;
 
 	err = mqtt_enable(&client);
 	if (err) {
-		printk("Could not ping server\n");
+		printk("Could not connect to client\n");
 	}
 
 	err = mqtt_ping(&client);
@@ -466,8 +439,12 @@ int sync_broker() {
 		printk("Could not ping server\n");
 	}
 
-//--//
+	double *ptr1 = &sync_data.longitude;
+	double *ptr2 = &sync_data.latitude;
+	int *ptr3 = &sync_data.batpercent;
 
+	/*Start of json configuration */
+	
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
@@ -476,13 +453,12 @@ int sync_broker() {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
-		return -ENOMEM; //add error handling later
+		return -ENOMEM;
 	}
 
-	// ret = json_add_obj(reported_obj, channel_type_str[channel->type],
-	// 		   (cJSON *)channel->data.buf);
-
-	err = json_add_str(reported_obj, "mode", "inactive");
+	err = json_add_double(reported_obj, "longitude", ptr1);
+	err += json_add_double(reported_obj, "latitude", ptr2);
+	err += json_add_int(reported_obj, "battery", ptr3);
 	if (err != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
@@ -504,7 +480,61 @@ int sync_broker() {
 	buffer = cJSON_PrintUnformatted(root_obj);
 	cJSON_Delete(root_obj);
 
-	//--//
+	/*end of json configuration */
+
+
+	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
+		     CONFIG_MQTT_PUB_TOPIC);
+
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	if (err) {
+		printk("mqtt processing failed\n");
+	}
+
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect\n");
+	}
+
+	wait(APP_SLEEP_MS);
+	err = mqtt_input(&client);
+	if (err) {
+		printk("Could not input data\n");
+	}
+
+	return 0;
+
+}
+
+int sync_broker() {
+	int err;
+
+	err = mqtt_enable(&client);
+	if (err) {
+		printk("Could not ping server\n");
+	}
+
+	err = mqtt_ping(&client);
+	if (err) {
+		printk("Could not ping server\n");
+	}
+
+/*start json encoding */
+
+	cJSON *root_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL) {
+		cJSON_Delete(root_obj);
+		return -ENOMEM;
+	}
+
+	char *buffer;
+
+	buffer = cJSON_PrintUnformatted(root_obj);
+	cJSON_Delete(root_obj);
+
+/*end json encoding */
+
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer,
 		     strlen(buffer), CONFIG_MQTT_GET_TOPIC);
 
