@@ -9,7 +9,9 @@
 extern "C" {
 #endif
 
-extern bool tracker_mode;
+// extern bool tracker_mode;
+
+int check_mode(void);
 
 void insert_gps_data(double longitude, double latitude);
 
