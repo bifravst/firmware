@@ -5,7 +5,6 @@
 #include <at_cmd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <string_manipulation.h>
 
 #define AT_BATSTAT	"AT%XVBAT"
 #define BAT_ROOF	5500
@@ -40,10 +39,9 @@ int convert_to_percentage(int bat_voltage_roof, int bat_voltage_floor, int curre
 	return (((current_voltage_level - bat_voltage_floor) * 100) / (bat_voltage_roof - bat_voltage_floor));
 }
 
-void request_battery_status(char *mqtt_assembly_line_d) {
+int request_battery_status() {
 	int err;
 	char buf[50];
-	char battery_percentage_s[50];
 	size_t buf_len = sizeof(buf);
 	char battery_level[4];
 	
@@ -58,9 +56,7 @@ void request_battery_status(char *mqtt_assembly_line_d) {
 	}
 
 	battery_percentage = convert_to_percentage(BAT_ROOF, BAT_FLOOR, atoi(battery_level));
-	
-	sprintf(battery_percentage_s, "%hu", battery_percentage);
 
-	concat_structure(mqtt_assembly_line_d, battery_percentage_s);
+	return battery_percentage;
 
 }
