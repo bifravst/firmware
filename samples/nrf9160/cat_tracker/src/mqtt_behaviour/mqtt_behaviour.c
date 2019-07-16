@@ -32,13 +32,14 @@ typedef struct Sync_data {
 	int batpercent;
 	double longitude;
 	double latitude;
-	bool active_tracking;
 	int gps_search_timeout;
 	int sleep_accel_thres;
 	int publish_interval;
+	char mode[];
 } Sync_data;
 
-Sync_data sync_data = {.active_tracking = true, .gps_search_timeout = 360, .sleep_accel_thres = 300, .publish_interval = 30};
+/*Default values */
+Sync_data sync_data = {.mode = "active", .gps_search_timeout = 360, .sleep_accel_thres = 300, .publish_interval = 30};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -392,7 +393,7 @@ static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 	return 0;
 }
 
-static int json_add_str(cJSON *parent, const char *str, const char *item)
+static int json_add_str(cJSON *parent, const char *str, char *item)
 {
 	cJSON *json_str;
 
@@ -426,6 +427,17 @@ static int json_add_int(cJSON *parent, const char *str, int *item) {
 	return json_add_obj(parent, str, json_int);
 }
 
+// static int json_add_bool(cJSON *parent, const char *str, bool *item) {
+// 	cJSON *json_bool;
+
+// 	json_bool = cJSON_CreateBool(item);
+// 	if (json_bool == NULL) {
+// 		return -ENOMEM;
+// 	}
+
+// 	return json_add_obj(parent, str, json_bool);
+// }
+
 int publish_gps_data() {
 	int err;
 
@@ -443,6 +455,13 @@ int publish_gps_data() {
 	double *ptr2 = &sync_data.latitude;
 	int *ptr3 = &sync_data.batpercent;
 
+	int *ptr4 = &sync_data.gps_search_timeout;
+	int *ptr5 = &sync_data.publish_interval;
+	int *ptr6 = &sync_data.sleep_accel_thres;
+
+	char *ptr7 = sync_data.mode;
+
+
 	/*Start of json configuration */
 	
 	cJSON *root_obj = cJSON_CreateObject();
@@ -459,6 +478,11 @@ int publish_gps_data() {
 	err = json_add_double(reported_obj, "longitude", ptr1);
 	err += json_add_double(reported_obj, "latitude", ptr2);
 	err += json_add_int(reported_obj, "battery", ptr3);
+	err += json_add_int(reported_obj, "publish interval", ptr4);
+	err += json_add_int(reported_obj, "gps search timeout", ptr5);
+	err += json_add_int(reported_obj, "idle threshold", ptr6);
+	err += json_add_str(reported_obj, "mode", ptr7);
+
 	if (err != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
