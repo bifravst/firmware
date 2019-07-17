@@ -5,6 +5,8 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
+#include <gps.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,7 +15,7 @@ extern "C" {
 
 int check_mode(void);
 
-void insert_gps_data(double longitude, double latitude);
+void insert_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime);
 
 void insert_battery_data(int battery_percentage);
 
