@@ -4,6 +4,9 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <stdbool.h>
 #include <string.h>
 
@@ -13,7 +16,9 @@
 #include <cJSON.h>
 #include <cJSON_os.h>
 
-#define APP_SLEEP_MS					10000 //default 70 seconds
+#include <gps.h>
+
+#define APP_SLEEP_MS					20000 //default 70 seconds
 #define APP_CONNECT_TRIES			10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
@@ -28,14 +33,17 @@
 
 // bool tracker_mode = true;
 
+//static struct gps_datetime gps_datetime;
+
 typedef struct Sync_data {
 	int batpercent;
 	double longitude;
 	double latitude;
+	char gps_timestamp[50];
 	int gps_search_timeout;
-	int sleep_accel_thres;
+	int idle_threshold;
 	int publish_interval;
-	char mode[50];
+	int mode;
 } Sync_data;
 
 //default real time changable device parameters
@@ -44,8 +52,7 @@ typedef struct Sync_data {
 // 			.sleep_accel_thres = 300,
 // 			.publish_interval = 30 };
 
-Sync_data sync_data;
-
+Sync_data sync_data = {.mode = true};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -65,27 +72,32 @@ static int nfds;
 
 int check_mode(void) {
 
-	printk("SYNC_DATA_MODE %s\n", sync_data.mode);
-
-	int status;
-
-	if (strcmp(sync_data.mode, "active")) {
-		printk("CHECKMODE ACTIVE\n");
-		status = true;
-	} else if(strcmp(sync_data.mode, "inactive")) {
-		printk("CHECKMODE INACTIVE\n");
-		status = false;
+	if (sync_data.mode) {
+		return true;
 	} else {
-		printk("What the fuck\n");
-		status = true;
+		return false;
 	}
 
-	return status;
+	return true;
 }
 
-void insert_gps_data(double longitude, double latitude) {
+void insert_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime) {
+	char temp[50];
+	char buffer[50];
+
 	sync_data.longitude = longitude;
 	sync_data.latitude = latitude;
+
+	__itoa(gps_datetime.year, buffer, 10);
+	strcat(temp, buffer);
+	// strcat(temp, itoa(buffer, gps_datetime.month, 10));
+	// strcat(temp, itoa(buffer, gps_datetime.day, 10));
+	// strcat(temp, itoa(buffer, gps_datetime.hour, 10));
+	// strcat(temp, itoa(buffer, gps_datetime.minute, 10));
+	// strcat(temp, itoa(buffer, gps_datetime.seconds, 10));
+	// strcat(temp, itoa(buffer, gps_datetime.ms, 10));
+
+	strcpy(sync_data.gps_timestamp, temp); 
 }
 
 void insert_battery_data(int battery_percentage) {
@@ -110,7 +122,7 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data, size_t le
 	param.message.payload.len = len;
 	param.message_id = sys_rand32_get();
 	param.dup_flag = 0;
-	param.retain_flag = 0; //Retain message by the broker, needs to be set eventually
+	param.retain_flag = 0;
 
 	data_print("Publishing: ", data, len);
 	printk("to topic: %s len: %u\n",
@@ -187,14 +199,13 @@ static int decode_response(char const *input)
 
 	state = cJSON_GetObjectItem(parameters, "state");
 	mode = cJSON_GetObjectItem(state, "mode");
-
-	printk("THE MODE IS %s\n", mode->valuestring);
-
-	if (strcmp(mode->valuestring, "active") || (strcmp(mode->valuestring, "inactive"))) {
-		strcpy(sync_data.mode, mode->valuestring);
-		printk("MODE IS ACUTALLY GETTING CHANGES\n");
+	if (state == NULL || mode == NULL) {
+		return -ENOENT;
 	}
 
+	printk("The mode is %d\n", mode->valueint);
+
+	sync_data.mode = mode->valueint;
 
 	cJSON_Delete(parameters);
 
@@ -214,12 +225,12 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		if (!initial_connection) {
-			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
-			initial_connection = true;
-		} else {
+		// if (!initial_connection) {
+			// subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+			// initial_connection = true;
+		// } else {
 			subscribe(CONFIG_MQTT_SUB_TOPIC);
-		}
+		// }
 
 		break;
 
@@ -249,12 +260,10 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 			}
 		}
 
-		if (initial_connection) {
-			err = decode_response(payload_buf);
-			if (err != 0) {
-				printk("Error with resonse from modem\n%d",
-				       err);
-			}
+		err = decode_response(payload_buf);
+		if (err != 0) {
+			printk("Could not decode response\n%d",
+					err);
 		}
 
 	} break;
@@ -489,16 +498,16 @@ static int json_add_int(cJSON *parent, const char *str, int *item) {
 	return json_add_obj(parent, str, json_int);
 }
 
-// static int json_add_bool(cJSON *parent, const char *str, bool *item) {
-// 	cJSON *json_bool;
+static int json_add_bool(cJSON *parent, const char *str, int item) {
+	cJSON *json_bool;
 
-// 	json_bool = cJSON_CreateBool(item);
-// 	if (json_bool == NULL) {
-// 		return -ENOMEM;
-// 	}
+	json_bool = cJSON_CreateBool(item);
+	if (json_bool == NULL) {
+		return -ENOMEM;
+	}
 
-// 	return json_add_obj(parent, str, json_bool);
-// }
+	return json_add_obj(parent, str, json_bool);
+}
 
 int publish_gps_data() {
 	int err;
@@ -516,47 +525,53 @@ int publish_gps_data() {
 	double *ptr1 = &sync_data.longitude;
 	double *ptr2 = &sync_data.latitude;
 	int *ptr3 = &sync_data.batpercent;
-
 	int *ptr4 = &sync_data.gps_search_timeout;
 	int *ptr5 = &sync_data.publish_interval;
-	int *ptr6 = &sync_data.sleep_accel_thres;
-
-	char *ptr7 = sync_data.mode;
+	int *ptr6 = &sync_data.idle_threshold;
+	int ptr7 = sync_data.mode;
+	char *ptr8 = sync_data.gps_timestamp;
 
 	/*Start of json configuration */
 	
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *gps_obj = cJSON_CreateObject();
 
 	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
+		cJSON_Delete(gps_obj);
 		return -ENOMEM;
 	}
 
-	err = json_add_double(reported_obj, "longitude", ptr1);
-	err += json_add_double(reported_obj, "latitude", ptr2);
-	err += json_add_int(reported_obj, "battery", ptr3);
-	err += json_add_int(reported_obj, "publish interval", ptr4);
-	err += json_add_int(reported_obj, "gps search timeout", ptr5);
-	err += json_add_int(reported_obj, "idle threshold", ptr6);
-	err += json_add_str(reported_obj, "mode", ptr7);
+	err = json_add_double(gps_obj, "long", ptr1);
+	err += json_add_double(gps_obj, "lat", ptr2);
+	err += json_add_str(gps_obj, "ts", ptr8);
+
+	err += json_add_int(reported_obj, "bat", ptr3);
+	err += json_add_int(reported_obj, "gpst", ptr4);
+	err += json_add_int(reported_obj, "pubint", ptr5);
+	err += json_add_int(reported_obj, "idlet", ptr6);
+	err += json_add_bool(reported_obj, "mode", ptr7);
 
 	if (err != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
+		cJSON_Delete(gps_obj);
 		return -ENOMEM;
 	}
 
-	err = json_add_obj(state_obj, "reported", reported_obj);
+	err = json_add_obj(reported_obj, "gps", gps_obj);
+	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 	if (err != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
+		cJSON_Delete(gps_obj);
 		return -EAGAIN;
 	}
 

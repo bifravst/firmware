@@ -21,7 +21,7 @@
 
 #define PUBLISH_INTERVAL	30
 #define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	720
+#define GPS_SEARCH_TIMEOUT	360
 #define SLEEP_ACCEL_THRES	30
 
 static struct gps_data gps_data;
@@ -161,7 +161,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 			gps_control_stop(0);
 			gps_sample_fetch(dev);
 			gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-			insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude);
+			insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude, gps_data.pvt.datetime);
 			k_sem_give(events[0].sem);
 		break;
 
@@ -181,7 +181,7 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	k_work_submit(&sync_broker_work);
+	//k_work_submit(&sync_broker_work);
 
 	while (1) {
 		if (check_mode()) { //tracker mode should be replaced by a function checking the mode
@@ -221,7 +221,7 @@ void main(void)
 				}
 				events[0].state = K_POLL_STATE_NOT_READY;
 				k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-			}
+			}	
 			events[1].state = K_POLL_STATE_NOT_READY;
 		}
 	}
