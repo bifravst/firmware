@@ -11,9 +11,13 @@
 extern "C" {
 #endif
 
-// extern bool tracker_mode;
-
 int check_mode(void);
+
+int check_publish_interval(void);
+
+int check_idle_threshold(void);
+
+int check_gps_timeout(void);
 
 void insert_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime);
 
@@ -32,7 +36,7 @@ int sync_broker(void);
 
 int subscribe(u8_t *sub_topic);
 
-int publish_get_payload(struct mqtt_client *c, size_t length);
+// int publish_get_payload(struct mqtt_client *c, size_t length);
 
 void mqtt_evt_handler(struct mqtt_client *const c,
 		      const struct mqtt_evt *evt);

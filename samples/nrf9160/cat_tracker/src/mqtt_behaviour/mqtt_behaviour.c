@@ -16,43 +16,35 @@
 #include <cJSON.h>
 #include <cJSON_os.h>
 
+#include <time.h>
+
 #include <gps.h>
 
-#define APP_SLEEP_MS					20000 //default 70 seconds
-#define APP_CONNECT_TRIES			10
+#define APP_SLEEP_MS 10000 //default 70 seconds
+#define APP_CONNECT_TRIES 10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
 #include "certificates.h"
 #endif
 
-#define CONFIG_MQTT_GET_TOPIC	"$aws/things/Cat-Tracker/shadow/get"
-#define CONFIG_MQTT_ACCEPTED_TOPIC	"$aws/things/Cat-Tracker/shadow/get/accepted"
-#define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
-#define CONFIG_MQTT_DELTA_TOPIC	"$aws/thing/Cat-Tracker/shadow/update/delta"
-
-// bool tracker_mode = true;
-
-//static struct gps_datetime gps_datetime;
+#define CONFIG_MQTT_GET_TOPIC "$aws/things/Cat-Tracker/shadow/get"
+#define CONFIG_MQTT_ACCEPTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/accepted"
+#define CONFIG_MQTT_REJECTED_TOPIC                                             \
+	"$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
+#define CONFIG_MQTT_DELTA_TOPIC "$aws/thing/Cat-Tracker/shadow/update/delta"
 
 typedef struct Sync_data {
 	int batpercent;
 	double longitude;
 	double latitude;
-	char gps_timestamp[50];
+	long int gps_timestamp;
 	int gps_search_timeout;
-	int idle_threshold;
 	int publish_interval;
-	int mode;
+	bool mode;
 } Sync_data;
 
-//default real time changable device parameters
-// Sync_data sync_data = { .mode = "inactive",
-// 			.gps_search_timeout = 360,
-// 			.sleep_accel_thres = 300,
-// 			.publish_interval = 30 };
-
-Sync_data sync_data = {.mode = true};
+Sync_data sync_data = { .mode = true, .publish_interval = 30, .gps_search_timeout = 360};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -66,12 +58,12 @@ static struct pollfd fds;
 
 static bool connected;
 
-static bool initial_connection = false;
+// static bool initial_connection = false;
 
 static int nfds;
 
-int check_mode(void) {
-
+int check_mode(void)
+{
 	if (sync_data.mode) {
 		return true;
 	} else {
@@ -81,30 +73,47 @@ int check_mode(void) {
 	return true;
 }
 
-void insert_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime) {
-	char temp[50];
-	char buffer[50];
+int check_publish_interval(void)
+{
+	return sync_data.publish_interval;
+}
+
+int check_gps_timeout(void)
+{
+	return sync_data.gps_search_timeout;
+}
+
+void insert_gps_data(double longitude, double latitude,
+		     struct gps_datetime gps_datetime)
+{
+
+	struct tm tm;
+	long int epoch;
 
 	sync_data.longitude = longitude;
 	sync_data.latitude = latitude;
 
-	__itoa(gps_datetime.year, buffer, 10);
-	strcat(temp, buffer);
-	// strcat(temp, itoa(buffer, gps_datetime.month, 10));
-	// strcat(temp, itoa(buffer, gps_datetime.day, 10));
-	// strcat(temp, itoa(buffer, gps_datetime.hour, 10));
-	// strcat(temp, itoa(buffer, gps_datetime.minute, 10));
-	// strcat(temp, itoa(buffer, gps_datetime.seconds, 10));
-	// strcat(temp, itoa(buffer, gps_datetime.ms, 10));
+	printk("year: %d\n", gps_datetime.year);
 
-	strcpy(sync_data.gps_timestamp, temp); 
+	tm.tm_year = gps_datetime.year;
+	tm.tm_mon = gps_datetime.month;
+	tm.tm_mday = gps_datetime.day;
+	tm.tm_hour = gps_datetime.hour;
+	tm.tm_min = gps_datetime.minute;
+	tm.tm_sec = gps_datetime.seconds;
+
+	epoch = mktime(&tm);
+	sync_data.gps_timestamp = epoch;
+
 }
 
-void insert_battery_data(int battery_percentage) {
+void insert_battery_data(int battery_percentage)
+{
 	sync_data.batpercent = battery_percentage;
 }
 
-void data_print(u8_t *prefix, u8_t *data, size_t len) {
+void data_print(u8_t *prefix, u8_t *data, size_t len)
+{
 	char buf[len + 1];
 
 	memcpy(buf, data, len);
@@ -112,7 +121,9 @@ void data_print(u8_t *prefix, u8_t *data, size_t len) {
 	printk("%s%s\n", prefix, buf);
 }
 
-int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data, size_t len, u8_t *topic ) {
+int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
+		 size_t len, u8_t *topic)
+{
 	struct mqtt_publish_param param;
 
 	param.message.topic.qos = qos;
@@ -125,14 +136,13 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data, size_t le
 	param.retain_flag = 0;
 
 	data_print("Publishing: ", data, len);
-	printk("to topic: %s len: %u\n",
-		topic,
-		(unsigned int)strlen(topic));
+	printk("to topic: %s len: %u\n", topic, (unsigned int)strlen(topic));
 
 	return mqtt_publish(c, &param);
 }
 
-int subscribe(u8_t *sub_topic) {
+int subscribe(u8_t *sub_topic)
+{
 	struct mqtt_topic subscribe_topic = {
 		.topic = { .utf8 = sub_topic, .size = strlen(sub_topic) },
 		.qos = MQTT_QOS_1_AT_LEAST_ONCE
@@ -148,49 +158,33 @@ int subscribe(u8_t *sub_topic) {
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-int publish_get_payload(struct mqtt_client *c, size_t length) {
-	u8_t *buf = payload_buf;
+static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
+			       size_t length)
+{
+	u8_t *buf = write_buf;
 	u8_t *end = buf + length;
 
 	if (length > sizeof(payload_buf)) {
 		return -EMSGSIZE;
 	}
-
 	while (buf < end) {
-		int ret = mqtt_read_publish_payload(c, buf, end - buf);
+		int ret = mqtt_read_publish_payload_blocking(c, buf, end - buf);
 
 		if (ret < 0) {
-			int err;
-
-			if (ret != -EAGAIN) {
-				return ret;
-			}
-
-			printk("mqtt_read_publish_payload: EAGAIN\n");
-
-			err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
-			if (err > 0 && (fds.revents & POLLIN) == POLLIN) {
-				continue;
-			} else {
-				return -EIO;
-			}
-		}
-
-		if (ret == 0) {
+			return ret;
+		} else if (ret == 0) {
 			return -EIO;
 		}
-
 		buf += ret;
 	}
-
 	return 0;
 }
 
 static int decode_response(char const *input)
 {
-
 	cJSON *state = NULL;
 	cJSON *mode = NULL;
+	cJSON *pubint = NULL;
 
 	cJSON *parameters = cJSON_Parse(input);
 	if (parameters == NULL) {
@@ -198,22 +192,26 @@ static int decode_response(char const *input)
 	}
 
 	state = cJSON_GetObjectItem(parameters, "state");
+	pubint = cJSON_GetObjectItem(state, "pubint");
 	mode = cJSON_GetObjectItem(state, "mode");
-	if (state == NULL || mode == NULL) {
-		return -ENOENT;
+
+	if (mode != NULL)
+	{
+		sync_data.mode = mode->valueint;
+
 	}
 
-	printk("The mode is %d\n", mode->valueint);
-
-	sync_data.mode = mode->valueint;
+	if (pubint != NULL) {
+		sync_data.publish_interval = pubint->valueint;
+	}
 
 	cJSON_Delete(parameters);
 
 	return 0;
 }
 
-void mqtt_evt_handler(struct mqtt_client *const c,
-		      const struct mqtt_evt *evt) {
+void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
+{
 	int err;
 
 	switch (evt->type) {
@@ -226,10 +224,10 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
 		// if (!initial_connection) {
-			// subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
-			// initial_connection = true;
+		// subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+		// initial_connection = true;
 		// } else {
-			subscribe(CONFIG_MQTT_SUB_TOPIC);
+		subscribe(CONFIG_MQTT_SUB_TOPIC);
 		// }
 
 		break;
@@ -247,10 +245,9 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 		printk("[%s:%d] MQTT PUBLISH result=%d len=%d\n", __func__,
 		       __LINE__, evt->result, p->message.payload.len);
-		err = publish_get_payload(c, p->message.payload.len);
-		if (err >= 0) {
-			//data_print("Received: ", payload_buf, p->message.payload.len);
-		} else {
+		err = publish_get_payload(c, payload_buf,
+					  p->message.payload.len);
+		if (err) {
 			printk("mqtt_read_publish_payload: Failed! %d\n", err);
 			printk("Disconnecting MQTT client...\n");
 
@@ -262,8 +259,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 
 		err = decode_response(payload_buf);
 		if (err != 0) {
-			printk("Could not decode response\n%d",
-					err);
+			printk("Could not decode response\n%d", err);
 		}
 
 	} break;
@@ -275,7 +271,7 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 
 		printk("[%s:%d] PUBACK packet id: %u\n", __func__, __LINE__,
-				evt->param.puback.message_id);
+		       evt->param.puback.message_id);
 		break;
 
 	case MQTT_EVT_SUBACK:
@@ -289,20 +285,18 @@ void mqtt_evt_handler(struct mqtt_client *const c,
 		break;
 
 	default:
-		printk("[%s:%d] default: %d\n", __func__, __LINE__,
-				evt->type);
+		printk("[%s:%d] default: %d\n", __func__, __LINE__, evt->type);
 		break;
 	}
 }
 
-void broker_init(void) {
+void broker_init(void)
+{
 	int err;
 	struct addrinfo *result;
 	struct addrinfo *addr;
-	struct addrinfo hints = {
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_STREAM
-	};
+	struct addrinfo hints = { .ai_family = AF_INET,
+				  .ai_socktype = SOCK_STREAM };
 
 	err = getaddrinfo(CONFIG_MQTT_BROKER_HOSTNAME, NULL, &hints, &result);
 	if (err) {
@@ -324,20 +318,20 @@ void broker_init(void) {
 
 			broker4->sin_addr.s_addr =
 				((struct sockaddr_in *)addr->ai_addr)
-				->sin_addr.s_addr;
+					->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
 			broker4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
 
-			inet_ntop(AF_INET, &broker4->sin_addr.s_addr,
-				  ipv4_addr, sizeof(ipv4_addr));
+			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
+				  sizeof(ipv4_addr));
 			printk("IPv4 Address found %s\n", ipv4_addr);
 
 			break;
 		} else {
 			printk("ai_addrlen = %u should be %u or %u\n",
-				(unsigned int)addr->ai_addrlen,
-				(unsigned int)sizeof(struct sockaddr_in),
-				(unsigned int)sizeof(struct sockaddr_in6));
+			       (unsigned int)addr->ai_addrlen,
+			       (unsigned int)sizeof(struct sockaddr_in),
+			       (unsigned int)sizeof(struct sockaddr_in6));
 		}
 
 		addr = addr->ai_next;
@@ -347,7 +341,8 @@ void broker_init(void) {
 	freeaddrinfo(result);
 }
 
-void client_init(struct mqtt_client *client) {
+void client_init(struct mqtt_client *client)
+{
 	mqtt_client_init(client);
 
 	broker_init();
@@ -364,10 +359,10 @@ void client_init(struct mqtt_client *client) {
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
 
-	#if defined(CONFIG_MQTT_LIB_TLS)
+#if defined(CONFIG_MQTT_LIB_TLS)
 	client->transport.type = MQTT_TRANSPORT_SECURE;
 
-	static sec_tag_t sec_tag_list[] = {CONFIG_CLOUD_CERT_SEC_TAG};
+	static sec_tag_t sec_tag_list[] = { CONFIG_CLOUD_CERT_SEC_TAG };
 	struct mqtt_sec_config *tls_config = &(client->transport).tls.config;
 
 	tls_config->peer_verify = 2;
@@ -376,16 +371,18 @@ void client_init(struct mqtt_client *client) {
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
 	tls_config->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
-	#else
+#else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
-	#endif
+#endif
 }
 
-void clear_fds(void) {
+void clear_fds(void)
+{
 	nfds = 0;
 }
 
-void wait(int timeout) {
+void wait(int timeout)
+{
 	if (nfds > 0) {
 		if (poll(&fds, nfds, timeout) < 0) {
 			printk("poll error: %d\n", errno);
@@ -393,7 +390,8 @@ void wait(int timeout) {
 	}
 }
 
-int process_mqtt_and_sleep(struct mqtt_client *client, int timeout) {
+int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
+{
 	s64_t remaining = timeout;
 	s64_t start_time = k_uptime_get();
 	int err;
@@ -419,13 +417,13 @@ int process_mqtt_and_sleep(struct mqtt_client *client, int timeout) {
 	return 0;
 }
 
-int mqtt_enable(struct mqtt_client *client) {
-
+int mqtt_enable(struct mqtt_client *client)
+{
 	int err, i = 0;
 
 	while (i++ < APP_CONNECT_TRIES && !connected) {
 		client_init(client);
-		
+
 		err = mqtt_connect(client);
 		if (err != 0) {
 			printk("ERROR: mqtt_connect %d\n", err);
@@ -433,11 +431,11 @@ int mqtt_enable(struct mqtt_client *client) {
 			continue;
 		}
 
-		#if defined(CONFIG_MQTT_LIB_TLS)
+#if defined(CONFIG_MQTT_LIB_TLS)
 		fds.fd = client->transport.tls.sock;
-		#else
+#else
 		fds.fd = client->transport.tcp.sock;
-		#endif
+#endif
 
 		fds.events = POLLIN;
 		nfds = 1;
@@ -447,7 +445,7 @@ int mqtt_enable(struct mqtt_client *client) {
 
 		if (!connected) {
 			mqtt_abort(client);
-		}	
+		}
 	}
 
 	if (connected) {
@@ -464,41 +462,20 @@ static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 	return 0;
 }
 
-static int json_add_str(cJSON *parent, const char *str, char *item)
+static int json_add_number(cJSON *parent, const char *str, double item)
 {
-	cJSON *json_str;
+	cJSON *json_num;
 
-	json_str = cJSON_CreateString(item);
-	if (json_str == NULL) {
+	json_num = cJSON_CreateNumber(item);
+	if (json_num == NULL) {
 		return -ENOMEM;
 	}
 
-	return json_add_obj(parent, str, json_str);
+	return json_add_obj(parent, str, json_num);
 }
 
-static int json_add_double(cJSON *parent, const char *str, double *item) {
-	cJSON *json_double;
-
-	json_double = cJSON_CreateDoubleArray(item, 1);
-	if (json_double == NULL) {
-		return -ENOMEM;
-	}
-
-	return json_add_obj(parent, str, json_double);
-}
-
-static int json_add_int(cJSON *parent, const char *str, int *item) {
-	cJSON *json_int;
-
-	json_int = cJSON_CreateIntArray(item, 1);
-	if (json_int == NULL) {
-		return -ENOMEM;
-	}
-
-	return json_add_obj(parent, str, json_int);
-}
-
-static int json_add_bool(cJSON *parent, const char *str, int item) {
+static int json_add_bool(cJSON *parent, const char *str, int item)
+{
 	cJSON *json_bool;
 
 	json_bool = cJSON_CreateBool(item);
@@ -509,7 +486,8 @@ static int json_add_bool(cJSON *parent, const char *str, int item) {
 	return json_add_obj(parent, str, json_bool);
 }
 
-int publish_gps_data() {
+int publish_gps_data()
+{
 	int err;
 
 	err = mqtt_enable(&client);
@@ -522,17 +500,6 @@ int publish_gps_data() {
 		printk("Could not ping server\n");
 	}
 
-	double *ptr1 = &sync_data.longitude;
-	double *ptr2 = &sync_data.latitude;
-	int *ptr3 = &sync_data.batpercent;
-	int *ptr4 = &sync_data.gps_search_timeout;
-	int *ptr5 = &sync_data.publish_interval;
-	int *ptr6 = &sync_data.idle_threshold;
-	int ptr7 = sync_data.mode;
-	char *ptr8 = sync_data.gps_timestamp;
-
-	/*Start of json configuration */
-	
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
@@ -546,15 +513,14 @@ int publish_gps_data() {
 		return -ENOMEM;
 	}
 
-	err = json_add_double(gps_obj, "long", ptr1);
-	err += json_add_double(gps_obj, "lat", ptr2);
-	err += json_add_str(gps_obj, "ts", ptr8);
+	err = json_add_number(gps_obj, "long", sync_data.longitude);
+	err += json_add_number(gps_obj, "lat", sync_data.latitude);
+	err += json_add_number(gps_obj, "ts", sync_data.gps_timestamp);
 
-	err += json_add_int(reported_obj, "bat", ptr3);
-	err += json_add_int(reported_obj, "gpst", ptr4);
-	err += json_add_int(reported_obj, "pubint", ptr5);
-	err += json_add_int(reported_obj, "idlet", ptr6);
-	err += json_add_bool(reported_obj, "mode", ptr7);
+	err += json_add_number(reported_obj, "bat", sync_data.batpercent);
+	err += json_add_number(reported_obj, "gpst", sync_data.gps_search_timeout);
+	err += json_add_number(reported_obj, "pubint", sync_data.publish_interval);
+	err += json_add_bool(reported_obj, "mode", sync_data.mode);
 
 	if (err != 0) {
 		cJSON_Delete(root_obj);
@@ -582,7 +548,6 @@ int publish_gps_data() {
 
 	/*end of json configuration */
 
-
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
 		     CONFIG_MQTT_PUB_TOPIC);
 
@@ -603,10 +568,10 @@ int publish_gps_data() {
 	}
 
 	return 0;
-
 }
 
-int sync_broker() {
+int sync_broker()
+{
 	int err;
 
 	err = mqtt_enable(&client);
@@ -619,7 +584,7 @@ int sync_broker() {
 		printk("Could not ping server\n");
 	}
 
-/*start json encoding */
+	/*start json encoding */
 
 	cJSON *root_obj = cJSON_CreateObject();
 
@@ -633,10 +598,10 @@ int sync_broker() {
 	buffer = cJSON_PrintUnformatted(root_obj);
 	cJSON_Delete(root_obj);
 
-/*end json encoding */
+	/*end json encoding */
 
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer,
-		     strlen(buffer), CONFIG_MQTT_GET_TOPIC);
+	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
+		     CONFIG_MQTT_GET_TOPIC);
 
 	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
@@ -657,7 +622,8 @@ int sync_broker() {
 	return 0;
 }
 
-int provision_certificates(void) {
+int provision_certificates(void)
+{
 #if defined(CONFIG_MQTT_LIB_TLS)
 	{
 		int err;

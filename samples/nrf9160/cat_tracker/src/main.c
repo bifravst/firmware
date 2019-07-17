@@ -17,13 +17,6 @@
 #include <sensor.h>
 #include <gps_controller.h>
 
-//these variables needs to be made dynamic in mqtt behaviour module
-
-#define PUBLISH_INTERVAL	30
-#define TRACKER_ID			"CT3001"
-#define GPS_SEARCH_TIMEOUT	360
-#define SLEEP_ACCEL_THRES	30
-
 static struct gps_data gps_data;
 
 K_SEM_DEFINE(gps_timing_sem, 0, 1);
@@ -31,23 +24,27 @@ K_SEM_DEFINE(idle_user_sem, 1, 1);
 
 struct k_poll_event events[2] = {
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY, &gps_timing_sem, 0),
+					K_POLL_MODE_NOTIFY_ONLY,
+					&gps_timing_sem, 0),
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY, &idle_user_sem, 0)
+					K_POLL_MODE_NOTIFY_ONLY, &idle_user_sem,
+					0)
 };
 
 static struct k_work request_battery_status_work;
 static struct k_work publish_gps_data_work;
 static struct k_work sync_broker_work;
 
-static void request_battery_status_work_fn(struct k_work *work) {
+static void request_battery_status_work_fn(struct k_work *work)
+{
 	int battery_percentage;
-	
+
 	battery_percentage = request_battery_status();
 	insert_battery_data(battery_percentage);
 }
 
-static void publish_gps_data_work_fn(struct k_work *work) {
+static void publish_gps_data_work_fn(struct k_work *work)
+{
 	int err;
 	err = publish_gps_data();
 	if (err != 0) {
@@ -55,7 +52,8 @@ static void publish_gps_data_work_fn(struct k_work *work) {
 	}
 }
 
-static void sync_broker_work_fn(struct k_work *work) {
+static void sync_broker_work_fn(struct k_work *work)
+{
 	int err;
 	err = sync_broker();
 	if (err != 0) {
@@ -63,8 +61,10 @@ static void sync_broker_work_fn(struct k_work *work) {
 	}
 }
 
-static void work_init() {
-	k_work_init(&request_battery_status_work, request_battery_status_work_fn);
+static void work_init()
+{
+	k_work_init(&request_battery_status_work,
+		    request_battery_status_work_fn);
 	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
 	k_work_init(&sync_broker_work, sync_broker_work_fn);
 }
@@ -92,7 +92,8 @@ static void led_notification_publish_data(void)
 	dk_set_led_off(DK_BTN1);
 }
 
-static void led_notification_lte_connected(void) {
+static void led_notification_lte_connected(void)
+{
 	dk_set_led_on(DK_BTN2);
 }
 #endif
@@ -116,7 +117,8 @@ static void lte_connect(void)
 }
 
 #if defined(CONFIG_ADXL362)
-static void adxl362_trigger_handler(struct device *dev, struct sensor_trigger *trig)
+static void adxl362_trigger_handler(struct device *dev,
+				    struct sensor_trigger *trig)
 {
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
@@ -152,27 +154,27 @@ static void adxl362_init(void)
 #endif
 }
 
-static void gps_control_handler(struct device *dev, struct gps_trigger *trigger) {
-
-	switch(trigger->type) {
-		case GPS_TRIG_FIX:
-			printk("gps control handler triggered!\n");
-			gps_control_on_trigger();
-			gps_control_stop(0);
-			gps_sample_fetch(dev);
-			gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-			insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude, gps_data.pvt.datetime);
-			k_sem_give(events[0].sem);
+static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
+{
+	switch (trigger->type) {
+	case GPS_TRIG_FIX:
+		printk("gps control handler triggered!\n");
+		gps_control_on_trigger();
+		gps_control_stop(0);
+		gps_sample_fetch(dev);
+		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
+		insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude,
+				gps_data.pvt.datetime);
+		k_sem_give(events[0].sem);
 		break;
 
-		default:
+	default:
 		break;
 	}
 }
 
 void main(void)
 {
-
 	printk("The cat tracker has started\n");
 	leds_init();
 	work_init();
@@ -181,25 +183,25 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	//k_work_submit(&sync_broker_work);
+	//k_work_submit(&sync_broker_work); //this does not work properly at the moment
 
 	while (1) {
-		if (check_mode()) { //tracker mode should be replaced by a function checking the mode
+		if (check_mode()) {
 			printk("We are in active mode\n");
 			k_work_submit(&request_battery_status_work);
 			gps_control_start(0);
-			k_poll(events, 1, K_SECONDS(GPS_SEARCH_TIMEOUT));
+			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[0].sem, 0);
 				k_work_submit(&publish_gps_data_work);
 				led_notification_publish_data();
 			} else {
 				gps_control_stop(0);
-				printk("GPS data could not be found within %d seconds, deleting assembly string\n",
-						GPS_SEARCH_TIMEOUT);
+				printk("GPS data could not be found within %d seconds\n",
+				       GPS_SEARCH_TIMEOUT);
 			}
 			events[0].state = K_POLL_STATE_NOT_READY;
-			k_sleep(K_SECONDS(PUBLISH_INTERVAL));
+			k_sleep(K_SECONDS(check_publish_interval()));
 		} else {
 			printk("We are in passive mode\n");
 			k_poll(events, 2, K_FOREVER);
@@ -208,20 +210,20 @@ void main(void)
 				k_work_submit(&request_battery_status_work);
 				gps_control_start(0);
 				k_poll(events, 1,
-				       K_SECONDS(GPS_SEARCH_TIMEOUT));
+				       K_SECONDS(check_gps_timeout()));
 				if (events[0].state ==
-				   K_POLL_STATE_SEM_AVAILABLE) {
+				    K_POLL_STATE_SEM_AVAILABLE) {
 					k_sem_take(events[0].sem, 0);
 					k_work_submit(&publish_gps_data_work);
 					led_notification_publish_data();
 				} else {
 					gps_control_stop(0);
-					printk("GPS data could not be found within %d seconds, deleting assembly string\n",
+					printk("GPS data could not be found within %d seconds\n",
 					       GPS_SEARCH_TIMEOUT);
 				}
 				events[0].state = K_POLL_STATE_NOT_READY;
-				k_sleep(K_SECONDS(PUBLISH_INTERVAL));
-			}	
+				k_sleep(K_SECONDS(check_publish_interval()));
+			}
 			events[1].state = K_POLL_STATE_NOT_READY;
 		}
 	}
