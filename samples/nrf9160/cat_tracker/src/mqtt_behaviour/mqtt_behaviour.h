@@ -19,9 +19,9 @@ int check_idle_threshold(void);
 
 int check_gps_timeout(void);
 
-void insert_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime);
+void attach_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime);
 
-void insert_battery_data(int battery_percentage);
+void attach_battery_data(int battery_percentage);
 
 int fds_init(struct mqtt_client *c);
 
