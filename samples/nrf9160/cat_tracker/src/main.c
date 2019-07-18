@@ -37,10 +37,7 @@ static struct k_work sync_broker_work;
 
 static void request_battery_status_work_fn(struct k_work *work)
 {
-	int battery_percentage;
-
-	battery_percentage = request_battery_status();
-	insert_battery_data(battery_percentage);
+	attach_battery_data(request_battery_status());
 }
 
 static void publish_gps_data_work_fn(struct k_work *work)
@@ -163,7 +160,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_control_stop(0);
 		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		insert_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude,
+		attach_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude,
 				gps_data.pvt.datetime);
 		k_sem_give(events[0].sem);
 		break;
@@ -185,6 +182,8 @@ void main(void)
 
 	//k_work_submit(&sync_broker_work); //this does not work properly at the moment
 
+	//sync_broker();
+
 	while (1) {
 		if (check_mode()) {
 			printk("We are in active mode\n");
@@ -198,7 +197,7 @@ void main(void)
 			} else {
 				gps_control_stop(0);
 				printk("GPS data could not be found within %d seconds\n",
-				       GPS_SEARCH_TIMEOUT);
+				       check_gps_timeout());
 			}
 			events[0].state = K_POLL_STATE_NOT_READY;
 			k_sleep(K_SECONDS(check_publish_interval()));
@@ -219,7 +218,7 @@ void main(void)
 				} else {
 					gps_control_stop(0);
 					printk("GPS data could not be found within %d seconds\n",
-					       GPS_SEARCH_TIMEOUT);
+					       check_gps_timeout());
 				}
 				events[0].state = K_POLL_STATE_NOT_READY;
 				k_sleep(K_SECONDS(check_publish_interval()));

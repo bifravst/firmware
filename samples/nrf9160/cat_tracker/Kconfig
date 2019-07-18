@@ -70,11 +70,11 @@ config MQTT_BROKER_PORT
 
 config MQTT_MESSAGE_BUFFER_SIZE
 	int ""
-	default 256
+	default 512
 
 config MQTT_PAYLOAD_BUFFER_SIZE
 	int ""
-	default 256
+	default 512
 
 endmenu
 

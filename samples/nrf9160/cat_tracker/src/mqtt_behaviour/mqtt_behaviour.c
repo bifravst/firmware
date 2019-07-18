@@ -20,8 +20,9 @@
 
 #include <gps.h>
 
-#define APP_SLEEP_MS 10000 //default 70 seconds
+#define APP_SLEEP_MS 10000
 #define APP_CONNECT_TRIES 10
+#define EMPTY_STRING ""
 
 #if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
@@ -31,7 +32,7 @@
 #define CONFIG_MQTT_GET_TOPIC "$aws/things/Cat-Tracker/shadow/get"
 #define CONFIG_MQTT_ACCEPTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/accepted"
 #define CONFIG_MQTT_REJECTED_TOPIC                                             \
-	"$aws/things/Cat-Tracker/shadow/get/rejected" //if rejected, retry after timeout
+	"$aws/things/Cat-Tracker/shadow/get/rejected"
 #define CONFIG_MQTT_DELTA_TOPIC "$aws/thing/Cat-Tracker/shadow/update/delta"
 
 typedef struct Sync_data {
@@ -39,12 +40,12 @@ typedef struct Sync_data {
 	double longitude;
 	double latitude;
 	long int gps_timestamp;
-	int gps_search_timeout;
+	int gps_timeout;
 	int publish_interval;
 	bool mode;
 } Sync_data;
 
-Sync_data sync_data = { .mode = true, .publish_interval = 30, .gps_search_timeout = 360};
+Sync_data sync_data = { .mode = true, .publish_interval = 60, .gps_timeout = 720};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -59,6 +60,8 @@ static struct pollfd fds;
 static bool connected;
 
 // static bool initial_connection = false;
+
+// static bool syncronized = false;
 
 static int nfds;
 
@@ -80,10 +83,10 @@ int check_publish_interval(void)
 
 int check_gps_timeout(void)
 {
-	return sync_data.gps_search_timeout;
+	return sync_data.gps_timeout;
 }
 
-void insert_gps_data(double longitude, double latitude,
+void attach_gps_data(double longitude, double latitude,
 		     struct gps_datetime gps_datetime)
 {
 
@@ -93,10 +96,8 @@ void insert_gps_data(double longitude, double latitude,
 	sync_data.longitude = longitude;
 	sync_data.latitude = latitude;
 
-	printk("year: %d\n", gps_datetime.year);
-
-	tm.tm_year = gps_datetime.year;
-	tm.tm_mon = gps_datetime.month;
+	tm.tm_year = gps_datetime.year - 1900;
+	tm.tm_mon = gps_datetime.month - 1;
 	tm.tm_mday = gps_datetime.day;
 	tm.tm_hour = gps_datetime.hour;
 	tm.tm_min = gps_datetime.minute;
@@ -107,7 +108,7 @@ void insert_gps_data(double longitude, double latitude,
 
 }
 
-void insert_battery_data(int battery_percentage)
+void attach_battery_data(int battery_percentage)
 {
 	sync_data.batpercent = battery_percentage;
 }
@@ -183,26 +184,46 @@ static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
 static int decode_response(char const *input)
 {
 	cJSON *state = NULL;
+	// cJSON *desired = NULL;
 	cJSON *mode = NULL;
 	cJSON *pubint = NULL;
+	cJSON *gpst = NULL;
 
 	cJSON *parameters = cJSON_Parse(input);
 	if (parameters == NULL) {
 		return -ENOENT;
 	}
 
-	state = cJSON_GetObjectItem(parameters, "state");
-	pubint = cJSON_GetObjectItem(state, "pubint");
-	mode = cJSON_GetObjectItem(state, "mode");
+	// if (syncronized)
+	// {
+		state = cJSON_GetObjectItem(parameters, "state");
+		pubint = cJSON_GetObjectItem(state, "pubint");
+		mode = cJSON_GetObjectItem(state, "mode");
+		gpst = cJSON_GetObjectItem(state, "gpst");
+	// } else
+	// {
+	// 	state = cJSON_GetObjectItem(parameters, "state");
+	// 	desired = cJSON_GetObjectItem(state, "desired");
+	// 	pubint = cJSON_GetObjectItem(desired, "pubint");
+	// 	mode = cJSON_GetObjectItem(desired, "mode");
+	// 	gpst = cJSON_GetObjectItem(desired, "gpst");
+	// 	syncronized = true;
+	// }
 
 	if (mode != NULL)
 	{
 		sync_data.mode = mode->valueint;
-
+		printk("SETTING MODE TO: %d\n", mode->valueint);
 	}
 
 	if (pubint != NULL) {
 		sync_data.publish_interval = pubint->valueint;
+		printk("SETTING PUBINT TO: %d\n", pubint->valueint);
+	}
+
+	if (gpst != NULL) {
+		sync_data.gps_timeout = gpst->valueint;
+		printk("SETTING GPST TO: %d\n", gpst->valueint);
 	}
 
 	cJSON_Delete(parameters);
@@ -223,12 +244,13 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		// if (!initial_connection) {
-		// subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
-		// initial_connection = true;
-		// } else {
-		subscribe(CONFIG_MQTT_SUB_TOPIC);
-		// }
+		//if (!initial_connection) {
+		//	subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+			// subscribe(CONFIG_MQTT_REJECTED_TOPIC);
+		//	initial_connection = true;
+		//} else {
+			subscribe(CONFIG_MQTT_SUB_TOPIC);
+		//}
 
 		break;
 
@@ -518,7 +540,7 @@ int publish_gps_data()
 	err += json_add_number(gps_obj, "ts", sync_data.gps_timestamp);
 
 	err += json_add_number(reported_obj, "bat", sync_data.batpercent);
-	err += json_add_number(reported_obj, "gpst", sync_data.gps_search_timeout);
+	err += json_add_number(reported_obj, "gpst", sync_data.gps_timeout);
 	err += json_add_number(reported_obj, "pubint", sync_data.publish_interval);
 	err += json_add_bool(reported_obj, "mode", sync_data.mode);
 
@@ -576,7 +598,7 @@ int sync_broker()
 
 	err = mqtt_enable(&client);
 	if (err) {
-		printk("Could not ping server\n");
+		printk("Could not connect to client\n");
 	}
 
 	err = mqtt_ping(&client);
@@ -584,22 +606,14 @@ int sync_broker()
 		printk("Could not ping server\n");
 	}
 
-	/*start json encoding */
-
-	cJSON *root_obj = cJSON_CreateObject();
-
-	if (root_obj == NULL) {
-		cJSON_Delete(root_obj);
-		return -ENOMEM;
-	}
+	cJSON *sync_obj = cJSON_CreateObject();
 
 	char *buffer;
 
-	buffer = cJSON_PrintUnformatted(root_obj);
-	cJSON_Delete(root_obj);
+	buffer = cJSON_PrintUnformatted(sync_obj);
 
-	/*end json encoding */
-
+	cJSON_Delete(sync_obj);
+	
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
 		     CONFIG_MQTT_GET_TOPIC);
 
@@ -633,7 +647,7 @@ int provision_certificates(void)
 
 		for (nrf_key_mgnt_cred_type_t type = 0; type < 3; type++) {
 			err = nrf_inbuilt_key_delete(sec_tag, type);
-			printk("nrf_inbuilt_key_delete(%u, %d) => result=%d\n",
+			printk("nrf_inbuilt_key_delete(%lu, %d) => result=%d\n",
 			       sec_tag, type, err);
 		}
 
