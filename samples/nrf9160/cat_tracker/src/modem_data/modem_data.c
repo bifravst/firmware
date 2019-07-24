@@ -7,12 +7,9 @@
 #include <string.h>
 
 #define AT_BATSTAT	"AT%XVBAT"
-#define BAT_ROOF	5200
-#define BAT_FLOOR	3000
 
 static const char     cmd[] = AT_BATSTAT;
 static enum at_cmd_state state;
-static unsigned short battery_percentage;
 
 void at_cmd_handler(char *state) {
 
@@ -35,16 +32,13 @@ void at_cmd_handler(char *state) {
 	}
 }
 
-int convert_to_percentage(int bat_voltage_roof, int bat_voltage_floor, int current_voltage_level) {
-	return (((current_voltage_level - bat_voltage_floor) * 100) / (bat_voltage_roof - bat_voltage_floor));
-}
-
 int request_battery_status() {
 	int err;
 	char buf[50];
 	size_t buf_len = sizeof(buf);
 	char battery_level[4];
-	
+	int battery_percentage;
+
 	err = at_cmd_write(cmd, buf, buf_len, &state);
 	if (err != 0) {
 		printk("Error in response from modem\n");
@@ -55,7 +49,7 @@ int request_battery_status() {
 		battery_level[i - 8] = buf[i];
 	}
 
-	battery_percentage = convert_to_percentage(BAT_ROOF, BAT_FLOOR, atoi(battery_level));
+	battery_percentage = atoi(battery_level);
 
 	return battery_percentage;
 

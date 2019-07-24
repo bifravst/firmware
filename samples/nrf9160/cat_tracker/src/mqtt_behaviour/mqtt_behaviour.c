@@ -22,7 +22,6 @@
 
 #define APP_SLEEP_MS 10000
 #define APP_CONNECT_TRIES 10
-#define EMPTY_STRING ""
 
 #if defined(CONFIG_MQTT_LIB_TLS)
 #include "nrf_inbuilt_key.h"
@@ -36,16 +35,36 @@
 #define CONFIG_MQTT_DELTA_TOPIC "$aws/thing/Cat-Tracker/shadow/update/delta"
 
 typedef struct Sync_data {
-	int batpercent;
+	int bat_voltage;
+	char bat_timestamp[50];
+
 	double longitude;
 	double latitude;
-	long int gps_timestamp;
+	float altitude;
+	float accuracy;
+	float speed;
+	float heading;
+	char gps_timestamp[50];
+
+	float acc[3];
+	char acc_timestamp[50];
+
 	int gps_timeout;
-	int publish_interval;
-	bool mode;
+	bool active;
+	int active_wait;
+	int passive_wait;
+
+	int movement_timeout;
+	
 } Sync_data;
 
-Sync_data sync_data = { .mode = true, .publish_interval = 60, .gps_timeout = 720};
+Sync_data sync_data = {
+	.gps_timeout = 720,
+	.active = true,
+	.active_wait = 60,
+	.passive_wait = 60,
+	.movement_timeout = 3600
+};
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -65,18 +84,22 @@ static int nfds;
 
 int check_mode(void)
 {
-	if (sync_data.mode) {
+	if (sync_data.active) {
 		return true;
 	} else {
 		return false;
 	}
-
-	return true;
 }
 
-int check_publish_interval(void)
+int check_active_wait(bool mode)
 {
-	return sync_data.publish_interval;
+	if (mode)
+	{
+		return sync_data.active_wait;
+	} else
+	{
+		return sync_data.passive_wait;
+	}
 }
 
 int check_gps_timeout(void)
@@ -84,31 +107,34 @@ int check_gps_timeout(void)
 	return sync_data.gps_timeout;
 }
 
-void attach_gps_data(double longitude, double latitude,
-		     struct gps_datetime gps_datetime)
+void attach_gps_data(struct gps_data gps_data)
 {
 
-	struct tm tm;
-	long int epoch;
+	// struct tm tm;
+	// long int epoch;
 
-	sync_data.longitude = longitude;
-	sync_data.latitude = latitude;
+	sync_data.longitude = gps_data.pvt.longitude;
+	sync_data.latitude = gps_data.pvt.latitude;
+	sync_data.altitude = gps_data.pvt.altitude;
+	sync_data.accuracy = gps_data.pvt.accuracy;
+	sync_data.speed = gps_data.pvt.speed;
+	sync_data.heading = gps_data.pvt.heading;
 
-	tm.tm_year = gps_datetime.year - 1900;
-	tm.tm_mon = gps_datetime.month - 1;
-	tm.tm_mday = gps_datetime.day;
-	tm.tm_hour = gps_datetime.hour;
-	tm.tm_min = gps_datetime.minute;
-	tm.tm_sec = gps_datetime.seconds;
+	// tm.tm_year = gps_datetime.year - 1900;
+	// tm.tm_mon = gps_datetime.month - 1;
+	// tm.tm_mday = gps_datetime.day;
+	// tm.tm_hour = gps_datetime.hour;
+	// tm.tm_min = gps_datetime.minute;
+	// tm.tm_sec = gps_datetime.seconds;
 
-	epoch = mktime(&tm);
-	sync_data.gps_timestamp = epoch;
+	// epoch = mktime(&tm);
+	// sync_data.gps_timestamp = epoch;
 
 }
 
-void attach_battery_data(int battery_percentage)
+void attach_battery_data(int battery_voltage)
 {
-	sync_data.batpercent = battery_percentage;
+	sync_data.bat_voltage = battery_voltage;
 }
 
 void data_print(u8_t *prefix, u8_t *data, size_t len)
@@ -182,48 +208,66 @@ int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
 static int decode_response(char const *input)
 {
 	cJSON *state = NULL;
-	cJSON *desired = NULL;
-	cJSON *mode = NULL;
-	cJSON *pubint = NULL;
+	//cJSON *desired = NULL;
+	cJSON *cfg = NULL;
+
 	cJSON *gpst = NULL;
+	cJSON *active = NULL;
+	cJSON *active_wait = NULL;
+	cJSON *passive_wait = NULL;
+	cJSON *movement_timeout = NULL;
 
 	cJSON *root_obj = cJSON_Parse(input);
 	if (root_obj == NULL) {
 		return -ENOENT;
 	}
 
-	if (!initial_connection)
-	{
+	// if (!initial_connection)
+	// {
+
+	// 	state = cJSON_GetObjectItem(root_obj, "state");
+	// 	desired = cJSON_GetObjectItem(state, "desired");
+	// 	gpst = cJSON_GetObjectItem(desired, "gpst");
+	// 	pubint = cJSON_GetObjectItem(desired, "");
+	// 	active = cJSON_GetObjectItem(desired, "active");
+
+	// 	initial_connection = true;
+	// } else {
 
 		state = cJSON_GetObjectItem(root_obj, "state");
-		desired = cJSON_GetObjectItem(state, "desired");
-		pubint = cJSON_GetObjectItem(desired, "pubint");
-		mode = cJSON_GetObjectItem(desired, "mode");
-		gpst = cJSON_GetObjectItem(desired, "gpst");
+		cfg = cJSON_GetObjectItem(state, "cfg");
 
-		initial_connection = true;
-	} else {
+		gpst = cJSON_GetObjectItem(cfg, "gpst");
+		active = cJSON_GetObjectItem(cfg, "act");
+		active_wait = cJSON_GetObjectItem(cfg, "actwt");
+		passive_wait = cJSON_GetObjectItem(cfg, "mvres");
+		movement_timeout = cJSON_GetObjectItem(cfg, "mvt");
 
-		state = cJSON_GetObjectItem(root_obj, "state");
-		pubint = cJSON_GetObjectItem(state, "pubint");
-		mode = cJSON_GetObjectItem(state, "mode");
-		gpst = cJSON_GetObjectItem(state, "gpst");
-
-	}
-
-	if (mode != NULL) {
-		sync_data.mode = mode->valueint;
-		printk("SETTING MODE TO: %d\n", mode->valueint);
-	}
-
-	if (pubint != NULL) {
-		sync_data.publish_interval = pubint->valueint;
-		printk("SETTING PUBINT TO: %d\n", pubint->valueint);
-	}
+	// }
 
 	if (gpst != NULL) {
 		sync_data.gps_timeout = gpst->valueint;
 		printk("SETTING GPST TO: %d\n", gpst->valueint);
+	}
+
+	if (active != NULL) {
+		sync_data.active = active->valueint;
+		printk("SETTING active TO: %d\n", active->valueint);
+	}
+
+	if (active_wait != NULL) {
+		sync_data.active_wait = active_wait->valueint;
+		printk("SETTING ACTIVE WAIT TO: %d\n", active_wait->valueint);
+	}
+
+	if (passive_wait != NULL) {
+		sync_data.passive_wait = passive_wait->valueint;
+		printk("SETTING PASSIVE_WAIT TO: %d\n", passive_wait->valueint);
+	}
+
+	if (movement_timeout != NULL) {
+		sync_data.movement_timeout = movement_timeout->valueint;
+		printk("SETTING MOVEMENT TIMEOUT TO: %d\n", movement_timeout->valueint);
 	}
 
 	cJSON_Delete(root_obj);
@@ -244,12 +288,12 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		if (!initial_connection) {
-			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+		//if (!initial_connection) {
+		//	subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
 			//subscribe(CONFIG_MQTT_REJECTED_TOPIC);
-		} else {
+		//} else {
 			subscribe(CONFIG_MQTT_SUB_TOPIC);
-		}
+		//}
 
 		break;
 
@@ -483,6 +527,19 @@ static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 	return 0;
 }
 
+static int json_add_str(cJSON *parent, const char *str, const char *item)
+{
+	cJSON *json_str;
+
+	json_str = cJSON_CreateString(item);
+	if (json_str == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_str);
+}
+
+
 static int json_add_number(cJSON *parent, const char *str, double item)
 {
 	cJSON *json_num;
@@ -507,7 +564,19 @@ static int json_add_bool(cJSON *parent, const char *str, int item)
 	return json_add_obj(parent, str, json_bool);
 }
 
-int publish_data(bool sync)
+static int json_add_floatArray(cJSON *parent, const char *str, const float *item)
+{
+	cJSON *json_float;
+
+	json_float = cJSON_CreateFloatArray(item, 3);
+	if (json_float == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_float);
+}
+
+int publish_data(void)
 {
 	int err;
 
@@ -521,68 +590,109 @@ int publish_data(bool sync)
 		printk("Could not ping server\n");
 	}
 
-	if (sync) {
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, "",
-			     0, CONFIG_MQTT_GET_TOPIC);
-	} else
-	{
+	// if (sync) {
+	// 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, "",
+	// 		     0, CONFIG_MQTT_GET_TOPIC);
+	// } else
+	// {
 
 		//*start, this section and all containing json should be relocated to its own module*/
 		cJSON *root_obj = cJSON_CreateObject();
 		cJSON *state_obj = cJSON_CreateObject();
 		cJSON *reported_obj = cJSON_CreateObject();
+		cJSON *bat_obj = cJSON_CreateObject();
+		cJSON *acc_obj = cJSON_CreateObject();
 		cJSON *gps_obj = cJSON_CreateObject();
+		cJSON *cfg_obj = cJSON_CreateObject();
+		cJSON *gps_val_obj = cJSON_CreateObject();
 
 		if (root_obj == NULL || state_obj == NULL ||
-		    reported_obj == NULL) {
+		    reported_obj == NULL || bat_obj == NULL ||
+		    acc_obj == NULL || gps_obj == NULL || cfg_obj == NULL ||
+		    gps_val_obj == NULL) {
 			cJSON_Delete(root_obj);
 			cJSON_Delete(state_obj);
 			cJSON_Delete(reported_obj);
+			cJSON_Delete(bat_obj);
+			cJSON_Delete(acc_obj);
 			cJSON_Delete(gps_obj);
+			cJSON_Delete(cfg_obj);
+			cJSON_Delete(gps_val_obj);
 			return -ENOMEM;
 		}
 
-		err = json_add_number(gps_obj, "long", sync_data.longitude);
-		err += json_add_number(gps_obj, "lat", sync_data.latitude);
-		err += json_add_number(gps_obj, "ts", sync_data.gps_timestamp);
 
-		err += json_add_number(reported_obj, "bat",
-				       sync_data.batpercent);
-		err += json_add_number(reported_obj, "gpst",
-				       sync_data.gps_timeout);
-		err += json_add_number(reported_obj, "pubint",
-				       sync_data.publish_interval);
-		err += json_add_bool(reported_obj, "mode", sync_data.mode);
+		/*BAT*/
+		err = json_add_number(bat_obj, "v", sync_data.bat_voltage);
+		err += json_add_str(bat_obj, "ts", sync_data.bat_timestamp);
+
+		/*ACC*/
+		err += json_add_floatArray(acc_obj, "v", sync_data.acc);
+		err += json_add_str(acc_obj, "ts", sync_data.acc_timestamp);
+
+		/*GPS*/
+		err += json_add_number(gps_val_obj, "lng", sync_data.longitude);
+		err += json_add_number(gps_val_obj, "lat", sync_data.latitude);
+		err += json_add_number(gps_val_obj, "acc", sync_data.accuracy);
+		err += json_add_number(gps_val_obj, "alt", sync_data.altitude);
+		err += json_add_number(gps_val_obj, "spd", sync_data.speed);
+		err += json_add_number(gps_val_obj, "hdg", sync_data.heading);
+
+		/*CFG*/
+		err += json_add_number(cfg_obj, "gpst", sync_data.gps_timeout);
+		err += json_add_bool(cfg_obj, "act", sync_data.active);
+		err += json_add_number(cfg_obj, "actwt", sync_data.active_wait);
+		err += json_add_number(cfg_obj, "mvres", sync_data.passive_wait);
+		err += json_add_number(cfg_obj, "mvt", sync_data.movement_timeout);
 
 		if (err != 0) {
 			cJSON_Delete(root_obj);
 			cJSON_Delete(state_obj);
 			cJSON_Delete(reported_obj);
+			cJSON_Delete(bat_obj);
+			cJSON_Delete(acc_obj);
 			cJSON_Delete(gps_obj);
+			cJSON_Delete(cfg_obj);
+			cJSON_Delete(gps_val_obj);
 			return -ENOMEM;
 		}
 
-		err = json_add_obj(reported_obj, "gps", gps_obj);
+		err = json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "acc", acc_obj);
+
+		err += json_add_obj(gps_obj, "v", gps_val_obj);
+		err += json_add_str(gps_obj, "ts", sync_data.acc_timestamp);
+
+		err += json_add_obj(reported_obj, "gps", gps_obj);
+
+		err +=json_add_obj(reported_obj, "cfg", cfg_obj);
+
 		err += json_add_obj(state_obj, "reported", reported_obj);
 		err += json_add_obj(root_obj, "state", state_obj);
+
 		if (err != 0) {
 			cJSON_Delete(root_obj);
 			cJSON_Delete(state_obj);
 			cJSON_Delete(reported_obj);
+			cJSON_Delete(bat_obj);
+			cJSON_Delete(acc_obj);
 			cJSON_Delete(gps_obj);
+			cJSON_Delete(cfg_obj);
+			cJSON_Delete(gps_val_obj);
 			return -EAGAIN;
 		}
 
 		char *buffer;
 
-		buffer = cJSON_PrintUnformatted(root_obj);
+		buffer = cJSON_Print(root_obj);
+
 		cJSON_Delete(root_obj);
 
 		/*end*/
 
 		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer,
 			     strlen(buffer), CONFIG_MQTT_PUB_TOPIC);
-	}
+	// }
 	
 	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
