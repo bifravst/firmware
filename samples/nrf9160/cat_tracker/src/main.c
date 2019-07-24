@@ -12,10 +12,13 @@
 #include <logging/log.h>
 #include <misc/reboot.h>
 #include <mqtt_behaviour.h>
-#include <modem_stats.h>
+#include <modem_data.h>
 #include <device.h>
 #include <sensor.h>
 #include <gps_controller.h>
+
+#define SYNC true
+#define NORMAL_OP false
 
 static struct gps_data gps_data;
 
@@ -32,7 +35,7 @@ struct k_poll_event events[2] = {
 };
 
 static struct k_work request_battery_status_work;
-static struct k_work publish_gps_data_work;
+static struct k_work publish_data_work;
 static struct k_work sync_broker_work;
 
 static void request_battery_status_work_fn(struct k_work *work)
@@ -40,10 +43,10 @@ static void request_battery_status_work_fn(struct k_work *work)
 	attach_battery_data(request_battery_status());
 }
 
-static void publish_gps_data_work_fn(struct k_work *work)
+static void publish_data_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_gps_data();
+	err = publish_data(NORMAL_OP);
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
 	}
@@ -52,7 +55,7 @@ static void publish_gps_data_work_fn(struct k_work *work)
 static void sync_broker_work_fn(struct k_work *work)
 {
 	int err;
-	err = sync_broker();
+	err = publish_data(SYNC);
 	if (err != 0) {
 		printk("Sync Error: %d", err);
 	}
@@ -62,13 +65,14 @@ static void work_init()
 {
 	k_work_init(&request_battery_status_work,
 		    request_battery_status_work_fn);
-	k_work_init(&publish_gps_data_work, publish_gps_data_work_fn);
+	k_work_init(&publish_data_work, publish_data_work_fn);
 	k_work_init(&sync_broker_work, sync_broker_work_fn);
 }
 
-#if defined(CONFIG_DK_LIBRARY)
+
 static void leds_init(void)
 {
+#if defined(CONFIG_DK_LIBRARY)
 	int err;
 
 	err = dk_leds_init();
@@ -80,20 +84,36 @@ static void leds_init(void)
 	if (err) {
 		printk("Could not set leds state, err code: %d\n", err);
 	}
-}
-
-static void led_notification_publish_data(void)
-{
-	dk_set_led_on(DK_BTN1);
-	k_sleep(1000);
-	dk_set_led_off(DK_BTN1);
-}
-
-static void led_notification_lte_connected(void)
-{
-	dk_set_led_on(DK_BTN2);
-}
 #endif
+}
+
+static void led_notification(char *mode)
+{
+	switch(mode)
+	{
+		case LTE_SEARCHING:
+			//set blå led
+		break;
+
+		case LTE_CONNECTED:
+			//set blå/grønn led
+		break;
+
+		case GPS_SEARCHING:
+			//set grønn led
+		break;
+
+		case GPS_FIX:
+			//set grønn/rød led
+		break;
+
+		case PUBLISH_GPS_DATA:
+			//toggle alle farger 2 ganger
+		break;
+	}
+}
+
+
 
 static void lte_connect(void)
 {
@@ -110,7 +130,6 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 	lte_lc_psm_req(true);
-	led_notification_lte_connected();
 }
 
 #if defined(CONFIG_ADXL362)
@@ -180,20 +199,17 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	//k_work_submit(&sync_broker_work); //this does not work properly at the moment
-
-	//sync_broker();
+	k_work_submit(&sync_broker_work);
 
 	while (1) {
 		if (check_mode()) {
 			printk("We are in active mode\n");
-			k_work_submit(&request_battery_status_work);
 			gps_control_start(0);
 			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[0].sem, 0);
-				k_work_submit(&publish_gps_data_work);
-				led_notification_publish_data();
+				k_work_submit(&request_battery_status_work);
+				k_work_submit(&publish_data_work);
 			} else {
 				gps_control_stop(0);
 				printk("GPS data could not be found within %d seconds\n",
@@ -206,15 +222,14 @@ void main(void)
 			k_poll(events, 2, K_FOREVER);
 			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[1].sem, 0);
-				k_work_submit(&request_battery_status_work);
 				gps_control_start(0);
 				k_poll(events, 1,
 				       K_SECONDS(check_gps_timeout()));
 				if (events[0].state ==
 				    K_POLL_STATE_SEM_AVAILABLE) {
 					k_sem_take(events[0].sem, 0);
-					k_work_submit(&publish_gps_data_work);
-					led_notification_publish_data();
+					k_work_submit(&request_battery_status_work);
+					k_work_submit(&publish_data_work);
 				} else {
 					gps_control_stop(0);
 					printk("GPS data could not be found within %d seconds\n",
