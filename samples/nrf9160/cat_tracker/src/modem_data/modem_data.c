@@ -1,4 +1,4 @@
-#include <modem_stats.h>
+#include <modem_data.h>
 #include <stdio.h>
 #include <zephyr.h>
 #include <kernel.h>
@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define AT_BATSTAT	"AT%XVBAT"
-#define BAT_ROOF	5500
+#define BAT_ROOF	5200
 #define BAT_FLOOR	3000
 
 static const char     cmd[] = AT_BATSTAT;

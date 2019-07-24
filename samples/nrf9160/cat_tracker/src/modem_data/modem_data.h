@@ -1,5 +1,5 @@
-#ifndef BATSTAT_H__
-#define BATSTAT_H__
+#ifndef MODEM_DATA_H__
+#define MODEM_DATA_H__
 
 #ifdef __cplusplus
 extern "C" {

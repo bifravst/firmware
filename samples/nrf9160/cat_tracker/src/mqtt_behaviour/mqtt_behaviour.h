@@ -32,11 +32,10 @@ void data_print(u8_t *prefix, u8_t *data, size_t len);
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
 	u8_t *data, size_t len, u8_t *topic);
 
-int sync_broker(void);
-
 int subscribe(u8_t *sub_topic);
 
-// int publish_get_payload(struct mqtt_client *c, size_t length);
+int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
+			       size_t length);
 
 void mqtt_evt_handler(struct mqtt_client *const c,
 		      const struct mqtt_evt *evt);
@@ -53,7 +52,7 @@ void wait();
 
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
-int publish_gps_data();
+int publish_data(bool sync);
 
 int provision_certificates(void);
 

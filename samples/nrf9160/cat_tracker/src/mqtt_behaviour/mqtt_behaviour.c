@@ -59,9 +59,7 @@ static struct pollfd fds;
 
 static bool connected;
 
-// static bool initial_connection = false;
-
-// static bool syncronized = false;
+static bool initial_connection = false;
 
 static int nfds;
 
@@ -159,7 +157,7 @@ int subscribe(u8_t *sub_topic)
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
+int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
 			       size_t length)
 {
 	u8_t *buf = write_buf;
@@ -184,34 +182,36 @@ static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
 static int decode_response(char const *input)
 {
 	cJSON *state = NULL;
-	// cJSON *desired = NULL;
+	cJSON *desired = NULL;
 	cJSON *mode = NULL;
 	cJSON *pubint = NULL;
 	cJSON *gpst = NULL;
 
-	cJSON *parameters = cJSON_Parse(input);
-	if (parameters == NULL) {
+	cJSON *root_obj = cJSON_Parse(input);
+	if (root_obj == NULL) {
 		return -ENOENT;
 	}
 
-	// if (syncronized)
-	// {
-		state = cJSON_GetObjectItem(parameters, "state");
+	if (!initial_connection)
+	{
+
+		state = cJSON_GetObjectItem(root_obj, "state");
+		desired = cJSON_GetObjectItem(state, "desired");
+		pubint = cJSON_GetObjectItem(desired, "pubint");
+		mode = cJSON_GetObjectItem(desired, "mode");
+		gpst = cJSON_GetObjectItem(desired, "gpst");
+
+		initial_connection = true;
+	} else {
+
+		state = cJSON_GetObjectItem(root_obj, "state");
 		pubint = cJSON_GetObjectItem(state, "pubint");
 		mode = cJSON_GetObjectItem(state, "mode");
 		gpst = cJSON_GetObjectItem(state, "gpst");
-	// } else
-	// {
-	// 	state = cJSON_GetObjectItem(parameters, "state");
-	// 	desired = cJSON_GetObjectItem(state, "desired");
-	// 	pubint = cJSON_GetObjectItem(desired, "pubint");
-	// 	mode = cJSON_GetObjectItem(desired, "mode");
-	// 	gpst = cJSON_GetObjectItem(desired, "gpst");
-	// 	syncronized = true;
-	// }
 
-	if (mode != NULL)
-	{
+	}
+
+	if (mode != NULL) {
 		sync_data.mode = mode->valueint;
 		printk("SETTING MODE TO: %d\n", mode->valueint);
 	}
@@ -226,7 +226,7 @@ static int decode_response(char const *input)
 		printk("SETTING GPST TO: %d\n", gpst->valueint);
 	}
 
-	cJSON_Delete(parameters);
+	cJSON_Delete(root_obj);
 
 	return 0;
 }
@@ -244,13 +244,12 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		//if (!initial_connection) {
-		//	subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
-			// subscribe(CONFIG_MQTT_REJECTED_TOPIC);
-		//	initial_connection = true;
-		//} else {
+		if (!initial_connection) {
+			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+			//subscribe(CONFIG_MQTT_REJECTED_TOPIC);
+		} else {
 			subscribe(CONFIG_MQTT_SUB_TOPIC);
-		//}
+		}
 
 		break;
 
@@ -508,7 +507,7 @@ static int json_add_bool(cJSON *parent, const char *str, int item)
 	return json_add_obj(parent, str, json_bool);
 }
 
-int publish_gps_data()
+int publish_data(bool sync)
 {
 	int err;
 
@@ -522,101 +521,69 @@ int publish_gps_data()
 		printk("Could not ping server\n");
 	}
 
-	cJSON *root_obj = cJSON_CreateObject();
-	cJSON *state_obj = cJSON_CreateObject();
-	cJSON *reported_obj = cJSON_CreateObject();
-	cJSON *gps_obj = cJSON_CreateObject();
+	if (sync) {
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, "",
+			     0, CONFIG_MQTT_GET_TOPIC);
+	} else
+	{
 
-	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL) {
+		//*start, this section and all containing json should be relocated to its own module*/
+		cJSON *root_obj = cJSON_CreateObject();
+		cJSON *state_obj = cJSON_CreateObject();
+		cJSON *reported_obj = cJSON_CreateObject();
+		cJSON *gps_obj = cJSON_CreateObject();
+
+		if (root_obj == NULL || state_obj == NULL ||
+		    reported_obj == NULL) {
+			cJSON_Delete(root_obj);
+			cJSON_Delete(state_obj);
+			cJSON_Delete(reported_obj);
+			cJSON_Delete(gps_obj);
+			return -ENOMEM;
+		}
+
+		err = json_add_number(gps_obj, "long", sync_data.longitude);
+		err += json_add_number(gps_obj, "lat", sync_data.latitude);
+		err += json_add_number(gps_obj, "ts", sync_data.gps_timestamp);
+
+		err += json_add_number(reported_obj, "bat",
+				       sync_data.batpercent);
+		err += json_add_number(reported_obj, "gpst",
+				       sync_data.gps_timeout);
+		err += json_add_number(reported_obj, "pubint",
+				       sync_data.publish_interval);
+		err += json_add_bool(reported_obj, "mode", sync_data.mode);
+
+		if (err != 0) {
+			cJSON_Delete(root_obj);
+			cJSON_Delete(state_obj);
+			cJSON_Delete(reported_obj);
+			cJSON_Delete(gps_obj);
+			return -ENOMEM;
+		}
+
+		err = json_add_obj(reported_obj, "gps", gps_obj);
+		err += json_add_obj(state_obj, "reported", reported_obj);
+		err += json_add_obj(root_obj, "state", state_obj);
+		if (err != 0) {
+			cJSON_Delete(root_obj);
+			cJSON_Delete(state_obj);
+			cJSON_Delete(reported_obj);
+			cJSON_Delete(gps_obj);
+			return -EAGAIN;
+		}
+
+		char *buffer;
+
+		buffer = cJSON_PrintUnformatted(root_obj);
 		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(gps_obj);
-		return -ENOMEM;
+
+		/*end*/
+
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer,
+			     strlen(buffer), CONFIG_MQTT_PUB_TOPIC);
 	}
-
-	err = json_add_number(gps_obj, "long", sync_data.longitude);
-	err += json_add_number(gps_obj, "lat", sync_data.latitude);
-	err += json_add_number(gps_obj, "ts", sync_data.gps_timestamp);
-
-	err += json_add_number(reported_obj, "bat", sync_data.batpercent);
-	err += json_add_number(reported_obj, "gpst", sync_data.gps_timeout);
-	err += json_add_number(reported_obj, "pubint", sync_data.publish_interval);
-	err += json_add_bool(reported_obj, "mode", sync_data.mode);
-
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(gps_obj);
-		return -ENOMEM;
-	}
-
-	err = json_add_obj(reported_obj, "gps", gps_obj);
-	err += json_add_obj(state_obj, "reported", reported_obj);
-	err += json_add_obj(root_obj, "state", state_obj);
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(gps_obj);
-		return -EAGAIN;
-	}
-
-	char *buffer;
-
-	buffer = cJSON_PrintUnformatted(root_obj);
-	cJSON_Delete(root_obj);
-
-	/*end of json configuration */
-
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
-		     CONFIG_MQTT_PUB_TOPIC);
-
-	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-	if (err) {
-		printk("mqtt processing failed\n");
-	}
-
-	err = mqtt_disconnect(&client);
-	if (err) {
-		printk("Could not disconnect\n");
-	}
-
-	wait(APP_SLEEP_MS);
-	err = mqtt_input(&client);
-	if (err) {
-		printk("Could not input data\n");
-	}
-
-	return 0;
-}
-
-int sync_broker()
-{
-	int err;
-
-	err = mqtt_enable(&client);
-	if (err) {
-		printk("Could not connect to client\n");
-	}
-
-	err = mqtt_ping(&client);
-	if (err) {
-		printk("Could not ping server\n");
-	}
-
-	cJSON *sync_obj = cJSON_CreateObject();
-
-	char *buffer;
-
-	buffer = cJSON_PrintUnformatted(sync_obj);
-
-	cJSON_Delete(sync_obj);
 	
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, buffer, strlen(buffer),
-		     CONFIG_MQTT_GET_TOPIC);
-
 	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 	if (err) {
 		printk("mqtt processing failed\n");
