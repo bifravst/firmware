@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
-#include <dk_buttons_and_leds.h>
 #include <zephyr.h>
 #include <stdio.h>
 #include <uart.h>
@@ -21,6 +20,8 @@
 #define NORMAL_OP false
 
 static struct gps_data gps_data;
+
+static struct sensor_value accel[3];
 
 K_SEM_DEFINE(gps_timing_sem, 0, 1);
 K_SEM_DEFINE(idle_user_sem, 1, 1);
@@ -46,7 +47,7 @@ static void request_battery_status_work_fn(struct k_work *work)
 static void publish_data_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_data(NORMAL_OP);
+	err = publish_data();
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
 	}
@@ -55,7 +56,7 @@ static void publish_data_work_fn(struct k_work *work)
 static void sync_broker_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_data(SYNC);
+	err = publish_data();
 	if (err != 0) {
 		printk("Sync Error: %d", err);
 	}
@@ -68,52 +69,6 @@ static void work_init()
 	k_work_init(&publish_data_work, publish_data_work_fn);
 	k_work_init(&sync_broker_work, sync_broker_work_fn);
 }
-
-
-static void leds_init(void)
-{
-#if defined(CONFIG_DK_LIBRARY)
-	int err;
-
-	err = dk_leds_init();
-	if (err) {
-		printk("Could not initialize leds, err code: %d\n", err);
-	}
-
-	err = dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
-	if (err) {
-		printk("Could not set leds state, err code: %d\n", err);
-	}
-#endif
-}
-
-static void led_notification(char *mode)
-{
-	switch(mode)
-	{
-		case LTE_SEARCHING:
-			//set blå led
-		break;
-
-		case LTE_CONNECTED:
-			//set blå/grønn led
-		break;
-
-		case GPS_SEARCHING:
-			//set grønn led
-		break;
-
-		case GPS_FIX:
-			//set grønn/rød led
-		break;
-
-		case PUBLISH_GPS_DATA:
-			//toggle alle farger 2 ganger
-		break;
-	}
-}
-
-
 
 static void lte_connect(void)
 {
@@ -139,6 +94,13 @@ static void adxl362_trigger_handler(struct device *dev,
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
 		printk("The cat has moved, grant publish access \n");
+
+
+		/*INSERT THIS DATA TO CUSTOM STRUCT */
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]);
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[1]);
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[2]);
+		
 
 		k_sem_give(events[1].sem);
 
@@ -179,8 +141,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_control_stop(0);
 		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		attach_gps_data(gps_data.pvt.longitude, gps_data.pvt.latitude,
-				gps_data.pvt.datetime);
+		attach_gps_data(gps_data);
 		k_sem_give(events[0].sem);
 		break;
 
@@ -189,17 +150,18 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	}
 }
 
+//make a timer which gives the accel semaphore every x seconds
+
 void main(void)
 {
 	printk("The cat tracker has started\n");
-	leds_init();
 	work_init();
 	provision_certificates();
 	lte_connect();
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	k_work_submit(&sync_broker_work);
+	//k_work_submit(&sync_broker_work);
 
 	while (1) {
 		if (check_mode()) {
@@ -216,7 +178,7 @@ void main(void)
 				       check_gps_timeout());
 			}
 			events[0].state = K_POLL_STATE_NOT_READY;
-			k_sleep(K_SECONDS(check_publish_interval()));
+			k_sleep(K_SECONDS(check_active_wait(true)));
 		} else {
 			printk("We are in passive mode\n");
 			k_poll(events, 2, K_FOREVER);
@@ -236,7 +198,7 @@ void main(void)
 					       check_gps_timeout());
 				}
 				events[0].state = K_POLL_STATE_NOT_READY;
-				k_sleep(K_SECONDS(check_publish_interval()));
+				k_sleep(K_SECONDS(check_active_wait(false)));
 			}
 			events[1].state = K_POLL_STATE_NOT_READY;
 		}

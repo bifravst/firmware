@@ -13,15 +13,15 @@ extern "C" {
 
 int check_mode(void);
 
-int check_publish_interval(void);
+int check_active_wait(bool mode);
 
 int check_idle_threshold(void);
 
 int check_gps_timeout(void);
 
-void attach_gps_data(double longitude, double latitude, struct gps_datetime gps_datetime);
+void attach_gps_data(struct gps_data gps_data);
 
-void attach_battery_data(int battery_percentage);
+void attach_battery_data(int battery_voltage);
 
 int fds_init(struct mqtt_client *c);
 
@@ -52,7 +52,7 @@ void wait();
 
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
-int publish_data(bool sync);
+int publish_data(void);
 
 int provision_certificates(void);
 
