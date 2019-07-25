@@ -28,8 +28,8 @@ typedef struct Sync_data {
 	bool active;
 	int active_wait;
 	int passive_wait;
-
 	int movement_timeout;
+	int accel_threshold;
 
 } Sync_data;
 

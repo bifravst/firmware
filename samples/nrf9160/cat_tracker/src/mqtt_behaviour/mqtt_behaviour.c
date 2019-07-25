@@ -13,7 +13,7 @@
 
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 10000
+#define APP_SLEEP_MS 20000
 #define APP_CONNECT_TRIES 10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
@@ -30,7 +30,8 @@ Sync_data sync_data = { .gps_timeout = 720,
 			.active = true,
 			.active_wait = 60,
 			.passive_wait = 60,
-			.movement_timeout = 3600 };
+			.movement_timeout = 3600,
+			.accel_threshold = 300 };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -191,11 +192,10 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		if (!initial_connection) {
-			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
-			// subscribe(CONFIG_MQTT_REJECTED_TOPIC);
-		} else {
+		if (initial_connection) {
 			subscribe(CONFIG_MQTT_SUB_TOPIC);
+		} else {
+			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
 		}
 
 		break;
