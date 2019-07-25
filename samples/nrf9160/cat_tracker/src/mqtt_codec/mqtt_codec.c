@@ -81,7 +81,7 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		return -ENOENT;
 	}
 
-	if (!initial_connection) {
+	if (!initial_connection) { //need to implement a way to make sure that the item is present, if not abort
 		state = cJSON_GetObjectItem(root_obj, "state");
 		desired = cJSON_GetObjectItem(state, "desired");
 		cfg = cJSON_GetObjectItem(desired, "cfg");
@@ -92,7 +92,7 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		passive_wait = cJSON_GetObjectItem(cfg, "mvres");
 		movement_timeout = cJSON_GetObjectItem(cfg, "mvt");
 
-		initial_connection = true;
+		//initial_connection = true;
 	} else {
 		state = cJSON_GetObjectItem(root_obj, "state");
 		cfg = cJSON_GetObjectItem(state, "cfg");
