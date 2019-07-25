@@ -36,6 +36,7 @@ typedef struct Sync_data {
 struct Transmit_data {
 	char *buf;
 	size_t len;
+	u8_t *topic;
 };
 
 int decode_response(char *input, struct Sync_data *sync_data,

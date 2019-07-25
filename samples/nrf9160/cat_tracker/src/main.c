@@ -17,7 +17,7 @@
 #include <gps_controller.h>
 
 #define SYNC true
-#define NORMAL_OP false
+#define NORM false
 
 static struct gps_data gps_data;
 
@@ -47,7 +47,7 @@ static void request_battery_status_work_fn(struct k_work *work)
 static void publish_data_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_data();
+	err = publish_data(NORM);
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
 	}
@@ -56,7 +56,7 @@ static void publish_data_work_fn(struct k_work *work)
 static void sync_broker_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_data();
+	err = publish_data(SYNC);
 	if (err != 0) {
 		printk("Sync Error: %d", err);
 	}
@@ -180,8 +180,8 @@ void main(void)
 	provision_certificates();
 	lte_connect();
 	adxl362_init();
-	//gps_control_init(gps_control_handler);
-	//k_work_submit(&sync_broker_work);
+	gps_control_init(gps_control_handler);
+	k_work_submit(&sync_broker_work);
 
 	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
 		      K_SECONDS(check_mov_timeout()));
@@ -189,41 +189,43 @@ void main(void)
 	while (1) {
 		if (check_mode()) {
 			printk("We are in active mode\n");
-			// gps_control_start(0);
-			// k_poll(events, 1, K_SECONDS(check_gps_timeout()));
-			// if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-			// 	k_sem_take(events[0].sem, 0);
-			k_work_submit(&request_battery_status_work);
-			k_work_submit(&publish_data_work);
-			// } else {
-			// 	gps_control_stop(0);
-			// 	printk("GPS data could not be found within %d seconds\n",
-			// 	       check_gps_timeout());
-			// }
-			// events[0].state = K_POLL_STATE_NOT_READY;
+			gps_control_start(0);
+			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
+			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[0].sem, 0);
+				k_work_submit(&request_battery_status_work);
+				k_work_submit(&publish_data_work);
+			} else {
+				gps_control_stop(0);
+				printk("GPS data could not be found within %d seconds\n",
+				       check_gps_timeout());
+			}
+			events[0].state = K_POLL_STATE_NOT_READY;
 			k_sleep(K_SECONDS(check_active_wait(true)));
 		} else {
 			printk("We are in passive mode\n");
 			k_poll(events, 2, K_FOREVER);
 			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 				k_sem_take(events[1].sem, 0);
-				// 	gps_control_start(0);
-				// 	k_poll(events, 1,
-				// 	       K_SECONDS(check_gps_timeout()));
-				// 	if (events[0].state ==
-				// 	    K_POLL_STATE_SEM_AVAILABLE) {
-				// 		k_sem_take(events[0].sem, 0);
-				k_work_submit(&request_battery_status_work);
-				k_work_submit(&publish_data_work);
-				k_timer_start(&my_timer,
-					      K_SECONDS(check_mov_timeout()),
-					      K_SECONDS(check_mov_timeout()));
-				// } else {
-				// 	gps_control_stop(0);
-				// 	printk("GPS data could not be found within %d seconds\n",
-				// 	       check_gps_timeout());
-				// }
-				// events[0].state = K_POLL_STATE_NOT_READY;
+				gps_control_start(0);
+				k_poll(events, 1,
+				       K_SECONDS(check_gps_timeout()));
+				if (events[0].state ==
+				    K_POLL_STATE_SEM_AVAILABLE) {
+					k_sem_take(events[0].sem, 0);
+					k_work_submit(
+						&request_battery_status_work);
+					k_work_submit(&publish_data_work);
+					k_timer_start(
+						&my_timer,
+						K_SECONDS(check_mov_timeout()),
+						K_SECONDS(check_mov_timeout()));
+				} else {
+					gps_control_stop(0);
+					printk("GPS data could not be found within %d seconds\n",
+					       check_gps_timeout());
+				}
+				events[0].state = K_POLL_STATE_NOT_READY;
 				k_sleep(K_SECONDS(check_active_wait(false)));
 			}
 			events[1].state = K_POLL_STATE_NOT_READY;
