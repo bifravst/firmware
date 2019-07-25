@@ -11,16 +11,12 @@
 
 #include "gps_controller.h"
 
-
 #include <logging/log.h>
 LOG_MODULE_REGISTER(gps_control, CONFIG_GPS_CONTROL_LOG_LEVEL);
 
 /* Structure to hold GPS work information */
 static struct {
-	enum {
-		GPS_WORK_START,
-		GPS_WORK_STOP
-	} type;
+	enum { GPS_WORK_START, GPS_WORK_STOP } type;
 	struct k_delayed_work work;
 	struct device *dev;
 	u32_t failed_fix_attempts;
@@ -33,7 +29,6 @@ static void gps_work_handler(struct k_work *work)
 	int err;
 
 	if (gps_work.type == GPS_WORK_START) {
-
 		err = gps_start(gps_work.dev);
 		if (err) {
 			printk("GPS could not be started, error: %d\n", err);
@@ -45,7 +40,6 @@ static void gps_work_handler(struct k_work *work)
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
-
 		err = gps_stop(gps_work.dev);
 		if (err) {
 			printk("GPS could not be stopped, error: %d\n", err);
@@ -92,14 +86,10 @@ int gps_control_init(gps_trigger_handler_t handler)
 	struct device *gps_dev;
 
 #ifdef CONFIG_GPS_SIM
-	struct gps_trigger gps_trig = {
-		.type = GPS_TRIG_DATA_READY
-	};
+	struct gps_trigger gps_trig = { .type = GPS_TRIG_DATA_READY };
 #else
-	struct gps_trigger gps_trig = {
-		.type = GPS_TRIG_FIX,
-		.chan = GPS_CHAN_NMEA
-	};
+	struct gps_trigger gps_trig = { .type = GPS_TRIG_FIX,
+					.chan = GPS_CHAN_NMEA };
 #endif /* CONFIG_GPS_SIM */
 
 	gps_dev = device_get_binding(CONFIG_GPS_DEV_NAME);
@@ -107,7 +97,6 @@ int gps_control_init(gps_trigger_handler_t handler)
 		printk("Could not get %s device\n", CONFIG_GPS_DEV_NAME);
 		return -ENODEV;
 	}
-
 
 	err = gps_trigger_set(gps_dev, &gps_trig, handler);
 	if (err) {
@@ -121,8 +110,9 @@ int gps_control_init(gps_trigger_handler_t handler)
 	gps_work.dev = gps_dev;
 	gps_work.type = GPS_WORK_START;
 
-	k_delayed_work_submit(&gps_work.work,
-			K_SECONDS(CONFIG_GPS_CONTROL_FIRST_FIX_CHECK_DELAY));
+	k_delayed_work_submit(
+		&gps_work.work,
+		K_SECONDS(CONFIG_GPS_CONTROL_FIRST_FIX_CHECK_DELAY));
 #endif
 	printk("GPS initialized\n");
 
