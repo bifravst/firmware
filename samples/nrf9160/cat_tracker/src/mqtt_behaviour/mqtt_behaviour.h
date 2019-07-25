@@ -19,9 +19,13 @@ int check_idle_threshold(void);
 
 int check_gps_timeout(void);
 
+int check_mov_timeout(void);
+
 void attach_gps_data(struct gps_data gps_data);
 
 void attach_battery_data(int battery_voltage);
+
+void attach_accel_data(double x, double y, double z);
 
 int fds_init(struct mqtt_client *c);
 
@@ -29,16 +33,14 @@ void data_print_set_mode(u8_t *prefix, u8_t *data, size_t len);
 
 void data_print(u8_t *prefix, u8_t *data, size_t len);
 
-int data_publish(struct mqtt_client *c, enum mqtt_qos qos,
-	u8_t *data, size_t len, u8_t *topic);
+int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
+		 size_t len, u8_t *topic);
 
 int subscribe(u8_t *sub_topic);
 
-int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
-			       size_t length);
+int publish_get_payload(struct mqtt_client *c, u8_t *write_buf, size_t length);
 
-void mqtt_evt_handler(struct mqtt_client *const c,
-		      const struct mqtt_evt *evt);
+void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt);
 
 void broker_init(void);
 
@@ -46,9 +48,9 @@ void client_init(struct mqtt_client *client);
 
 int mqtt_enable(struct mqtt_client *client);
 
-void clear_fds();
+void clear_fds(void);
 
-void wait();
+void wait(int timeout);
 
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
