@@ -44,6 +44,15 @@ static bool initial_connection = false;
 
 static int nfds;
 
+static char *client_id_imei;
+
+void set_client_id_imei(char *imei)
+{
+	client_id_imei = imei;
+
+	printk("reponse from modem was: %s\n", client_id_imei);
+}
+
 int check_mode(void)
 {
 	if (sync_data.active) {
@@ -327,8 +336,8 @@ void client_init(struct mqtt_client *client)
 
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
-	client->client_id.utf8 = (u8_t *)CONFIG_MQTT_AWS_CLIENT_ID;
-	client->client_id.size = strlen(CONFIG_MQTT_AWS_CLIENT_ID);
+	client->client_id.utf8 = (u8_t *)client_id_imei;
+	client->client_id.size = strlen(client_id_imei);
 	client->password = NULL;
 	client->user_name = NULL;
 	client->protocol_version = MQTT_VERSION_3_1_1;
