@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+void set_client_id_imei(char *imei);
+
 int check_mode(void);
 
 int check_active_wait(bool mode);

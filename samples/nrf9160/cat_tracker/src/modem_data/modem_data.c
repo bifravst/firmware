@@ -7,9 +7,15 @@
 #include <string.h>
 
 #define AT_BATSTAT "AT%XVBAT"
+#define AT_IMEI "AT+CGSN"
 
 static const char cmd[] = AT_BATSTAT;
+static const char cmd_imei[] = AT_IMEI;
+
 static enum at_cmd_state state;
+
+static char buf_imei[50];
+size_t buf_len_imei = sizeof(buf_imei);
 
 void at_cmd_handler(char *state)
 {
@@ -53,4 +59,18 @@ int request_battery_status()
 	battery_percentage = atoi(battery_level);
 
 	return battery_percentage;
+}
+
+char *request_init_modem_data()
+{
+	int err;
+	// char buf_imei[50];
+	// size_t buf_len = sizeof(buf);
+
+	err = at_cmd_write(cmd_imei, buf_imei, buf_len_imei, &state);
+	if (err != 0) {
+		printk("Error in response from modem\n");
+	}
+
+	return buf_imei;
 }
