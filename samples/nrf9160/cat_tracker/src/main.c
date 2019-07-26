@@ -93,25 +93,46 @@ static void adxl362_trigger_handler(struct device *dev,
 {
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
-		printk("The cat has moved, grant publish access \n");
 
-		sensor_sample_fetch(dev);
+		if (sensor_sample_fetch(dev) < 0) {
+			printk("Sample fetch error\n");
+			return;
+		}
 
 		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]);
 		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &accel[1]);
 		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &accel[2]);
 
-		attach_accel_data(sensor_value_to_double(&accel[0]),
-				  sensor_value_to_double(&accel[1]),
-				  sensor_value_to_double(&accel[2]));
+		if ((abs(sensor_value_to_double(&accel[0])) >
+		     check_accel_thres()) ||
+		    (abs(sensor_value_to_double(&accel[1])) >
+		     check_accel_thres()) ||
+		    (abs(sensor_value_to_double(&accel[2])) >
+		     check_accel_thres())) {
+			attach_accel_data(sensor_value_to_double(&accel[0]),
+					  sensor_value_to_double(&accel[1]),
+					  sensor_value_to_double(&accel[2]));
 
-		if (sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]) <
-		    0) {
-			printf("Channel get error:\n");
-			return;
+			printf("x: %.1f, y: %.1f, z: %.1f (m/s^2)\n",
+			       sensor_value_to_double(&accel[0]),
+			       sensor_value_to_double(&accel[1]),
+			       sensor_value_to_double(&accel[2]));
+			k_sem_give(events[1].sem);
 		}
 
-		k_sem_give(events[1].sem);
+		// printk("The cat has moved, grant publish access \n");
+
+		// sensor_sample_fetch(dev);
+
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]);
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &accel[1]);
+		// sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &accel[2]);
+
+		// attach_accel_data(sensor_value_to_double(&accel[0]),
+		// 		  sensor_value_to_double(&accel[1]),
+		// 		  sensor_value_to_double(&accel[2]));
+
+		// k_sem_give(events[1].sem);
 
 		break;
 	default:
@@ -183,8 +204,6 @@ void main(void)
 	// gps_control_init(gps_control_handler);
 	k_work_submit(&sync_broker_work);
 
-	//k_work_submit(&publish_data_work);
-
 	// k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
 	// 	      K_SECONDS(check_mov_timeout()));
 
@@ -206,30 +225,31 @@ void main(void)
 			k_sleep(K_SECONDS(check_active_wait(true)));
 		} else {
 			printk("We are in passive mode\n");
-			// k_poll(events, 2, K_FOREVER);
-			// if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-			// 	k_sem_take(events[1].sem, 0);
-			// 	gps_control_start(0);
-			// 	k_poll(events, 1,
-			// 	       K_SECONDS(check_gps_timeout()));
-			// 	if (events[0].state ==
-			// 	    K_POLL_STATE_SEM_AVAILABLE) {
-			// 		k_sem_take(events[0].sem, 0);
-			k_work_submit(&request_battery_status_work);
-			k_work_submit(&publish_data_work);
-			// 	k_timer_start(
-			// 		&my_timer,
-			// 		K_SECONDS(check_mov_timeout()),
-			// 		K_SECONDS(check_mov_timeout()));
-			// } else {
-			// 	gps_control_stop(0);
-			// 	printk("GPS data could not be found within %d seconds\n",
-			// 	       check_gps_timeout());
-			// }
-			// events[0].state = K_POLL_STATE_NOT_READY;
-			k_sleep(K_SECONDS(check_active_wait(false)));
-			// }
-			// events[1].state = K_POLL_STATE_NOT_READY;
+			k_poll(events, 2, K_FOREVER);
+			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[1].sem, 0);
+				printk("Accelerometer triggered!!");
+				// 	gps_control_start(0);
+				// 	k_poll(events, 1,
+				// 	       K_SECONDS(check_gps_timeout()));
+				// 	if (events[0].state ==
+				// 	    K_POLL_STATE_SEM_AVAILABLE) {
+				// 		k_sem_take(events[0].sem, 0);
+				k_work_submit(&request_battery_status_work);
+				k_work_submit(&publish_data_work);
+				// 	k_timer_start(
+				// 		&my_timer,
+				// 		K_SECONDS(check_mov_timeout()),
+				// 		K_SECONDS(check_mov_timeout()));
+				// } else {
+				// 	gps_control_stop(0);
+				// 	printk("GPS data could not be found within %d seconds\n",
+				// 	       check_gps_timeout());
+				// }
+				// events[0].state = K_POLL_STATE_NOT_READY;
+				//k_sleep(K_SECONDS(check_active_wait(false)));
+			}
+			events[1].state = K_POLL_STATE_NOT_READY;
 		}
 	}
 }

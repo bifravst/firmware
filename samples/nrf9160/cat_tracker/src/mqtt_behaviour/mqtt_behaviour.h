@@ -21,6 +21,8 @@ int check_gps_timeout(void);
 
 int check_mov_timeout(void);
 
+double check_accel_thres(void);
+
 void attach_gps_data(struct gps_data gps_data);
 
 void attach_battery_data(int battery_voltage);
