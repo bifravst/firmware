@@ -40,7 +40,7 @@ struct Transmit_data {
 };
 
 int decode_response(char *input, struct Sync_data *sync_data,
-		    bool initial_connection);
+		    bool inital_connection);
 
 int encode_message(struct Transmit_data *output, struct Sync_data *sync_data);
 

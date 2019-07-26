@@ -21,17 +21,12 @@
 #include "certificates.h"
 #endif
 
-#define CONFIG_MQTT_GET_TOPIC "$aws/things/Cat-Tracker/shadow/get"
-#define CONFIG_MQTT_ACCEPTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/accepted"
-#define CONFIG_MQTT_REJECTED_TOPIC "$aws/things/Cat-Tracker/shadow/get/rejected"
-#define CONFIG_MQTT_DELTA_TOPIC "$aws/thing/Cat-Tracker/shadow/update/delta"
-
 Sync_data sync_data = { .gps_timeout = 720,
-			.active = true,
+			.active = false,
 			.active_wait = 60,
 			.passive_wait = 60,
 			.movement_timeout = 3600,
-			.accel_threshold = 300 };
+			.accel_threshold = 30 };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -75,6 +70,15 @@ int check_gps_timeout(void)
 int check_mov_timeout(void)
 {
 	return sync_data.movement_timeout;
+}
+
+double check_accel_thres(void)
+{
+	double accel_threshold_double;
+
+	accel_threshold_double = sync_data.accel_threshold / 10;
+
+	return accel_threshold_double;
 }
 
 void attach_gps_data(struct gps_data gps_data)
@@ -193,9 +197,9 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
 		if (initial_connection) {
-			subscribe(CONFIG_MQTT_SUB_TOPIC);
+			subscribe(CONFIG_MQTT_AWS_UPDATE_DELTA_TOPIC);
 		} else {
-			subscribe(CONFIG_MQTT_ACCEPTED_TOPIC);
+			subscribe(CONFIG_MQTT_AWS_GET_ACCEPTED_TOPIC);
 		}
 
 		break;
@@ -271,7 +275,8 @@ void broker_init(void)
 	struct addrinfo hints = { .ai_family = AF_INET,
 				  .ai_socktype = SOCK_STREAM };
 
-	err = getaddrinfo(CONFIG_MQTT_BROKER_HOSTNAME, NULL, &hints, &result);
+	err = getaddrinfo(CONFIG_MQTT_AWS_BROKER_HOSTNAME, NULL, &hints,
+			  &result);
 	if (err) {
 		printk("ERROR: getaddrinfo failed %d\n", err);
 
@@ -293,7 +298,7 @@ void broker_init(void)
 				((struct sockaddr_in *)addr->ai_addr)
 					->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
-			broker4->sin_port = htons(CONFIG_MQTT_BROKER_PORT);
+			broker4->sin_port = htons(CONFIG_MQTT_AWS_BROKER_PORT);
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
@@ -322,8 +327,8 @@ void client_init(struct mqtt_client *client)
 
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
-	client->client_id.utf8 = (u8_t *)CONFIG_MQTT_CLIENT_ID;
-	client->client_id.size = strlen(CONFIG_MQTT_CLIENT_ID);
+	client->client_id.utf8 = (u8_t *)CONFIG_MQTT_AWS_CLIENT_ID;
+	client->client_id.size = strlen(CONFIG_MQTT_AWS_CLIENT_ID);
 	client->password = NULL;
 	client->user_name = NULL;
 	client->protocol_version = MQTT_VERSION_3_1_1;
@@ -343,7 +348,7 @@ void client_init(struct mqtt_client *client)
 	tls_config->cipher_list = NULL;
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
-	tls_config->hostname = CONFIG_MQTT_BROKER_HOSTNAME;
+	tls_config->hostname = CONFIG_MQTT_AWS_BROKER_HOSTNAME;
 #else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 #endif
@@ -446,13 +451,13 @@ int publish_data(bool op)
 	if (op) {
 		transmit_data.buf = "";
 		transmit_data.len = strlen(transmit_data.buf);
-		transmit_data.topic = CONFIG_MQTT_GET_TOPIC;
+		transmit_data.topic = CONFIG_MQTT_AWS_GET_TOPIC;
 	} else {
 		err = encode_message(&transmit_data, &sync_data);
 		if (err != 0) {
 			printk("ERROR when enconding message: %d\n", err);
 		}
-		transmit_data.topic = CONFIG_MQTT_PUB_TOPIC;
+		transmit_data.topic = CONFIG_MQTT_AWS_UPDATE_TOPIC;
 	}
 
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
