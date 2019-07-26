@@ -150,19 +150,19 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	cJSON *bat_obj = cJSON_CreateObject();
 	cJSON *acc_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateObject();
-	cJSON *cfg_obj = cJSON_CreateObject();
+	// cJSON *cfg_obj = cJSON_CreateObject();
 	cJSON *gps_val_obj = cJSON_CreateObject();
 
 	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
 	    bat_obj == NULL || acc_obj == NULL || gps_obj == NULL ||
-	    cfg_obj == NULL || gps_val_obj == NULL) {
+	    gps_val_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(bat_obj);
 		cJSON_Delete(acc_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(cfg_obj);
+		// cJSON_Delete(cfg_obj);
 		cJSON_Delete(gps_val_obj);
 		return -ENOMEM;
 	}
@@ -184,12 +184,12 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	err += json_add_number(gps_val_obj, "hdg", sync_data->heading);
 
 	/*CFG*/
-	err += json_add_number(cfg_obj, "gpst", sync_data->gps_timeout);
-	err += json_add_bool(cfg_obj, "act", sync_data->active);
-	err += json_add_number(cfg_obj, "actwt", sync_data->active_wait);
-	err += json_add_number(cfg_obj, "mvres", sync_data->passive_wait);
-	err += json_add_number(cfg_obj, "mvt", sync_data->movement_timeout);
-	err += json_add_number(cfg_obj, "acct", sync_data->accel_threshold);
+	// err += json_add_number(cfg_obj, "gpst", sync_data->gps_timeout);
+	// err += json_add_bool(cfg_obj, "act", sync_data->active);
+	// err += json_add_number(cfg_obj, "actwt", sync_data->active_wait);
+	// err += json_add_number(cfg_obj, "mvres", sync_data->passive_wait);
+	// err += json_add_number(cfg_obj, "mvt", sync_data->movement_timeout);
+	// err += json_add_number(cfg_obj, "acct", sync_data->accel_threshold);
 
 	if (err != 0) {
 		cJSON_Delete(root_obj);
@@ -198,7 +198,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 		cJSON_Delete(bat_obj);
 		cJSON_Delete(acc_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(cfg_obj);
+		// cJSON_Delete(cfg_obj);
 		cJSON_Delete(gps_val_obj);
 		return -ENOMEM;
 	}
@@ -211,7 +211,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 	err += json_add_obj(reported_obj, "gps", gps_obj);
 
-	err += json_add_obj(reported_obj, "cfg", cfg_obj);
+	// err += json_add_obj(reported_obj, "cfg", cfg_obj);
 
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
@@ -223,7 +223,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 		cJSON_Delete(bat_obj);
 		cJSON_Delete(acc_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(cfg_obj);
+		// cJSON_Delete(cfg_obj);
 		cJSON_Delete(gps_val_obj);
 		return -EAGAIN;
 	}

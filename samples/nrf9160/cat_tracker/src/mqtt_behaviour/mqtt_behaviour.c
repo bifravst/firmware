@@ -21,12 +21,12 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 720,
-			.active = false,
-			.active_wait = 60,
-			.passive_wait = 60,
+Sync_data sync_data = { .gps_timeout = 360,
+			.active = true,
+			.active_wait = 30,
+			.passive_wait = 30,
 			.movement_timeout = 3600,
-			.accel_threshold = 30 };
+			.accel_threshold = 85 };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
