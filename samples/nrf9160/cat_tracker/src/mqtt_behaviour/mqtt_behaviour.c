@@ -13,7 +13,7 @@
 
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 20000
+#define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
@@ -21,7 +21,7 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 360,
+Sync_data sync_data = { .gps_timeout = 9000,
 			.active = true,
 			.active_wait = 30,
 			.passive_wait = 30,

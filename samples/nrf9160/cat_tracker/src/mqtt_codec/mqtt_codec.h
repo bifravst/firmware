@@ -44,6 +44,8 @@ int decode_response(char *input, struct Sync_data *sync_data,
 
 int encode_message(struct Transmit_data *output, struct Sync_data *sync_data);
 
+bool check_config_change();
+
 #ifdef __cplusplus
 }
 #endif

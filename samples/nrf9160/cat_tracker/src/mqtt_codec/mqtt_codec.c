@@ -14,6 +14,7 @@ bool change_active_wait;
 bool change_passive_wait;
 bool change_movement_timeout;
 bool change_accel_threshold;
+bool change_config;
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
@@ -113,24 +114,28 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		sync_data->gps_timeout = gpst->valueint;
 		printk("SETTING GPST TO: %d\n", gpst->valueint);
 		change_gpst = true;
+		change_config = true;
 	}
 
 	if (active != NULL) {
 		sync_data->active = active->valueint;
 		printk("SETTING ACTIVE TO: %d\n", active->valueint);
 		change_active = true;
+		change_config = true;
 	}
 
 	if (active_wait != NULL) {
 		sync_data->active_wait = active_wait->valueint;
 		printk("SETTING ACTIVE WAIT TO: %d\n", active_wait->valueint);
 		change_active_wait = true;
+		change_config = true;
 	}
 
 	if (passive_wait != NULL) {
 		sync_data->passive_wait = passive_wait->valueint;
 		printk("SETTING PASSIVE_WAIT TO: %d\n", passive_wait->valueint);
 		change_passive_wait = true;
+		change_config = true;
 	}
 
 	if (movement_timeout != NULL) {
@@ -138,6 +143,7 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		printk("SETTING MOVEMENT TIMEOUT TO: %d\n",
 		       movement_timeout->valueint);
 		change_movement_timeout = true;
+		change_config = true;
 	}
 
 	if (accel_threshold != NULL) {
@@ -145,6 +151,7 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		printk("SETTING ACCEL THRESHOLD TIMEOUT TO: %d\n",
 		       accel_threshold->valueint);
 		change_accel_threshold = true;
+		change_config = true;
 	}
 
 	cJSON_Delete(root_obj);
@@ -238,13 +245,15 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 		return -ENOMEM;
 	}
 
-	err = json_add_obj(reported_obj, "bat", bat_obj);
-	err += json_add_obj(reported_obj, "acc", acc_obj);
+	if (!change_config) {
+		err = json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "acc", acc_obj);
 
-	err += json_add_obj(gps_obj, "v", gps_val_obj);
-	err += json_add_str(gps_obj, "ts", sync_data->acc_timestamp);
+		err += json_add_obj(gps_obj, "v", gps_val_obj);
+		err += json_add_str(gps_obj, "ts", sync_data->acc_timestamp);
 
-	err += json_add_obj(reported_obj, "gps", gps_obj);
+		err += json_add_obj(reported_obj, "gps", gps_obj);
+	}
 
 	if (change_gpst || change_active || change_active_wait ||
 	    change_passive_wait || change_movement_timeout ||
@@ -253,6 +262,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 		change_gpst = change_active = change_active_wait =
 			change_passive_wait = change_movement_timeout =
 				change_accel_threshold = false;
+		change_config = false;
 	}
 
 	err += json_add_obj(state_obj, "reported", reported_obj);
@@ -278,4 +288,9 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	cJSON_Delete(root_obj);
 
 	return 0;
+}
+
+bool check_config_change()
+{
+	return change_config;
 }
