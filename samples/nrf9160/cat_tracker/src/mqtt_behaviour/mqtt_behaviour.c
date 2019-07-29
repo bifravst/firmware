@@ -46,11 +46,69 @@ static int nfds;
 
 static char *client_id_imei;
 
+static char get_topic[100] = "$aws/things/{thingname}/shadow/get";
+
+static char get_accepted_desired_cfg_topic[100] =
+	"$aws/things/{thingname}/shadow/get/accepted/desired/cfg";
+
+static char update_topic[100] = "$aws/things/{thingname}/shadow/update";
+
+static char update_delta_topic[100] =
+	"$aws/things/{thingname}/shadow/update/delta";
+
+static char broker_name[100] =
+	"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
+
+char *replaceWord(const char *s, const char *oldW, const char *newW)
+{
+	char *result;
+	int i, cnt = 0;
+	int newWlen = strlen(newW);
+	int oldWlen = strlen(oldW);
+
+	// Counting the number of times old word
+	// occur in the string
+	for (i = 0; s[i] != '\0'; i++) {
+		if (strstr(&s[i], oldW) == &s[i]) {
+			cnt++;
+
+			// Jumping to index after the old word.
+			i += oldWlen - 1;
+		}
+	}
+
+	// Making new string of enough length
+	result = (char *)malloc(i + cnt * (newWlen - oldWlen) + 1);
+
+	i = 0;
+	while (*s) {
+		// compare the substring with the result
+		if (strstr(s, oldW) == s) {
+			strcpy(&result[i], newW);
+			i += newWlen;
+			s += oldWlen;
+		} else
+			result[i++] = *s++;
+	}
+
+	result[i] = '\0';
+	return result;
+}
+
 void set_client_id_imei(char *imei)
 {
+	imei[strcspn(imei, "\r\n")] = 0;
 	client_id_imei = imei;
 
-	printk("reponse from modem was: %s\n", client_id_imei);
+	strcpy(get_topic, replaceWord(get_topic, "{thingname}", imei));
+	strcpy(get_accepted_desired_cfg_topic,
+	       replaceWord(get_accepted_desired_cfg_topic, "{thingname}",
+			   imei));
+	strcpy(update_topic, replaceWord(update_topic, "{thingname}", imei));
+	strcpy(update_delta_topic,
+	       replaceWord(update_delta_topic, "{thingname}", imei));
+
+	printk("client_id: %s\n", client_id_imei);
 }
 
 int check_mode(void)
@@ -206,9 +264,9 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
 		if (initial_connection) {
-			subscribe(CONFIG_MQTT_AWS_UPDATE_DELTA_TOPIC);
+			subscribe(update_delta_topic);
 		} else {
-			subscribe(CONFIG_MQTT_AWS_GET_ACCEPTED_TOPIC);
+			subscribe(get_accepted_desired_cfg_topic);
 		}
 
 		break;
@@ -284,8 +342,7 @@ void broker_init(void)
 	struct addrinfo hints = { .ai_family = AF_INET,
 				  .ai_socktype = SOCK_STREAM };
 
-	err = getaddrinfo(CONFIG_MQTT_AWS_BROKER_HOSTNAME, NULL, &hints,
-			  &result);
+	err = getaddrinfo(broker_name, NULL, &hints, &result);
 	if (err) {
 		printk("ERROR: getaddrinfo failed %d\n", err);
 
@@ -357,7 +414,7 @@ void client_init(struct mqtt_client *client)
 	tls_config->cipher_list = NULL;
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
-	tls_config->hostname = CONFIG_MQTT_AWS_BROKER_HOSTNAME;
+	tls_config->hostname = broker_name;
 #else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 #endif
@@ -460,13 +517,13 @@ int publish_data(bool op)
 	if (op) {
 		transmit_data.buf = "";
 		transmit_data.len = strlen(transmit_data.buf);
-		transmit_data.topic = CONFIG_MQTT_AWS_GET_TOPIC;
+		transmit_data.topic = get_topic;
 	} else {
 		err = encode_message(&transmit_data, &sync_data);
 		if (err != 0) {
 			printk("ERROR when enconding message: %d\n", err);
 		}
-		transmit_data.topic = CONFIG_MQTT_AWS_UPDATE_TOPIC;
+		transmit_data.topic = update_topic;
 	}
 
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
