@@ -13,7 +13,7 @@
 
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 5000
+#define APP_SLEEP_MS 3000
 #define APP_CONNECT_TRIES 10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
@@ -21,8 +21,8 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 9000,
-			.active = true,
+Sync_data sync_data = { .gps_timeout = 15,
+			.active = false,
 			.active_wait = 30,
 			.passive_wait = 30,
 			.movement_timeout = 3600,
@@ -44,20 +44,19 @@ static bool initial_connection = false;
 
 static int nfds;
 
-static char *client_id_imei;
+static char client_id_imei[100] = "Cat-Tracker";
 
-static char get_topic[100] = "$aws/things/{thingname}/shadow/get";
+static char get_topic[100] = "$aws/things/Cat-Tracker/shadow/get";
 
-static char get_accepted_desired_cfg_topic[100] =
-	"$aws/things/{thingname}/shadow/get/accepted/desired/cfg";
+static char get_accepted_desired_cfg_topic[100] = "$aws/things/Cat-Tracker/shadow/get/accepted/desired/cfg";
 
-static char update_topic[100] = "$aws/things/{thingname}/shadow/update";
+static char update_topic[100] = "$aws/things/Cat-Tracker/shadow/update";
 
-static char update_delta_topic[100] =
-	"$aws/things/{thingname}/shadow/update/delta";
+static char update_delta_topic[100] = "$aws/things/Cat-Tracker/shadow/update/delta";
 
-static char broker_name[100] =
-	"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
+static char broker_name[100] = "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
+//"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
+//352656100247819
 
 char *replaceWord(const char *s, const char *oldW, const char *newW)
 {
@@ -95,20 +94,28 @@ char *replaceWord(const char *s, const char *oldW, const char *newW)
 	return result;
 }
 
+void set_gps_found(bool gps_found) {
+	sync_data.gps_found = gps_found;
+}
+
 void set_client_id_imei(char *imei)
 {
-	imei[strcspn(imei, "\r\n")] = 0;
-	client_id_imei = imei;
+	// strcpy(client_id_imei, imei);
+	// strcpy(get_topic,
+	//        replaceWord(CONFIG_MQTT_AWS_GET_TOPIC, "{thingname}", imei));
+	// strcpy(get_accepted_desired_cfg_topic,
+	//        replaceWord(CONFIG_MQTT_AWS_GET_ACCEPTED_TOPIC, "{thingname}",
+	// 		   imei));
+	// strcpy(update_topic,
+	//        replaceWord(CONFIG_MQTT_AWS_UPDATE_TOPIC, "{thingname}", imei));
+	// strcpy(update_delta_topic,
+	//        replaceWord(CONFIG_MQTT_AWS_UPDATE_DELTA_TOPIC, "{thingname}",
+	// 		   imei));
 
-	strcpy(get_topic, replaceWord(get_topic, "{thingname}", imei));
-	strcpy(get_accepted_desired_cfg_topic,
-	       replaceWord(get_accepted_desired_cfg_topic, "{thingname}",
-			   imei));
-	strcpy(update_topic, replaceWord(update_topic, "{thingname}", imei));
-	strcpy(update_delta_topic,
-	       replaceWord(update_delta_topic, "{thingname}", imei));
-
-	printk("client_id: %s\n", client_id_imei);
+	// printk("GET TOPIC %s\n", get_topic);
+	// printk("GET ACCEPTED TOPIC %s\n", get_accepted_desired_cfg_topic);
+	// printk("UPDATE %s\n", update_topic);
+	// printk("UPDATE DELTA %s\n", update_delta_topic);
 }
 
 int check_mode(void)
@@ -298,10 +305,11 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			break;
 		}
 
-		err = decode_response(payload_buf, &sync_data,
-				      initial_connection);
-		if (err != 0) {
-			printk("Could not decode response\n%d", err);
+		if (p->message.payload.len > 2) {
+			err = decode_response(payload_buf, &sync_data);
+			if (err != 0) {
+				printk("Could not decode response\n%d", err);
+			}
 		}
 
 		initial_connection = true;

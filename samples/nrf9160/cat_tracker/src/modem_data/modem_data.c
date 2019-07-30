@@ -64,8 +64,6 @@ int request_battery_status()
 char *request_init_modem_data()
 {
 	int err;
-	// char buf_imei[50];
-	// size_t buf_len = sizeof(buf);
 
 	err = at_cmd_write(cmd_imei, buf_imei, buf_len_imei, &state);
 	if (err != 0) {

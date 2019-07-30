@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+void set_gps_found(bool gps_found);
+
 void set_client_id_imei(char *imei);
 
 int check_mode(void);
