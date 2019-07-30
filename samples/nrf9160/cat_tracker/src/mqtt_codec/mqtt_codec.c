@@ -16,6 +16,15 @@ bool change_movement_timeout;
 bool change_accel_threshold;
 bool change_config;
 
+typedef struct Digital_twin {
+	cJSON *gpst;
+	cJSON *active;
+	cJSON *active_wait;
+	cJSON *passive_wait;
+	cJSON *movement_timeout;
+	cJSON *accel_threshold;
+} Digital_twin;
+
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
 	cJSON_AddItemToObject(parent, str, item);
@@ -71,11 +80,16 @@ static int json_add_DoubleArray(cJSON *parent, const char *str, double *item)
 	return json_add_obj(parent, str, json_double);
 }
 
-int decode_response(char *input, struct Sync_data *sync_data,
-		    bool initial_connection)
+static cJSON *json_object_decode(cJSON *obj, const char *str)
 {
-	cJSON *state = NULL;
-	cJSON *cfg = NULL;
+	return obj ? cJSON_GetObjectItem(obj, str) : NULL;
+}
+
+int decode_response(char *input, struct Sync_data *sync_data)
+{
+	cJSON *root_obj = NULL;
+	cJSON *group_obj = NULL;
+	cJSON *subgroup_obj = NULL;
 	cJSON *gpst = NULL;
 	cJSON *active = NULL;
 	cJSON *active_wait = NULL;
@@ -83,32 +97,37 @@ int decode_response(char *input, struct Sync_data *sync_data,
 	cJSON *movement_timeout = NULL;
 	cJSON *accel_threshold = NULL;
 
-	cJSON *root_obj = cJSON_Parse(input);
+	if (input == NULL) {
+		return -EINVAL;
+	}
+
+	root_obj = cJSON_Parse(input);
 	if (root_obj == NULL) {
-		printk("Not able to parse incoming json object\n");
-		cJSON_Delete(root_obj);
 		return -ENOENT;
 	}
 
-	if (!initial_connection) {
-		cfg = cJSON_GetObjectItem(root_obj, "cfg");
-		gpst = cJSON_GetObjectItem(cfg, "gpst");
-		active = cJSON_GetObjectItem(cfg, "act");
-		active_wait = cJSON_GetObjectItem(cfg, "actwt");
-		passive_wait = cJSON_GetObjectItem(cfg, "mvres");
-		movement_timeout = cJSON_GetObjectItem(cfg, "mvt");
-		accel_threshold = cJSON_GetObjectItem(cfg, "acct");
-
-	} else {
-		state = cJSON_GetObjectItem(root_obj, "state");
-		cfg = cJSON_GetObjectItem(state, "cfg");
-		gpst = cJSON_GetObjectItem(cfg, "gpst");
-		active = cJSON_GetObjectItem(cfg, "act");
-		active_wait = cJSON_GetObjectItem(cfg, "actwt");
-		passive_wait = cJSON_GetObjectItem(cfg, "mvres");
-		movement_timeout = cJSON_GetObjectItem(cfg, "mvt");
-		accel_threshold = cJSON_GetObjectItem(cfg, "acct");
+	group_obj = json_object_decode(root_obj, "cfg");
+	if (group_obj != NULL) {
+		goto bisect;
 	}
+
+	group_obj = json_object_decode(root_obj, "state");
+	if (group_obj != NULL) {
+		subgroup_obj = json_object_decode(group_obj, "cfg");
+		if (subgroup_obj != NULL) {
+		} else {
+			goto end;
+		}
+	}
+
+bisect:
+
+	gpst = cJSON_GetObjectItem(subgroup_obj, "gpst");
+	active = cJSON_GetObjectItem(subgroup_obj, "act");
+	active_wait = cJSON_GetObjectItem(subgroup_obj, "actwt");
+	passive_wait = cJSON_GetObjectItem(subgroup_obj, "mvres");
+	movement_timeout = cJSON_GetObjectItem(subgroup_obj, "mvt");
+	accel_threshold = cJSON_GetObjectItem(subgroup_obj, "acct");
 
 	if (gpst != NULL) {
 		sync_data->gps_timeout = gpst->valueint;
@@ -153,9 +172,8 @@ int decode_response(char *input, struct Sync_data *sync_data,
 		change_accel_threshold = true;
 		change_config = true;
 	}
-
+end:
 	cJSON_Delete(root_obj);
-
 	return 0;
 }
 
@@ -246,13 +264,23 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	}
 
 	if (!change_config) {
-		err = json_add_obj(reported_obj, "bat", bat_obj);
-		err += json_add_obj(reported_obj, "acc", acc_obj);
+		if (sync_data->active == true &&
+		    sync_data->gps_found == false) {
+			err = json_add_obj(reported_obj, "bat", bat_obj);
+		}
 
-		err += json_add_obj(gps_obj, "v", gps_val_obj);
-		err += json_add_str(gps_obj, "ts", sync_data->acc_timestamp);
+		if (sync_data->active == false &&
+		    sync_data->gps_found == false) {
+			err = json_add_obj(reported_obj, "bat", bat_obj);
+			err += json_add_obj(reported_obj, "acc", acc_obj);
+		}
 
-		err += json_add_obj(reported_obj, "gps", gps_obj);
+		if (sync_data->gps_found == true) {
+			err += json_add_obj(gps_obj, "v", gps_val_obj);
+			err += json_add_str(gps_obj, "ts",
+					    sync_data->acc_timestamp);
+			err += json_add_obj(reported_obj, "gps", gps_obj);
+		}
 	}
 
 	if (change_gpst || change_active || change_active_wait ||

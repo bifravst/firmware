@@ -31,6 +31,8 @@ typedef struct Sync_data {
 	int movement_timeout;
 	int accel_threshold;
 
+	bool gps_found;
+
 } Sync_data;
 
 struct Transmit_data {
@@ -39,8 +41,7 @@ struct Transmit_data {
 	u8_t *topic;
 };
 
-int decode_response(char *input, struct Sync_data *sync_data,
-		    bool inital_connection);
+int decode_response(char *input, struct Sync_data *sync_data);
 
 int encode_message(struct Transmit_data *output, struct Sync_data *sync_data);
 

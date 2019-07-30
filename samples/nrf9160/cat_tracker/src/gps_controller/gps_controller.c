@@ -108,7 +108,7 @@ int gps_control_init(gps_trigger_handler_t handler)
 	k_delayed_work_init(&gps_work.work, gps_work_handler);
 
 	gps_work.dev = gps_dev;
-	gps_work.type = GPS_WORK_START;
+	gps_work.type = GPS_WORK_STOP;
 
 	k_delayed_work_submit(
 		&gps_work.work,
