@@ -278,13 +278,27 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 		}
 
+		if (sync_data->active == true && sync_data->gps_found == true) {
+			err = json_add_obj(reported_obj, "bat", bat_obj);
+
+			err += json_add_obj(gps_obj, "v", gps_val_obj);
+			err += json_add_str(gps_obj, "ts",
+					    sync_data->acc_timestamp);
+			err += json_add_obj(reported_obj, "gps", gps_obj);
+		}
+
 		if (sync_data->active == false &&
 		    sync_data->gps_found == false) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
+
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
 
-		if (sync_data->gps_found == true) {
+		if (sync_data->active == true && sync_data->gps_found == true) {
+			err = json_add_obj(reported_obj, "bat", bat_obj);
+
+			err += json_add_obj(reported_obj, "acc", acc_obj);
+
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_str(gps_obj, "ts",
 					    sync_data->acc_timestamp);

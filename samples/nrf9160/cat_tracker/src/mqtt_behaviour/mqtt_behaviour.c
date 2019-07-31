@@ -21,7 +21,7 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 3600,
+Sync_data sync_data = { .gps_timeout = 15,
 			.active = true,
 			.active_wait = 30,
 			.passive_wait = 30,
@@ -45,23 +45,22 @@ static bool initial_connection = false;
 
 static int nfds;
 
-static char client_id_imei[100] = "352656100247819";
+static char client_id_imei[100] = "Cat-Tracker";
 
-static char get_topic[100] = "$aws/things/352656100247819/shadow/get";
+static char get_topic[100] = "$aws/things/Cat-Tracker/shadow/get";
 
 static char get_accepted_desired_cfg_topic[100] =
-	"$aws/things/352656100247819/shadow/get/accepted/desired/cfg";
+	"$aws/things/Cat-Tracker/shadow/get/accepted/desired/cfg";
 
 static char get_rejected_topic[100] =
-	"$aws/things/352656100247819/shadow/get/rejected";
+	"$aws/things/Cat-Tracker/shadow/get/rejected";
 
-static char update_topic[100] = "$aws/things/352656100247819/shadow/update";
+static char update_topic[100] = "$aws/things/Cat-Tracker/shadow/update";
 
 static char update_delta_topic[100] =
-	"$aws/things/352656100247819/shadow/update/delta";
+	"$aws/things/Cat-Tracker/shadow/update/delta";
 
-static char broker_name[100] =
-	"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
+static char broker_name[100] = "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
 //"a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
 //"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
 //352656100247819
