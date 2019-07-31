@@ -20,6 +20,8 @@
 #define SYNC true
 #define NORM false
 
+static bool active;
+
 static struct gps_data gps_data;
 
 static struct sensor_value accel[3];
@@ -36,18 +38,14 @@ struct k_poll_event events[2] = {
 					0)
 };
 
-// static struct k_work request_battery_status_work;
 static struct k_work publish_data_work;
 static struct k_work sync_broker_work;
 static struct k_work gps_start_work;
 static struct k_work gps_stop_work;
 static struct k_work gps_found_work;
 static struct k_work gps_not_found_work;
-
-// static void request_battery_status_work_fn(struct k_work *work)
-// {
-// 	attach_battery_data(request_battery_status());
-// }
+static struct k_work gps_init_work;
+static struct k_work get_modem_info_work;
 
 static void gps_found_work_fn(struct k_work *work)
 {
@@ -69,11 +67,14 @@ static void gps_stop_work_fn(struct k_work *work)
 	gps_control_stop(0);
 }
 
+static void get_modem_info_work_fn(struct k_work *work)
+{
+	attach_battery_data(request_battery_status());
+}
+
 static void publish_data_work_fn(struct k_work *work)
 {
 	int err;
-
-	attach_battery_data(request_battery_status());
 
 	err = publish_data(NORM);
 	if (err != 0) {
@@ -104,6 +105,29 @@ static void sync_broker_work_fn(struct k_work *work)
 	}
 }
 
+static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
+{
+	switch (trigger->type) {
+	case GPS_TRIG_FIX:
+		printk("gps control handler triggered!\n");
+		gps_control_on_trigger();
+		k_work_submit(&gps_stop_work);
+		gps_sample_fetch(dev);
+		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
+		attach_gps_data(gps_data);
+		k_sem_give(events[0].sem);
+		break;
+
+	default:
+		break;
+	}
+}
+
+static void gps_init_work_fn(struct k_work *work)
+{
+	gps_control_init(gps_control_handler);
+}
+
 static void work_init()
 {
 	k_work_init(&publish_data_work, publish_data_work_fn);
@@ -112,6 +136,8 @@ static void work_init()
 	k_work_init(&gps_stop_work, gps_stop_work_fn);
 	k_work_init(&gps_found_work, gps_found_work_fn);
 	k_work_init(&gps_not_found_work, gps_not_found_work_fn);
+	k_work_init(&gps_init_work, gps_init_work_fn);
+	k_work_init(&get_modem_info_work, get_modem_info_work_fn);
 }
 
 static void lte_connect(void)
@@ -192,24 +218,6 @@ static void adxl362_init(void)
 #endif
 }
 
-static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
-{
-	switch (trigger->type) {
-	case GPS_TRIG_FIX:
-		printk("gps control handler triggered!\n");
-		gps_control_on_trigger();
-		gps_stop(0);
-		gps_sample_fetch(dev);
-		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		attach_gps_data(gps_data);
-		k_sem_give(events[0].sem);
-		break;
-
-	default:
-		break;
-	}
-}
-
 void my_work_handler(struct k_work *work)
 {
 	k_sem_give(events[1].sem);
@@ -231,53 +239,50 @@ void main(void)
 	provision_certificates();
 	lte_connect();
 	adxl362_init();
-	// set_client_id_imei(request_init_modem_data());
-	gps_control_init(gps_control_handler);
+	k_work_submit(&gps_init_work);
 	k_work_submit(&sync_broker_work);
 
-	// k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
-	// 	      K_SECONDS(check_mov_timeout()));
+	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
+		      K_SECONDS(check_mov_timeout()));
 
-	while (1) {
-		if (check_mode()) {
-			printk("ACTIVE MODE\n");
-			k_work_submit(&gps_start_work);
-			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
-			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[0].sem, 0);
-				k_work_submit(&gps_found_work);
-				k_work_submit(&publish_data_work);
-			} else {
-				printk("GPS data could not be found\n");
-				k_work_submit(&gps_stop_work);
-				k_work_submit(&gps_not_found_work);
-				k_work_submit(&publish_data_work);
-			}
-			events[0].state = K_POLL_STATE_NOT_READY;
-			k_sleep(K_SECONDS(check_active_wait(true)));
-		} else {
-			printk("PASSIVE MODE\n");
-			k_poll(events, 2, K_FOREVER);
-			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[1].sem, 0);
-				k_work_submit(&gps_start_work);
-				k_poll(events, 1,
-				       K_SECONDS(check_gps_timeout()));
-				if (events[0].state ==
-				    K_POLL_STATE_SEM_AVAILABLE) {
-					k_sem_take(events[0].sem, 0);
-					k_work_submit(&gps_found_work);
-					k_work_submit(&publish_data_work);
-				} else {
-					printk("GPS data could not be found\n");
-					k_work_submit(&gps_stop_work);
-					k_work_submit(&gps_not_found_work);
-					k_work_submit(&publish_data_work);
-				}
-				events[0].state = K_POLL_STATE_NOT_READY;
-				k_sleep(K_SECONDS(check_active_wait(false)));
-			}
-			events[1].state = K_POLL_STATE_NOT_READY;
-		}
+check_mode:
+	k_work_submit(&get_modem_info_work);
+	if (check_mode()) {
+		active = true;
+		goto active;
+	} else {
+		active = false;
+		goto passive;
 	}
+
+active:
+	printk("ACTIVE MODE\n");
+	goto gps_search;
+
+passive:
+	printk("PASSIVE MODE\n");
+	k_poll(events, 2, K_FOREVER);
+	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+		k_sem_take(events[1].sem, 0);
+	}
+	events[1].state = K_POLL_STATE_NOT_READY;
+	goto gps_search;
+
+gps_search:
+	k_work_submit(&gps_start_work);
+	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
+	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+		k_sem_take(events[0].sem, 0);
+		k_work_submit(&gps_found_work);
+		k_work_submit(&get_modem_info_work);
+		k_work_submit(&publish_data_work);
+	} else {
+		k_work_submit(&gps_stop_work);
+		k_work_submit(&gps_not_found_work);
+		k_work_submit(&publish_data_work);
+	}
+	events[0].state = K_POLL_STATE_NOT_READY;
+	k_sleep(K_SECONDS(check_active_wait(active)));
+
+	goto check_mode;
 }

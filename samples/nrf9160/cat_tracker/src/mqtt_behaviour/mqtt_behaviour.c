@@ -21,12 +21,13 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 15,
-			.active = false,
+Sync_data sync_data = { .gps_timeout = 3600,
+			.active = true,
 			.active_wait = 30,
 			.passive_wait = 30,
 			.movement_timeout = 3600,
-			.accel_threshold = 85 };
+			.accel_threshold = 100,
+			.gps_found = false };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -44,17 +45,24 @@ static bool initial_connection = false;
 
 static int nfds;
 
-static char client_id_imei[100] = "Cat-Tracker";
+static char client_id_imei[100] = "352656100247819";
 
-static char get_topic[100] = "$aws/things/Cat-Tracker/shadow/get";
+static char get_topic[100] = "$aws/things/352656100247819/shadow/get";
 
-static char get_accepted_desired_cfg_topic[100] = "$aws/things/Cat-Tracker/shadow/get/accepted/desired/cfg";
+static char get_accepted_desired_cfg_topic[100] =
+	"$aws/things/352656100247819/shadow/get/accepted/desired/cfg";
 
-static char update_topic[100] = "$aws/things/Cat-Tracker/shadow/update";
+static char get_rejected_topic[100] =
+	"$aws/things/352656100247819/shadow/get/rejected";
 
-static char update_delta_topic[100] = "$aws/things/Cat-Tracker/shadow/update/delta";
+static char update_topic[100] = "$aws/things/352656100247819/shadow/update";
 
-static char broker_name[100] = "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
+static char update_delta_topic[100] =
+	"$aws/things/352656100247819/shadow/update/delta";
+
+static char broker_name[100] =
+	"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
+//"a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
 //"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
 //352656100247819
 
@@ -94,7 +102,8 @@ char *replaceWord(const char *s, const char *oldW, const char *newW)
 	return result;
 }
 
-void set_gps_found(bool gps_found) {
+void set_gps_found(bool gps_found)
+{
 	sync_data.gps_found = gps_found;
 }
 
@@ -274,8 +283,10 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 			subscribe(update_delta_topic);
 		} else {
 			subscribe(get_accepted_desired_cfg_topic);
+			//subscribe(get_rejected_topic);
 		}
 
+		initial_connection = true;
 		break;
 
 	case MQTT_EVT_DISCONNECT:
@@ -311,8 +322,6 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 				printk("Could not decode response\n%d", err);
 			}
 		}
-
-		initial_connection = true;
 
 	} break;
 

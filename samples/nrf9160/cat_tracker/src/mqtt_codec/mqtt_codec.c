@@ -108,26 +108,35 @@ int decode_response(char *input, struct Sync_data *sync_data)
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {
-		goto bisect;
+		gpst = cJSON_GetObjectItem(group_obj, "gpst");
+		active = cJSON_GetObjectItem(group_obj, "act");
+		active_wait = cJSON_GetObjectItem(group_obj, "actwt");
+		passive_wait = cJSON_GetObjectItem(group_obj, "mvres");
+		movement_timeout = cJSON_GetObjectItem(group_obj, "mvt");
+		accel_threshold = cJSON_GetObjectItem(group_obj, "acct");
+		goto get_data;
 	}
 
 	group_obj = json_object_decode(root_obj, "state");
 	if (group_obj != NULL) {
 		subgroup_obj = json_object_decode(group_obj, "cfg");
 		if (subgroup_obj != NULL) {
-		} else {
-			goto end;
+			gpst = cJSON_GetObjectItem(subgroup_obj, "gpst");
+			active = cJSON_GetObjectItem(subgroup_obj, "act");
+			active_wait =
+				cJSON_GetObjectItem(subgroup_obj, "actwt");
+			passive_wait =
+				cJSON_GetObjectItem(subgroup_obj, "mvres");
+			movement_timeout =
+				cJSON_GetObjectItem(subgroup_obj, "mvt");
+			accel_threshold =
+				cJSON_GetObjectItem(subgroup_obj, "acct");
 		}
+	} else {
+		goto end;
 	}
 
-bisect:
-
-	gpst = cJSON_GetObjectItem(subgroup_obj, "gpst");
-	active = cJSON_GetObjectItem(subgroup_obj, "act");
-	active_wait = cJSON_GetObjectItem(subgroup_obj, "actwt");
-	passive_wait = cJSON_GetObjectItem(subgroup_obj, "mvres");
-	movement_timeout = cJSON_GetObjectItem(subgroup_obj, "mvt");
-	accel_threshold = cJSON_GetObjectItem(subgroup_obj, "acct");
+get_data:
 
 	if (gpst != NULL) {
 		sync_data->gps_timeout = gpst->valueint;
