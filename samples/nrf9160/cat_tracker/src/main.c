@@ -13,6 +13,7 @@
 #include <mqtt_behaviour.h>
 #include <modem_data.h>
 #include <device.h>
+#include <leds.h>
 #include <sensor.h>
 #include <gps_controller.h>
 #include <mqtt_codec.h>
@@ -155,6 +156,7 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 	lte_lc_psm_req(true);
+	led_notif_lte(true);
 }
 
 #if defined(CONFIG_ADXL362)
@@ -236,6 +238,7 @@ void main(void)
 {
 	printk("The cat tracker has started\n");
 	work_init();
+	leds_init();
 	provision_certificates();
 	lte_connect();
 	adxl362_init();

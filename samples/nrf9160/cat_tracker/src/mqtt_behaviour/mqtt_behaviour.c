@@ -9,6 +9,8 @@
 
 #include <time.h>
 
+#include <leds.h>
+
 #include <gps.h>
 
 #include <mqtt_codec.h>
@@ -541,6 +543,8 @@ int publish_data(bool op)
 		}
 		transmit_data.topic = update_topic;
 	}
+
+	led_notif_publish();
 
 	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
 		     transmit_data.len, transmit_data.topic);

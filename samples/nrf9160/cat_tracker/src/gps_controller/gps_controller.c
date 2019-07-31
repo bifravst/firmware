@@ -8,6 +8,7 @@
 #include <misc/util.h>
 #include <gps.h>
 #include <lte_lc.h>
+#include <leds.h>
 
 #include "gps_controller.h"
 
@@ -38,6 +39,8 @@ static void gps_work_handler(struct k_work *work)
 		printk("GPS started successfully.\nSearching for satellites ");
 		printk("to get position fix. This may take several minutes.\n");
 
+		led_notif_gps_search(true);
+
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
 		err = gps_stop(gps_work.dev);
@@ -45,6 +48,8 @@ static void gps_work_handler(struct k_work *work)
 			printk("GPS could not be stopped, error: %d\n", err);
 			return;
 		}
+
+		led_notif_gps_search(false);
 
 		return;
 	}
