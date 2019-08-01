@@ -217,20 +217,6 @@ static void adxl362_init(void)
 #endif
 }
 
-void my_work_handler(struct k_work *work)
-{
-	k_sem_give(events[1].sem);
-}
-
-K_WORK_DEFINE(my_work, my_work_handler);
-
-void my_timer_handler(struct k_timer *dummy)
-{
-	k_work_submit(&my_work);
-}
-
-K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
-
 void main(void)
 {
 	int err;
@@ -250,10 +236,6 @@ void main(void)
 #endif
 
 	k_work_submit(&sync_broker_work);
-
-	/*Timer which gives the idle_user_sem every movement_timeout, giving a forced update from device*/
-	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
-		      K_SECONDS(check_mov_timeout()));
 
 check_mode:
 	k_work_submit(&get_modem_info_work);
@@ -300,9 +282,6 @@ gps_search:
 	k_work_submit(&publish_data_work);
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #endif
-
-	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
-		      K_SECONDS(check_mov_timeout()));
 
 	goto check_mode;
 }
