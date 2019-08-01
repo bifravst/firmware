@@ -24,10 +24,10 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 360,
-			.active = false,
-			.active_wait = 30,
-			.passive_wait = 30,
+Sync_data sync_data = { .gps_timeout = 180,
+			.active = true,
+			.active_wait = 45,
+			.passive_wait = 45,
 			.movement_timeout = 3600,
 			.accel_threshold = 100,
 			.gps_found = false };
