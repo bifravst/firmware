@@ -18,9 +18,6 @@
 #include <gps_controller.h>
 #include <mqtt_codec.h>
 
-#define SYNC true
-#define NORM false
-
 static bool active;
 
 K_SEM_DEFINE(gps_timing_sem, 0, 1);
@@ -254,8 +251,9 @@ void main(void)
 
 	k_work_submit(&sync_broker_work);
 
-	// k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
-	// 	      K_SECONDS(check_mov_timeout()));
+	/*Timer which gives the idle_user_sem every movement_timeout, giving a forced update from device*/
+	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
+		      K_SECONDS(check_mov_timeout()));
 
 check_mode:
 	k_work_submit(&get_modem_info_work);
@@ -302,6 +300,9 @@ gps_search:
 	k_work_submit(&publish_data_work);
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #endif
+
+	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
+		      K_SECONDS(check_mov_timeout()));
 
 	goto check_mode;
 }
