@@ -16,7 +16,7 @@
 
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 3000
+#define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 10
 
 #if defined(CONFIG_MQTT_LIB_TLS)
