@@ -21,6 +21,7 @@ config GPS_USE_SIM
 	help
 		Use simulated GPS data.
 
+
 config GPS_USE_EXTERNAL
 	bool "User provided GPS device"
 	help
@@ -41,6 +42,10 @@ config GPS_DEV_NAME
 config GPS_TRIGGER
 	bool
 	default GPS_SIM_TRIGGER if GPS_USE_SIM
+	
+config ENABLE_NRF9160_GPS
+	bool "Enable ENABLE_NRF9160_GPS"
+	default y
 
 endmenu	# GPS
 
@@ -56,49 +61,13 @@ config MQTT_SUB_TOPIC
 	string "MQTT subscribe topic"
 	default "my/subscribe/topic"
 
-config MQTT_AWS_GET_TOPIC
-	string "MQTT AWS get topic"
-	default "$aws/things/{thingname}/shadow/get"
-
-config MQTT_AWS_GET_ACCEPTED_TOPIC
-	string "MQTT AWS get topic"
-	default "$aws/things/{thingname}/shadow/get/accepted/desired/cfg"
-
-config MQTT_AWS_GET_REJECTED_TOPIC
-	string "MQTT AWS get topic"
-	default "$aws/things/{thingname}/shadow/get/rejected"
-
-config MQTT_AWS_UPDATE_TOPIC
-	string "MQTT AWS get topic"
-	default "$aws/things/{thingname}/shadow/update"
-
-config MQTT_AWS_UPDATE_DELTA_TOPIC
-	string "MQTT AWS get topic"
-	default "$aws/things/{thingname}/shadow/update/delta"
-
-config MQTT_AWS_CLIENT_ID
-	string "MQTT AWS Client ID"
-	default "Cat-Tracker"
-
-config MQTT_AWS_BROKER_HOSTNAME
-	string "MQTT AWS broker hostname"
+config CLOUD_HOST_NAME
+	string "Cloud broker hostname"
 	default "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com"
 
-config MQTT_CLIENT_ID
-	string "MQTT Client ID"
-	default "my-client-id"
-
-config MQTT_BROKER_HOSTNAME
-	string "MQTT broker hostname"
-	default "iot.eclipse.org"
-
-config MQTT_BROKER_PORT
-	int "MQTT broker port"
-	default 1883
-
-config MQTT_AWS_BROKER_PORT
-	int "MQTT AWS broker port"
-	default 8883	
+config CLOUD_PORT
+	int "Cloud AWS broker port"
+	default 8883
 
 config MQTT_MESSAGE_BUFFER_SIZE
 	int ""

@@ -23,12 +23,8 @@
 
 static bool active;
 
-static struct gps_data gps_data;
-
-static struct sensor_value accel[3];
-
 K_SEM_DEFINE(gps_timing_sem, 0, 1);
-K_SEM_DEFINE(idle_user_sem, 1, 1);
+K_SEM_DEFINE(idle_user_sem, 0, 1);
 
 struct k_poll_event events[2] = {
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
@@ -77,13 +73,13 @@ static void publish_data_work_fn(struct k_work *work)
 {
 	int err;
 
-	err = publish_data(NORM);
+	err = publish_data(false);
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
 	}
 
 	if (check_config_change()) {
-		err = publish_data(NORM);
+		err = publish_data(false);
 		if (err != 0) {
 			printk("Sync Error: %d", err);
 		}
@@ -93,13 +89,13 @@ static void publish_data_work_fn(struct k_work *work)
 static void sync_broker_work_fn(struct k_work *work)
 {
 	int err;
-	err = publish_data(SYNC);
+	err = publish_data(true);
 	if (err != 0) {
 		printk("Sync Error: %d", err);
 	}
 
 	if (check_config_change()) {
-		err = publish_data(NORM);
+		err = publish_data(false);
 		if (err != 0) {
 			printk("Sync Error: %d", err);
 		}
@@ -108,6 +104,8 @@ static void sync_broker_work_fn(struct k_work *work)
 
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 {
+	static struct gps_data gps_data;
+
 	switch (trigger->type) {
 	case GPS_TRIG_FIX:
 		printk("gps control handler triggered!\n");
@@ -163,6 +161,8 @@ static void lte_connect(void)
 static void adxl362_trigger_handler(struct device *dev,
 				    struct sensor_trigger *trig)
 {
+	static struct sensor_value accel[3];
+
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
 
@@ -236,17 +236,26 @@ K_TIMER_DEFINE(my_timer, my_timer_handler, NULL);
 
 void main(void)
 {
+	int err;
+
 	printk("The cat tracker has started\n");
 	work_init();
 	leds_init();
-	provision_certificates();
+	err = cloud_configuration_init();
+	if (err != 0) {
+		printk("cloud not properly configured: %d\n", err);
+	}
 	lte_connect();
 	adxl362_init();
+
+#if defined(CONFIG_ENABLE_NRF9160_GPS)
 	k_work_submit(&gps_init_work);
+#endif
+
 	k_work_submit(&sync_broker_work);
 
-	k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
-		      K_SECONDS(check_mov_timeout()));
+	// k_timer_start(&my_timer, K_SECONDS(check_mov_timeout()),
+	// 	      K_SECONDS(check_mov_timeout()));
 
 check_mode:
 	k_work_submit(&get_modem_info_work);
@@ -264,20 +273,22 @@ active:
 
 passive:
 	printk("PASSIVE MODE\n");
+#if defined(CONFIG_ADXL362)
 	k_poll(events, 2, K_FOREVER);
 	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[1].sem, 0);
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
+#endif
 	goto gps_search;
 
 gps_search:
+#if defined(CONFIG_ENABLE_NRF9160_GPS)
 	k_work_submit(&gps_start_work);
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
 		k_work_submit(&gps_found_work);
-		k_work_submit(&get_modem_info_work);
 		k_work_submit(&publish_data_work);
 	} else {
 		k_work_submit(&gps_stop_work);
@@ -286,6 +297,11 @@ gps_search:
 	}
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
+#else
+	k_work_submit(&gps_not_found_work);
+	k_work_submit(&publish_data_work);
+	k_sleep(K_SECONDS(check_active_wait(active)));
+#endif
 
 	goto check_mode;
 }

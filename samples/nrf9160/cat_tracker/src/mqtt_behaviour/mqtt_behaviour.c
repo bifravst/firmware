@@ -3,6 +3,7 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
+#include <nrf_socket.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,85 +48,169 @@ static bool initial_connection = false;
 
 static int nfds;
 
-static char client_id_imei[100] = "Cat-Tracker";
-
-static char get_topic[100] = "$aws/things/Cat-Tracker/shadow/get";
-
-static char get_accepted_desired_cfg_topic[100] =
-	"$aws/things/Cat-Tracker/shadow/get/accepted/desired/cfg";
-
-static char get_rejected_topic[100] =
-	"$aws/things/Cat-Tracker/shadow/get/rejected";
-
-static char update_topic[100] = "$aws/things/Cat-Tracker/shadow/update";
-
-static char update_delta_topic[100] =
-	"$aws/things/Cat-Tracker/shadow/update/delta";
-
-static char broker_name[100] = "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
 //"a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
 //"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
-//352656100247819
+//352656100247819 -- thingy IMEI
 
-char *replaceWord(const char *s, const char *oldW, const char *newW)
+#define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
+#define CLOUD_PORT CONFIG_CLOUD_PORT
+
+#define NRF_IMEI_LEN 15
+#define AWS_CLOUD_CLIENT_ID_LEN (NRF_IMEI_LEN)
+
+#define AWS "$aws/things/"
+#define AWS_LEN (sizeof(AWS) - 1)
+
+#define NCT_SHADOW_BASE_TOPIC AWS "%s/shadow"
+#define NCT_SHADOW_BASE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 7)
+
+#define NCT_ACCEPTED_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
+#define NCT_ACCEPTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
+
+#define NCT_REJECTED_TOPIC AWS "%s/shadow/get/rejected"
+#define NCT_REJECTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
+
+#define NCT_UPDATE_DELTA_TOPIC AWS "%s/shadow/update/delta"
+#define NCT_UPDATE_DELTA_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
+
+#define NCT_UPDATE_TOPIC AWS "%s/shadow/update"
+#define NCT_UPDATE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 14)
+
+#define NCT_SHADOW_GET AWS "%s/shadow/get"
+#define NCT_SHADOW_GET_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 11)
+
+static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
+/* Buffers for keeping the topics for nrf_cloud */
+static char shadow_base_topic[NCT_SHADOW_BASE_TOPIC_LEN + 1];
+static char accepted_topic[NCT_ACCEPTED_TOPIC_LEN + 1];
+static char rejected_topic[NCT_REJECTED_TOPIC_LEN + 1];
+static char update_delta_topic[NCT_UPDATE_DELTA_TOPIC_LEN + 1];
+static char update_topic[NCT_UPDATE_TOPIC_LEN + 1];
+static char get_topic[NCT_SHADOW_GET_LEN + 1];
+
+/*Needs to be reviewed if subscribing to all topics upon all connections is nessecary */
+static const struct mqtt_topic nct_cc_rx_list[] = {
+	{ .topic = { .utf8 = accepted_topic, .size = NCT_ACCEPTED_TOPIC_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = { .utf8 = rejected_topic, .size = NCT_REJECTED_TOPIC_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = { .utf8 = update_delta_topic,
+		     .size = NCT_UPDATE_DELTA_TOPIC_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
+};
+
+static const struct mqtt_topic nct_cc_tx_list[] = {
+	{ .topic = { .utf8 = get_topic, .size = NCT_SHADOW_GET_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = { .utf8 = update_topic, .size = NCT_UPDATE_TOPIC_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
+};
+
+/* Function to get the client id */
+static int nct_client_id_get(char *id)
 {
-	char *result;
-	int i, cnt = 0;
-	int newWlen = strlen(newW);
-	int oldWlen = strlen(oldW);
+	int at_socket_fd;
+	int bytes_written;
+	int bytes_read;
+	char imei_buf[NRF_IMEI_LEN + 1];
+	int ret;
 
-	// Counting the number of times old word
-	// occur in the string
-	for (i = 0; s[i] != '\0'; i++) {
-		if (strstr(&s[i], oldW) == &s[i]) {
-			cnt++;
+	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
+	__ASSERT_NO_MSG(at_socket_fd >= 0);
 
-			// Jumping to index after the old word.
-			i += oldWlen - 1;
-		}
+	bytes_written = nrf_write(at_socket_fd, "AT+CGSN", 7);
+	__ASSERT_NO_MSG(bytes_written == 7);
+
+	bytes_read = nrf_read(at_socket_fd, imei_buf, NRF_IMEI_LEN);
+	__ASSERT_NO_MSG(bytes_read == NRF_IMEI_LEN);
+	imei_buf[NRF_IMEI_LEN] = 0;
+
+	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
+
+	ret = nrf_close(at_socket_fd);
+	__ASSERT_NO_MSG(ret == 0);
+
+	return 0;
+}
+
+static int nct_topics_populate(void)
+{
+	int err;
+
+	err = nct_client_id_get(client_id_buf);
+	if (err != 0) {
+		return err;
 	}
 
-	// Making new string of enough length
-	result = (char *)malloc(i + cnt * (newWlen - oldWlen) + 1);
-
-	i = 0;
-	while (*s) {
-		// compare the substring with the result
-		if (strstr(s, oldW) == s) {
-			strcpy(&result[i], newW);
-			i += newWlen;
-			s += oldWlen;
-		} else
-			result[i++] = *s++;
+	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
+		       NCT_SHADOW_BASE_TOPIC, client_id_buf);
+	if (err != NCT_SHADOW_BASE_TOPIC_LEN) {
+		return -ENOMEM;
 	}
 
-	result[i] = '\0';
-	return result;
+	err = snprintf(accepted_topic, sizeof(accepted_topic),
+		       NCT_ACCEPTED_TOPIC, client_id_buf);
+	if (err != NCT_ACCEPTED_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	printk("Accepted topic set to %s\n", accepted_topic);
+
+	err = snprintf(rejected_topic, sizeof(rejected_topic),
+		       NCT_REJECTED_TOPIC, client_id_buf);
+	if (err != NCT_REJECTED_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	printk("Rejected topic set to %s\n", rejected_topic);
+
+	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
+		       NCT_UPDATE_DELTA_TOPIC, client_id_buf);
+	if (err != NCT_UPDATE_DELTA_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	printk("Update delta topic set to %s\n", update_delta_topic);
+
+	err = snprintf(update_topic, sizeof(update_topic), NCT_UPDATE_TOPIC,
+		       client_id_buf);
+	if (err != NCT_UPDATE_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	printk("Update topic set to %s\n", update_topic);
+
+	err = snprintf(get_topic, sizeof(get_topic), NCT_SHADOW_GET,
+		       client_id_buf);
+	if (err != NCT_SHADOW_GET_LEN) {
+		return -ENOMEM;
+	}
+
+	printk("Get topic set to %s\n", get_topic);
+
+	return 0;
+}
+
+int cloud_configuration_init(void)
+{
+	int err;
+
+	err = nct_topics_populate();
+	if (err) {
+		return err;
+	}
+
+	err = provision_certificates();
+	if (err) {
+		return err;
+	}
+
+	return 0;
 }
 
 void set_gps_found(bool gps_found)
 {
 	sync_data.gps_found = gps_found;
-}
-
-void set_client_id_imei(char *imei)
-{
-	// strcpy(client_id_imei, imei);
-	// strcpy(get_topic,
-	//        replaceWord(CONFIG_MQTT_AWS_GET_TOPIC, "{thingname}", imei));
-	// strcpy(get_accepted_desired_cfg_topic,
-	//        replaceWord(CONFIG_MQTT_AWS_GET_ACCEPTED_TOPIC, "{thingname}",
-	// 		   imei));
-	// strcpy(update_topic,
-	//        replaceWord(CONFIG_MQTT_AWS_UPDATE_TOPIC, "{thingname}", imei));
-	// strcpy(update_delta_topic,
-	//        replaceWord(CONFIG_MQTT_AWS_UPDATE_DELTA_TOPIC, "{thingname}",
-	// 		   imei));
-
-	// printk("GET TOPIC %s\n", get_topic);
-	// printk("GET ACCEPTED TOPIC %s\n", get_accepted_desired_cfg_topic);
-	// printk("UPDATE %s\n", update_topic);
-	// printk("UPDATE DELTA %s\n", update_delta_topic);
 }
 
 int check_mode(void)
@@ -283,7 +368,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		if (initial_connection) {
 			subscribe(update_delta_topic);
 		} else {
-			subscribe(get_accepted_desired_cfg_topic);
+			subscribe(accepted_topic);
 			//subscribe(get_rejected_topic);
 		}
 
@@ -360,7 +445,7 @@ void broker_init(void)
 	struct addrinfo hints = { .ai_family = AF_INET,
 				  .ai_socktype = SOCK_STREAM };
 
-	err = getaddrinfo(broker_name, NULL, &hints, &result);
+	err = getaddrinfo(CLOUD_HOSTNAME, NULL, &hints, &result);
 	if (err) {
 		printk("ERROR: getaddrinfo failed %d\n", err);
 
@@ -382,7 +467,7 @@ void broker_init(void)
 				((struct sockaddr_in *)addr->ai_addr)
 					->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
-			broker4->sin_port = htons(CONFIG_MQTT_AWS_BROKER_PORT);
+			broker4->sin_port = htons(CLOUD_PORT);
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
@@ -411,8 +496,8 @@ void client_init(struct mqtt_client *client)
 
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
-	client->client_id.utf8 = (u8_t *)client_id_imei;
-	client->client_id.size = strlen(client_id_imei);
+	client->client_id.utf8 = (u8_t *)client_id_buf;
+	client->client_id.size = strlen(client_id_buf);
 	client->password = NULL;
 	client->user_name = NULL;
 	client->protocol_version = MQTT_VERSION_3_1_1;
@@ -432,7 +517,7 @@ void client_init(struct mqtt_client *client)
 	tls_config->cipher_list = NULL;
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
-	tls_config->hostname = broker_name;
+	tls_config->hostname = CLOUD_HOSTNAME;
 #else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 #endif

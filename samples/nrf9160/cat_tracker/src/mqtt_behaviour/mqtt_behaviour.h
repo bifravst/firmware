@@ -11,9 +11,9 @@
 extern "C" {
 #endif
 
-void set_gps_found(bool gps_found);
+int cloud_configuration_init(void);
 
-void set_client_id_imei(char *imei);
+void set_gps_found(bool gps_found);
 
 int check_mode(void);
 
