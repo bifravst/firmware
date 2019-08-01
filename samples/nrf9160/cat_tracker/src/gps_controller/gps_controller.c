@@ -26,7 +26,6 @@ static struct {
 
 static void gps_work_handler(struct k_work *work)
 {
-#if !defined(CONFIG_GPS_SIM)
 	int err;
 
 	if (gps_work.type == GPS_WORK_START) {
@@ -53,35 +52,28 @@ static void gps_work_handler(struct k_work *work)
 
 		return;
 	}
-#endif
 }
 
 void gps_control_stop(u32_t delay_ms)
 {
-#if !defined(CONFIG_GPS_SIM)
 	gps_work.type = GPS_WORK_STOP;
 	k_delayed_work_submit(&gps_work.work, delay_ms);
-#endif
 }
 
 void gps_control_start(u32_t delay_ms)
 {
-#if !defined(CONFIG_GPS_SIM)
 	gps_work.type = GPS_WORK_START;
 	k_delayed_work_submit(&gps_work.work, delay_ms);
-#endif
 }
 
 void gps_control_on_trigger(void)
 {
-#if !defined(CONFIG_GPS_SIM)
 	k_delayed_work_cancel(&gps_work.work);
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {
 		gps_work.fix_count = 0;
 		gps_control_stop(K_NO_WAIT);
 	}
-#endif
 }
 
 /** @brief Configures and starts the GPS device. */
@@ -90,12 +82,8 @@ int gps_control_init(gps_trigger_handler_t handler)
 	int err;
 	struct device *gps_dev;
 
-#ifdef CONFIG_GPS_SIM
-	struct gps_trigger gps_trig = { .type = GPS_TRIG_DATA_READY };
-#else
 	struct gps_trigger gps_trig = { .type = GPS_TRIG_FIX,
 					.chan = GPS_CHAN_NMEA };
-#endif /* CONFIG_GPS_SIM */
 
 	gps_dev = device_get_binding(CONFIG_GPS_DEV_NAME);
 	if (gps_dev == NULL) {
@@ -109,7 +97,6 @@ int gps_control_init(gps_trigger_handler_t handler)
 		return err;
 	}
 
-#if !defined(CONFIG_GPS_SIM)
 	k_delayed_work_init(&gps_work.work, gps_work_handler);
 
 	gps_work.dev = gps_dev;
@@ -118,7 +105,7 @@ int gps_control_init(gps_trigger_handler_t handler)
 	k_delayed_work_submit(
 		&gps_work.work,
 		K_SECONDS(CONFIG_GPS_CONTROL_FIRST_FIX_CHECK_DELAY));
-#endif
+
 	printk("GPS initialized\n");
 
 	return 0;

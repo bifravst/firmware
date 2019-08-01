@@ -5,11 +5,7 @@
 extern "C" {
 #endif
 
-void at_cmd_handler(char *state);
-
 int request_battery_status();
-
-char *request_init_modem_data();
 
 #ifdef __cplusplus
 }
