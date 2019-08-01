@@ -3,7 +3,6 @@
  *
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
-#define CLOUD_CLIENT_ID "testingtesting"
 
 #define CLOUD_CLIENT_PRIVATE_KEY                                               \
 	"-----BEGIN RSA PRIVATE KEY-----\n"                                    \

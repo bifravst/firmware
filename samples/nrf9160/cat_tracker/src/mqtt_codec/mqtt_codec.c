@@ -87,6 +87,7 @@ static cJSON *json_object_decode(cJSON *obj, const char *str)
 
 int decode_response(char *input, struct Sync_data *sync_data)
 {
+	char *string = NULL;
 	cJSON *root_obj = NULL;
 	cJSON *group_obj = NULL;
 	cJSON *subgroup_obj = NULL;
@@ -105,6 +106,13 @@ int decode_response(char *input, struct Sync_data *sync_data)
 	if (root_obj == NULL) {
 		return -ENOENT;
 	}
+
+	string = cJSON_Print(root_obj);
+	if (string == NULL) {
+		printk("Failed to print monitor.\n");
+	}
+
+	printk("Incoming message %s\n", string);
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {

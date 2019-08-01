@@ -63,7 +63,7 @@ config MQTT_SUB_TOPIC
 
 config CLOUD_HOST_NAME
 	string "Cloud broker hostname"
-	default "a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com"
+	default "a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com"
 
 config CLOUD_PORT
 	int "Cloud AWS broker port"

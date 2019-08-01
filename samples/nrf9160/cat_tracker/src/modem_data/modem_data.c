@@ -12,8 +12,7 @@ static const char cmd[] = AT_BATSTAT;
 
 static enum at_cmd_state state;
 
-/*What happens here if the response from modem is more than 4 bytes? account for that */
-
+/*This module needs rework, essentially a dummed down version of modem_info.c */
 int request_battery_status()
 {
 	int err;

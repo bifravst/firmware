@@ -51,8 +51,3 @@ void led_notif_publish()
 	}
 #endif
 }
-
-// extern void my_entry_point(void *, void *, void *);
-
-// K_THREAD_DEFINE(my_tid, MY_STACK_SIZE, my_entry_point, NULL, NULL, NULL,
-// 		MY_PRIORITY, 0, K_NO_WAIT);

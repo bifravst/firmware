@@ -24,7 +24,7 @@
 #include "certificates.h"
 #endif
 
-Sync_data sync_data = { .gps_timeout = 15,
+Sync_data sync_data = { .gps_timeout = 360,
 			.active = true,
 			.active_wait = 30,
 			.passive_wait = 30,
@@ -44,19 +44,13 @@ static struct pollfd fds;
 
 static bool connected;
 
-static bool initial_connection = false;
-
 static int nfds;
-
-//"a2zs8l7txlw7wc-ats.iot.us-west-2.amazonaws.com";
-//"a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com";
-//352656100247819 -- thingy IMEI
 
 #define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
 #define CLOUD_PORT CONFIG_CLOUD_PORT
 
-#define NRF_IMEI_LEN 15
-#define AWS_CLOUD_CLIENT_ID_LEN (NRF_IMEI_LEN)
+#define IMEI_LEN 15
+#define AWS_CLOUD_CLIENT_ID_LEN (IMEI_LEN)
 
 #define AWS "$aws/things/"
 #define AWS_LEN (sizeof(AWS) - 1)
@@ -79,6 +73,8 @@ static int nfds;
 #define NCT_SHADOW_GET AWS "%s/shadow/get"
 #define NCT_SHADOW_GET_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 11)
 
+#define NCT_CC_SUBSCRIBE_ID 1234
+
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 /* Buffers for keeping the topics for nrf_cloud */
 static char shadow_base_topic[NCT_SHADOW_BASE_TOPIC_LEN + 1];
@@ -99,20 +95,13 @@ static const struct mqtt_topic nct_cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-static const struct mqtt_topic nct_cc_tx_list[] = {
-	{ .topic = { .utf8 = get_topic, .size = NCT_SHADOW_GET_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
-	{ .topic = { .utf8 = update_topic, .size = NCT_UPDATE_TOPIC_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
-};
-
 /* Function to get the client id */
 static int nct_client_id_get(char *id)
 {
 	int at_socket_fd;
 	int bytes_written;
 	int bytes_read;
-	char imei_buf[NRF_IMEI_LEN + 1];
+	char imei_buf[IMEI_LEN + 1];
 	int ret;
 
 	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
@@ -121,9 +110,9 @@ static int nct_client_id_get(char *id)
 	bytes_written = nrf_write(at_socket_fd, "AT+CGSN", 7);
 	__ASSERT_NO_MSG(bytes_written == 7);
 
-	bytes_read = nrf_read(at_socket_fd, imei_buf, NRF_IMEI_LEN);
-	__ASSERT_NO_MSG(bytes_read == NRF_IMEI_LEN);
-	imei_buf[NRF_IMEI_LEN] = 0;
+	bytes_read = nrf_read(at_socket_fd, imei_buf, IMEI_LEN);
+	__ASSERT_NO_MSG(bytes_read == IMEI_LEN);
+	imei_buf[IMEI_LEN] = 0;
 
 	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
 
@@ -141,6 +130,11 @@ static int nct_topics_populate(void)
 	if (err != 0) {
 		return err;
 	}
+
+	char str[11] = "Cat-Tracker";
+
+	strcpy(client_id_buf, "");
+	strcpy(client_id_buf, str);
 
 	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
 		       NCT_SHADOW_BASE_TOPIC, client_id_buf);
@@ -252,25 +246,12 @@ double check_accel_thres(void)
 
 void attach_gps_data(struct gps_data gps_data)
 {
-	// struct tm tm;
-	// long int epoch;
-
 	sync_data.longitude = gps_data.pvt.longitude;
 	sync_data.latitude = gps_data.pvt.latitude;
 	sync_data.altitude = gps_data.pvt.altitude;
 	sync_data.accuracy = gps_data.pvt.accuracy;
 	sync_data.speed = gps_data.pvt.speed;
 	sync_data.heading = gps_data.pvt.heading;
-
-	// tm.tm_year = gps_datetime.year - 1900;
-	// tm.tm_mon = gps_datetime.month - 1;
-	// tm.tm_mday = gps_datetime.day;
-	// tm.tm_hour = gps_datetime.hour;
-	// tm.tm_min = gps_datetime.minute;
-	// tm.tm_sec = gps_datetime.seconds;
-
-	// epoch = mktime(&tm);
-	// sync_data.gps_timestamp = epoch;
 }
 
 void attach_battery_data(int battery_voltage)
@@ -314,19 +295,18 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	return mqtt_publish(c, &param);
 }
 
-int subscribe(u8_t *sub_topic)
+int subscribe()
 {
-	struct mqtt_topic subscribe_topic = {
-		.topic = { .utf8 = sub_topic, .size = strlen(sub_topic) },
-		.qos = MQTT_QOS_1_AT_LEAST_ONCE
-	};
-
 	const struct mqtt_subscription_list subscription_list = {
-		.list = &subscribe_topic, .list_count = 1, .message_id = 1234
+		.list = (struct mqtt_topic *)&nct_cc_rx_list,
+		.list_count = ARRAY_SIZE(nct_cc_rx_list),
+		.message_id = NCT_CC_SUBSCRIBE_ID
 	};
 
-	printk("Subscribing to: %s len %u\n", sub_topic,
-	       (unsigned int)strlen(sub_topic));
+	for (int i = 0; i < subscription_list.list_count; i++) {
+		printk("Subscribing to: %s\n",
+		       subscription_list.list[i].topic.utf8);
+	}
 
 	return mqtt_subscribe(&client, &subscription_list);
 }
@@ -365,14 +345,8 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 		connected = true;
 		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
 
-		if (initial_connection) {
-			subscribe(update_delta_topic);
-		} else {
-			subscribe(accepted_topic);
-			//subscribe(get_rejected_topic);
-		}
+		subscribe();
 
-		initial_connection = true;
 		break;
 
 	case MQTT_EVT_DISCONNECT:
