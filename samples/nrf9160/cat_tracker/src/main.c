@@ -32,8 +32,6 @@ struct k_poll_event events[2] = {
 					0)
 };
 
-static struct k_work publish_data_work;
-static struct k_work sync_broker_work;
 static struct k_work gps_start_work;
 static struct k_work gps_stop_work;
 static struct k_work gps_found_work;
@@ -66,7 +64,7 @@ static void get_modem_info_work_fn(struct k_work *work)
 	attach_battery_data(request_battery_status());
 }
 
-static void publish_data_work_fn(struct k_work *work)
+static void publish_cloud()
 {
 	int err;
 
@@ -83,7 +81,7 @@ static void publish_data_work_fn(struct k_work *work)
 	}
 }
 
-static void sync_broker_work_fn(struct k_work *work)
+static void sync_cloud()
 {
 	int err;
 	err = publish_data(true);
@@ -126,8 +124,6 @@ static void gps_init_work_fn(struct k_work *work)
 
 static void work_init()
 {
-	k_work_init(&publish_data_work, publish_data_work_fn);
-	k_work_init(&sync_broker_work, sync_broker_work_fn);
 	k_work_init(&gps_start_work, gps_start_work_fn);
 	k_work_init(&gps_stop_work, gps_stop_work_fn);
 	k_work_init(&gps_found_work, gps_found_work_fn);
@@ -235,7 +231,7 @@ void main(void)
 	k_work_submit(&gps_init_work);
 #endif
 
-	k_work_submit(&sync_broker_work);
+	sync_cloud();
 
 check_mode:
 	k_work_submit(&get_modem_info_work);
@@ -269,17 +265,17 @@ gps_search:
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
 		k_work_submit(&gps_found_work);
-		k_work_submit(&publish_data_work);
+		publish_cloud();
 	} else {
 		k_work_submit(&gps_stop_work);
 		k_work_submit(&gps_not_found_work);
-		k_work_submit(&publish_data_work);
+		publish_cloud();
 	}
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #else
 	k_work_submit(&gps_not_found_work);
-	k_work_submit(&publish_data_work);
+	publish_cloud();
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #endif
 

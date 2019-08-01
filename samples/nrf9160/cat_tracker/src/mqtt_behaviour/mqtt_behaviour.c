@@ -4,16 +4,11 @@
 #include <net/socket.h>
 #include <lte_lc.h>
 #include <nrf_socket.h>
-
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <time.h>
-
 #include <leds.h>
-
 #include <gps.h>
-
 #include <mqtt_codec.h>
 
 #define APP_SLEEP_MS 5000
@@ -26,8 +21,8 @@
 
 Sync_data sync_data = { .gps_timeout = 180,
 			.active = true,
-			.active_wait = 45,
-			.passive_wait = 45,
+			.active_wait = 60,
+			.passive_wait = 60,
 			.movement_timeout = 3600,
 			.accel_threshold = 100,
 			.gps_found = false };
