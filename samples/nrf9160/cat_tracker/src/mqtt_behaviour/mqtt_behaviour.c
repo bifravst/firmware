@@ -25,7 +25,7 @@
 #endif
 
 Sync_data sync_data = { .gps_timeout = 360,
-			.active = true,
+			.active = false,
 			.active_wait = 30,
 			.passive_wait = 30,
 			.movement_timeout = 3600,
@@ -130,11 +130,6 @@ static int nct_topics_populate(void)
 	if (err != 0) {
 		return err;
 	}
-
-	char str[11] = "Cat-Tracker";
-
-	strcpy(client_id_buf, "");
-	strcpy(client_id_buf, str);
 
 	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
 		       NCT_SHADOW_BASE_TOPIC, client_id_buf);
