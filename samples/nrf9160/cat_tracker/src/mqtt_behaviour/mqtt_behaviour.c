@@ -11,13 +11,8 @@
 #include <gps.h>
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 5000
-#define APP_CONNECT_TRIES 10
-
-#if defined(CONFIG_MQTT_LIB_TLS)
-#include "nrf_inbuilt_key.h"
-#include "certificates.h"
-#endif
+#define APP_SLEEP_MS 500
+#define APP_CONNECT_TRIES 5
 
 Sync_data sync_data = { .gps_timeout = 180,
 			.active = true,
@@ -180,11 +175,6 @@ int cloud_configuration_init(void)
 	int err;
 
 	err = nct_topics_populate();
-	if (err) {
-		return err;
-	}
-
-	err = provision_certificates();
 	if (err) {
 		return err;
 	}
@@ -614,58 +604,5 @@ int publish_data(bool op)
 		printk("Could not input data\n");
 	}
 
-	return 0;
-}
-
-int provision_certificates(void)
-{
-#if defined(CONFIG_MQTT_LIB_TLS)
-	{
-		int err;
-
-		/* Delete certificates */
-		nrf_sec_tag_t sec_tag = CONFIG_CLOUD_CERT_SEC_TAG;
-
-		for (nrf_key_mgnt_cred_type_t type = 0; type < 3; type++) {
-			err = nrf_inbuilt_key_delete(sec_tag, type);
-			printk("nrf_inbuilt_key_delete(%lu, %d) => result=%d\n",
-			       sec_tag, type, err);
-		}
-
-		/* Provision CA Certificate. */
-		err = nrf_inbuilt_key_write(CONFIG_CLOUD_CERT_SEC_TAG,
-					    NRF_KEY_MGMT_CRED_TYPE_CA_CHAIN,
-					    CLOUD_CA_CERTIFICATE,
-					    strlen(CLOUD_CA_CERTIFICATE));
-		printk("nrf_inbuilt_key_write => result=%d\n", err);
-		if (err) {
-			printk("CLOUD_CA_CERTIFICATE err: %d", err);
-			return err;
-		}
-
-		/* Provision Private Certificate. */
-		err = nrf_inbuilt_key_write(CONFIG_CLOUD_CERT_SEC_TAG,
-					    NRF_KEY_MGMT_CRED_TYPE_PRIVATE_CERT,
-					    CLOUD_CLIENT_PRIVATE_KEY,
-					    strlen(CLOUD_CLIENT_PRIVATE_KEY));
-		printk("nrf_inbuilt_key_write => result=%d\n", err);
-		if (err) {
-			printk("NRF_CLOUD_CLIENT_PRIVATE_KEY err: %d", err);
-			return err;
-		}
-
-		/* Provision Public Certificate. */
-		err = nrf_inbuilt_key_write(
-			CONFIG_CLOUD_CERT_SEC_TAG,
-			NRF_KEY_MGMT_CRED_TYPE_PUBLIC_CERT,
-			CLOUD_CLIENT_PUBLIC_CERTIFICATE,
-			strlen(CLOUD_CLIENT_PUBLIC_CERTIFICATE));
-		printk("nrf_inbuilt_key_write => result=%d\n", err);
-		if (err) {
-			printk("CLOUD_CLIENT_PUBLIC_CERTIFICATE err: %d", err);
-			return err;
-		}
-	}
-#endif
 	return 0;
 }
