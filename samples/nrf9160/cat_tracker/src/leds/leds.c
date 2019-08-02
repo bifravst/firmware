@@ -16,6 +16,7 @@ void leds_init(void)
 	if (err) {
 		printk("Could not set leds state, err code: %d\n", err);
 	}
+
 #endif
 }
 
@@ -44,10 +45,8 @@ void led_notif_gps_search(bool searching)
 void led_notif_publish()
 {
 #if defined(CONFIG_DK_LIBRARY)
-	for (int i = 0; i < 2; i++) {
-		dk_set_led_on(DK_LED3);
-		k_sleep(500);
-		dk_set_led_off(DK_LED3);
-	}
+	dk_set_led_on(DK_LED3);
+	k_sleep(500);
+	dk_set_led_off(DK_LED3);
 #endif
 }

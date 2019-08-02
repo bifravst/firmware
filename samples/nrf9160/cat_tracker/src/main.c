@@ -13,6 +13,7 @@
 #include <mqtt_behaviour.h>
 #include <modem_data.h>
 #include <device.h>
+#include <dk_buttons_and_leds.h>
 #include <leds.h>
 #include <sensor.h>
 #include <gps_controller.h>
@@ -31,38 +32,6 @@ struct k_poll_event events[2] = {
 					K_POLL_MODE_NOTIFY_ONLY, &idle_user_sem,
 					0)
 };
-
-static struct k_work gps_start_work;
-static struct k_work gps_stop_work;
-static struct k_work gps_found_work;
-static struct k_work gps_not_found_work;
-static struct k_work gps_init_work;
-static struct k_work get_modem_info_work;
-
-static void gps_found_work_fn(struct k_work *work)
-{
-	set_gps_found(true);
-}
-
-static void gps_not_found_work_fn(struct k_work *work)
-{
-	set_gps_found(false);
-}
-
-static void gps_start_work_fn(struct k_work *work)
-{
-	gps_control_start(0);
-}
-
-static void gps_stop_work_fn(struct k_work *work)
-{
-	gps_control_stop(0);
-}
-
-static void get_modem_info_work_fn(struct k_work *work)
-{
-	attach_battery_data(request_battery_status());
-}
 
 static void publish_cloud()
 {
@@ -105,7 +74,6 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	case GPS_TRIG_FIX:
 		printk("gps control handler triggered!\n");
 		gps_control_on_trigger();
-		k_work_submit(&gps_stop_work);
 		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		attach_gps_data(gps_data);
@@ -115,21 +83,6 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	default:
 		break;
 	}
-}
-
-static void gps_init_work_fn(struct k_work *work)
-{
-	gps_control_init(gps_control_handler);
-}
-
-static void work_init()
-{
-	k_work_init(&gps_start_work, gps_start_work_fn);
-	k_work_init(&gps_stop_work, gps_stop_work_fn);
-	k_work_init(&gps_found_work, gps_found_work_fn);
-	k_work_init(&gps_not_found_work, gps_not_found_work_fn);
-	k_work_init(&gps_init_work, gps_init_work_fn);
-	k_work_init(&get_modem_info_work, get_modem_info_work_fn);
 }
 
 static void lte_connect(void)
@@ -213,28 +166,62 @@ static void adxl362_init(void)
 #endif
 }
 
+static void button_handler(u32_t button_states, u32_t has_changed)
+{
+	u8_t btn_num;
+
+	while (has_changed) {
+		btn_num = 0;
+
+		/* Get bit position for next button that changed state. */
+		for (u8_t i = 0; i < 32; i++) {
+			if (has_changed & BIT(i)) {
+				btn_num = i + 1;
+				break;
+			}
+		}
+
+		/* Button number has been stored, remove from bitmask. */
+		has_changed &= ~(1UL << (btn_num - 1));
+
+		if (has_changed == 0 || has_changed == 1) {
+			gps_control_stop(K_NO_WAIT);
+			set_gps_found(false);
+			k_sem_give(events[0].sem);
+		}
+	}
+}
+
 void main(void)
 {
 	int err;
 
 	printk("The cat tracker has started\n");
-	work_init();
+
 	leds_init();
+
+	err = dk_buttons_init(button_handler);
+	if (err != 0) {
+		printk("dk buttons not initialized correctly: %d\n", err);
+	}
+
 	err = cloud_configuration_init();
 	if (err != 0) {
 		printk("cloud not properly configured: %d\n", err);
 	}
+
 	lte_connect();
+
 	adxl362_init();
 
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
-	k_work_submit(&gps_init_work);
+	gps_control_init(gps_control_handler);
 #endif
 
 	sync_cloud();
 
 check_mode:
-	k_work_submit(&get_modem_info_work);
+	attach_battery_data(request_battery_status());
 	if (check_mode()) {
 		active = true;
 		goto active;
@@ -260,21 +247,21 @@ passive:
 
 gps_search:
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
-	k_work_submit(&gps_start_work);
+	gps_control_start(K_NO_WAIT);
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
-		k_work_submit(&gps_found_work);
+		set_gps_found(true);
 		publish_cloud();
 	} else {
-		k_work_submit(&gps_stop_work);
-		k_work_submit(&gps_not_found_work);
+		gps_control_stop(K_NO_WAIT);
+		set_gps_found(false);
 		publish_cloud();
 	}
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #else
-	k_work_submit(&gps_not_found_work);
+	set_gps_found(false);
 	publish_cloud();
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #endif

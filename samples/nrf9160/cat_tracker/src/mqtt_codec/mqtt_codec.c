@@ -302,7 +302,8 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
 
-		if (sync_data->active == true && sync_data->gps_found == true) {
+		if (sync_data->active == false &&
+		    sync_data->gps_found == true) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 
 			err += json_add_obj(reported_obj, "acc", acc_obj);
