@@ -222,7 +222,7 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 void main(void)
 {
 	int err;
-
+	work_init();
 	printk("The cat tracker has started\n");
 
 	leds_init();
