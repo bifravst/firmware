@@ -18,6 +18,7 @@
 #include <sensor.h>
 #include <gps_controller.h>
 #include <mqtt_codec.h>
+#include <dk_buttons_and_leds.h>
 
 static bool active;
 
@@ -50,9 +51,10 @@ static void publish_cloud()
 	}
 }
 
-static void sync_cloud()
+static void cloud_sync()
 {
 	int err;
+
 	err = publish_data(true);
 	if (err != 0) {
 		printk("Sync Error: %d", err);
@@ -64,6 +66,31 @@ static void sync_cloud()
 			printk("Sync Error: %d", err);
 		}
 	}
+}
+
+static void gps_found_work_fn(struct k_work *work)
+{
+	set_gps_found(true);
+}
+
+static void gps_not_found_work_fn(struct k_work *work)
+{
+	set_gps_found(false);
+}
+
+static void gps_start_work_fn(struct k_work *work)
+{
+	gps_control_start(K_NO_WAIT);
+}
+
+static void gps_stop_work_fn(struct k_work *work)
+{
+	gps_control_stop(K_NO_WAIT);
+}
+
+static void get_modem_info_work_fn(struct k_work *work)
+{
+	attach_battery_data(request_battery_status());
 }
 
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
@@ -218,7 +245,7 @@ void main(void)
 	gps_control_init(gps_control_handler);
 #endif
 
-	sync_cloud();
+	cloud_sync();
 
 check_mode:
 	attach_battery_data(request_battery_status());
