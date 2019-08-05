@@ -7,13 +7,9 @@
 extern "C" {
 #endif
 
-void leds_init(void);
+void gps_search_led_start();
 
-void led_notif_lte(bool connected);
-
-void led_notif_gps_search(bool searching);
-
-void led_notif_publish(void);
+void gps_search_led_stop();
 
 #ifdef __cplusplus
 }

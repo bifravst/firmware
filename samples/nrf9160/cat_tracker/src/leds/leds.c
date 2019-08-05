@@ -1,52 +1,102 @@
 #include <zephyr.h>
+#include <device.h>
+#include <drivers/gpio.h>
+#include <sys/printk.h>
+#include <sys/__assert.h>
+#include <string.h>
 #include <leds.h>
-#include <dk_buttons_and_leds.h>
 
-void leds_init(void)
+#define STACKSIZE 1024
+#define PRIORITY 7
+
+static struct device *led_devs[ARRAY_SIZE(led_pins)];
+
+static const struct gpio_pin led_pins[] = {
+#ifdef LED0_GPIO_PIN
+	{
+		LED0_GPIO_CONTROLLER,
+		LED0_GPIO_PIN,
+	},
+#endif
+#ifdef LED1_GPIO_PIN
+	{
+		LED1_GPIO_CONTROLLER,
+		LED1_GPIO_PIN,
+	},
+#endif
+#ifdef LED2_GPIO_PIN
+	{
+		LED2_GPIO_CONTROLLER,
+		LED2_GPIO_PIN,
+	},
+#endif
+#ifdef LED3_GPIO_PIN
+	{
+		LED3_GPIO_CONTROLLER,
+		LED3_GPIO_PIN,
+	},
+#endif
+};
+
+void blink(u32_t sleep_ms, u32_t led1, u32_t led2)
 {
-#if defined(CONFIG_DK_LIBRARY)
-	int err = 0;
+	int cnt = 0;
 
-	err = dk_leds_init();
+	led_devs[led1] = device_get_binding(led_pins[led1].port);
+	if (!led_devs[led1]) {
+		LOG_ERR("Cannot bind gpio device");
+		return -ENODEV;
+	}
+
+	led_devs[led2] = device_get_binding(led_pins[led2].port);
+	if (!led_devs[led2]) {
+		LOG_ERR("Cannot bind gpio device");
+		return -ENODEV;
+	}
+
+	err = gpio_pin_configure(led_devs[led1], led_pins[led1].number,
+				 GPIO_DIR_OUT);
 	if (err) {
-		printk("Could not initialize leds, err code: %d\n", err);
+		LOG_ERR("Cannot configure LED gpio");
+		return err;
 	}
 
-	err = dk_set_leds_state(0x00, DK_ALL_LEDS_MSK);
+	err = gpio_pin_configure(led_devs[led2], led_pins[led2].number,
+				 GPIO_DIR_OUT);
 	if (err) {
-		printk("Could not set leds state, err code: %d\n", err);
+		LOG_ERR("Cannot configure LED gpio");
+		return err;
 	}
 
-#endif
-}
+	//	err = gpio_pin_write(led_devs[led1], led_pins[led1].number,
+	//			IS_ENABLED(CONFIG_DK_LIBRARY_INVERT_LEDS) ? !val : val);
+	//	if (err) {
+	//		LOG_ERR("Cannot write LED gpio");
+	//	}
 
-void led_notif_lte(bool connected)
-{
-#if defined(CONFIG_DK_LIBRARY)
-	if (connected) {
-		dk_set_led_on(DK_LED1);
-	} else {
-		dk_set_led_off(DK_LED1);
+	while (1) {
+		gpio_pin_write(led_devs[led1], led_pins[led1].number, cnt % 2);
+		gpio_pin_write(led_devs[led1], led_pins[led1].number,
+			       (cnt + 1) % 2);
+		k_sleep(sleep_ms);
+		cnt++
 	}
-#endif
 }
 
-void led_notif_gps_search(bool searching)
+void blink1(void)
 {
-#if defined(CONFIG_DK_LIBRARY)
-	if (searching) {
-		dk_set_led_on(DK_LED2);
-	} else {
-		dk_set_led_off(DK_LED2);
-	}
-#endif
+	blink(500, LED1, LED2);
 }
 
-void led_notif_publish()
+K_THREAD_DEFINE(blink1_id, STACKSIZE, blink1, NULL, NULL, NULL, PRIORITY, 0,
+		K_FOREVER);
+
+void gps_search_led_start()
 {
-#if defined(CONFIG_DK_LIBRARY)
-	dk_set_led_on(DK_LED3);
-	k_sleep(500);
-	dk_set_led_off(DK_LED3);
-#endif
+	k_thread_start(blink1_id);
+}
+
+void gps_search_led_stop()
+{
+	k_thread_abort(blink1_id);
 }

@@ -16,15 +16,6 @@ bool change_movement_timeout;
 bool change_accel_threshold;
 bool change_config;
 
-typedef struct Digital_twin {
-	cJSON *gpst;
-	cJSON *active;
-	cJSON *active_wait;
-	cJSON *passive_wait;
-	cJSON *movement_timeout;
-	cJSON *accel_threshold;
-} Digital_twin;
-
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
 	cJSON_AddItemToObject(parent, str, item);

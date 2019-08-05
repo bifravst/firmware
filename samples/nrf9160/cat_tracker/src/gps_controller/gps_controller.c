@@ -52,14 +52,14 @@ static void gps_work_handler(struct k_work *work)
 
 void gps_control_stop()
 {
-	led_notif_gps_search(false);
+	gps_search_led_stop();
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
 }
 
 void gps_control_start()
 {
-	led_notif_gps_search(true);
+	gps_search_led_start();
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);
 }
