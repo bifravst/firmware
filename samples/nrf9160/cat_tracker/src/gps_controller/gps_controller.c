@@ -38,8 +38,6 @@ static void gps_work_handler(struct k_work *work)
 		printk("GPS started successfully.\nSearching for satellites ");
 		printk("to get position fix. This may take several minutes.\n");
 
-		led_notif_gps_search(true);
-
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
 		err = gps_stop(gps_work.dev);
@@ -48,22 +46,22 @@ static void gps_work_handler(struct k_work *work)
 			return;
 		}
 
-		led_notif_gps_search(false);
-
 		return;
 	}
 }
 
-void gps_control_stop(u32_t delay_ms)
+void gps_control_stop()
 {
+	led_notif_gps_search(false);
 	gps_work.type = GPS_WORK_STOP;
-	k_delayed_work_submit(&gps_work.work, delay_ms);
+	k_work_submit(&gps_work.work);
 }
 
-void gps_control_start(u32_t delay_ms)
+void gps_control_start()
 {
+	led_notif_gps_search(true);
 	gps_work.type = GPS_WORK_START;
-	k_delayed_work_submit(&gps_work.work, delay_ms);
+	k_work_submit(&gps_work.work);
 }
 
 void gps_control_on_trigger(void)
@@ -72,7 +70,7 @@ void gps_control_on_trigger(void)
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {
 		gps_work.fix_count = 0;
-		gps_control_stop(K_NO_WAIT);
+		gps_control_stop();
 	}
 }
 
@@ -97,14 +95,12 @@ int gps_control_init(gps_trigger_handler_t handler)
 		return err;
 	}
 
-	k_delayed_work_init(&gps_work.work, gps_work_handler);
+	k_work_init(&gps_work.work, gps_work_handler);
 
-	gps_work.dev = gps_dev;
-	gps_work.type = GPS_WORK_STOP;
+	//gps_work.dev = gps_dev;
+	//gps_work.type = GPS_WORK_STOP;
 
-	k_delayed_work_submit(
-		&gps_work.work,
-		K_SECONDS(CONFIG_GPS_CONTROL_FIRST_FIX_CHECK_DELAY));
+	//k_work_submit(&gps_work.work);
 
 	printk("GPS initialized\n");
 

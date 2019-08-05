@@ -13,6 +13,10 @@
 
 #define APP_SLEEP_MS 500
 #define APP_CONNECT_TRIES 5
+#define MAX_ITERATIONS 1
+#define EMPTY_STRING ""
+
+#define SUCCESS_OR_BREAK(err) { if (err != 0) { break; } }
 
 Sync_data sync_data = { .gps_timeout = 180,
 			.active = true,
@@ -558,7 +562,7 @@ int mqtt_enable(struct mqtt_client *client)
 
 int publish_data(bool op)
 {
-	int err;
+	int err, i = 0;
 	struct Transmit_data transmit_data;
 
 	err = mqtt_enable(&client);
@@ -566,13 +570,8 @@ int publish_data(bool op)
 		printk("Could not connect to client\n");
 	}
 
-	err = mqtt_ping(&client);
-	if (err) {
-		printk("Could not ping server\n");
-	}
-
 	if (op) {
-		transmit_data.buf = "";
+		transmit_data.buf = EMPTY_STRING;
 		transmit_data.len = strlen(transmit_data.buf);
 		transmit_data.topic = get_topic;
 	} else {
@@ -585,12 +584,29 @@ int publish_data(bool op)
 
 	led_notif_publish();
 
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-		     transmit_data.len, transmit_data.topic);
+	while(i++ < MAX_ITERATIONS && connected) {
 
-	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-	if (err) {
-		printk("mqtt processing failed\n");
+		err = mqtt_ping(&client);
+		SUCCESS_OR_BREAK(err);
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		SUCCESS_OR_BREAK(err);
+
+		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf, 
+		transmit_data.len, transmit_data.topic);
+		SUCCESS_OR_BREAK(err);
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		SUCCESS_OR_BREAK(err);
+
+		if (check_config_change()) {
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
+				transmit_data.len, transmit_data.topic);
+
+			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			SUCCESS_OR_BREAK(err);
+		}
+
 	}
 
 	err = mqtt_disconnect(&client);
