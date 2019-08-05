@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <leds.h>
 #include <gps.h>
 #include <mqtt_codec.h>
 
@@ -16,7 +15,12 @@
 #define MAX_ITERATIONS 1
 #define EMPTY_STRING ""
 
-#define SUCCESS_OR_BREAK(err) { if (err != 0) { break; } }
+#define SUCCESS_OR_BREAK(err)                                                  \
+	{                                                                      \
+		if (err != 0) {                                                \
+			break;                                                 \
+		}                                                              \
+	}
 
 Sync_data sync_data = { .gps_timeout = 180,
 			.active = true,
@@ -49,48 +53,45 @@ static int nfds;
 #define AWS "$aws/things/"
 #define AWS_LEN (sizeof(AWS) - 1)
 
-#define NCT_SHADOW_BASE_TOPIC AWS "%s/shadow"
-#define NCT_SHADOW_BASE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 7)
+#define SHADOW_BASE_TOPIC AWS "%s/shadow"
+#define SHADOW_BASE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 7)
 
-#define NCT_ACCEPTED_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
-#define NCT_ACCEPTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
+#define ACCEPTED_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
+#define ACCEPTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
 
-#define NCT_REJECTED_TOPIC AWS "%s/shadow/get/rejected"
-#define NCT_REJECTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
+#define REJECTED_TOPIC AWS "%s/shadow/get/rejected"
+#define REJECTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
 
-#define NCT_UPDATE_DELTA_TOPIC AWS "%s/shadow/update/delta"
-#define NCT_UPDATE_DELTA_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
+#define UPDATE_DELTA_TOPIC AWS "%s/shadow/update/delta"
+#define UPDATE_DELTA_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
 
-#define NCT_UPDATE_TOPIC AWS "%s/shadow/update"
-#define NCT_UPDATE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 14)
+#define UPDATE_TOPIC AWS "%s/shadow/update"
+#define UPDATE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 14)
 
-#define NCT_SHADOW_GET AWS "%s/shadow/get"
-#define NCT_SHADOW_GET_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 11)
+#define SHADOW_GET AWS "%s/shadow/get"
+#define SHADOW_GET_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 11)
 
-#define NCT_CC_SUBSCRIBE_ID 1234
+#define CC_SUBSCRIBE_ID 1234
 
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
-/* Buffers for keeping the topics for nrf_cloud */
-static char shadow_base_topic[NCT_SHADOW_BASE_TOPIC_LEN + 1];
-static char accepted_topic[NCT_ACCEPTED_TOPIC_LEN + 1];
-static char rejected_topic[NCT_REJECTED_TOPIC_LEN + 1];
-static char update_delta_topic[NCT_UPDATE_DELTA_TOPIC_LEN + 1];
-static char update_topic[NCT_UPDATE_TOPIC_LEN + 1];
-static char get_topic[NCT_SHADOW_GET_LEN + 1];
+static char shadow_base_topic[SHADOW_BASE_TOPIC_LEN + 1];
+static char accepted_topic[ACCEPTED_TOPIC_LEN + 1];
+static char rejected_topic[REJECTED_TOPIC_LEN + 1];
+static char update_delta_topic[UPDATE_DELTA_TOPIC_LEN + 1];
+static char update_topic[UPDATE_TOPIC_LEN + 1];
+static char get_topic[SHADOW_GET_LEN + 1];
 
-/*Needs to be reviewed if subscribing to all topics upon all connections is nessecary */
-static const struct mqtt_topic nct_cc_rx_list[] = {
-	{ .topic = { .utf8 = accepted_topic, .size = NCT_ACCEPTED_TOPIC_LEN },
+static const struct mqtt_topic cc_rx_list[] = {
+	{ .topic = { .utf8 = accepted_topic, .size = ACCEPTED_TOPIC_LEN },
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
-	{ .topic = { .utf8 = rejected_topic, .size = NCT_REJECTED_TOPIC_LEN },
+	{ .topic = { .utf8 = rejected_topic, .size = REJECTED_TOPIC_LEN },
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
 	{ .topic = { .utf8 = update_delta_topic,
-		     .size = NCT_UPDATE_DELTA_TOPIC_LEN },
+		     .size = UPDATE_DELTA_TOPIC_LEN },
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-/* Function to get the client id */
-static int nct_client_id_get(char *id)
+static int client_id_get(char *id)
 {
 	int at_socket_fd;
 	int bytes_written;
@@ -116,56 +117,55 @@ static int nct_client_id_get(char *id)
 	return 0;
 }
 
-static int nct_topics_populate(void)
+static int topics_populate(void)
 {
 	int err;
 
-	err = nct_client_id_get(client_id_buf);
+	err = client_id_get(client_id_buf);
 	if (err != 0) {
 		return err;
 	}
 
 	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
-		       NCT_SHADOW_BASE_TOPIC, client_id_buf);
-	if (err != NCT_SHADOW_BASE_TOPIC_LEN) {
+		       SHADOW_BASE_TOPIC, client_id_buf);
+	if (err != SHADOW_BASE_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
-	err = snprintf(accepted_topic, sizeof(accepted_topic),
-		       NCT_ACCEPTED_TOPIC, client_id_buf);
-	if (err != NCT_ACCEPTED_TOPIC_LEN) {
+	err = snprintf(accepted_topic, sizeof(accepted_topic), ACCEPTED_TOPIC,
+		       client_id_buf);
+	if (err != ACCEPTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	printk("Accepted topic set to %s\n", accepted_topic);
 
-	err = snprintf(rejected_topic, sizeof(rejected_topic),
-		       NCT_REJECTED_TOPIC, client_id_buf);
-	if (err != NCT_REJECTED_TOPIC_LEN) {
+	err = snprintf(rejected_topic, sizeof(rejected_topic), REJECTED_TOPIC,
+		       client_id_buf);
+	if (err != REJECTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	printk("Rejected topic set to %s\n", rejected_topic);
 
 	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
-		       NCT_UPDATE_DELTA_TOPIC, client_id_buf);
-	if (err != NCT_UPDATE_DELTA_TOPIC_LEN) {
+		       UPDATE_DELTA_TOPIC, client_id_buf);
+	if (err != UPDATE_DELTA_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	printk("Update delta topic set to %s\n", update_delta_topic);
 
-	err = snprintf(update_topic, sizeof(update_topic), NCT_UPDATE_TOPIC,
+	err = snprintf(update_topic, sizeof(update_topic), UPDATE_TOPIC,
 		       client_id_buf);
-	if (err != NCT_UPDATE_TOPIC_LEN) {
+	if (err != UPDATE_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
 	printk("Update topic set to %s\n", update_topic);
 
-	err = snprintf(get_topic, sizeof(get_topic), NCT_SHADOW_GET,
-		       client_id_buf);
-	if (err != NCT_SHADOW_GET_LEN) {
+	err = snprintf(get_topic, sizeof(get_topic), SHADOW_GET, client_id_buf);
+	if (err != SHADOW_GET_LEN) {
 		return -ENOMEM;
 	}
 
@@ -178,7 +178,7 @@ int cloud_configuration_init(void)
 {
 	int err;
 
-	err = nct_topics_populate();
+	err = topics_populate();
 	if (err) {
 		return err;
 	}
@@ -282,9 +282,9 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 int subscribe()
 {
 	const struct mqtt_subscription_list subscription_list = {
-		.list = (struct mqtt_topic *)&nct_cc_rx_list,
-		.list_count = ARRAY_SIZE(nct_cc_rx_list),
-		.message_id = NCT_CC_SUBSCRIBE_ID
+		.list = (struct mqtt_topic *)&cc_rx_list,
+		.list_count = ARRAY_SIZE(cc_rx_list),
+		.message_id = CC_SUBSCRIBE_ID
 	};
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
@@ -582,31 +582,29 @@ int publish_data(bool op)
 		transmit_data.topic = update_topic;
 	}
 
-	led_notif_publish();
-
-	while(i++ < MAX_ITERATIONS && connected) {
-
+	while (i++ < MAX_ITERATIONS && connected) {
 		err = mqtt_ping(&client);
 		SUCCESS_OR_BREAK(err);
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		SUCCESS_OR_BREAK(err);
 
-		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf, 
-		transmit_data.len, transmit_data.topic);
+		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				   transmit_data.buf, transmit_data.len,
+				   transmit_data.topic);
 		SUCCESS_OR_BREAK(err);
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		SUCCESS_OR_BREAK(err);
 
 		if (check_config_change()) {
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-				transmit_data.len, transmit_data.topic);
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				     transmit_data.buf, transmit_data.len,
+				     transmit_data.topic);
 
 			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 			SUCCESS_OR_BREAK(err);
 		}
-
 	}
 
 	err = mqtt_disconnect(&client);

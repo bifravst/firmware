@@ -14,14 +14,14 @@
 #include <modem_data.h>
 #include <device.h>
 #include <dk_buttons_and_leds.h>
-#include <leds.h>
 #include <sensor.h>
 #include <gps_controller.h>
 #include <mqtt_codec.h>
-#include <dk_buttons_and_leds.h>
 
 #define NORMAL_OPERATION false
 #define SYNCRONIZATION true
+#define NO_GPS_FIX false
+#define GPS_FIX true
 
 static bool active;
 
@@ -114,7 +114,18 @@ static void lte_connect(void)
 		printk("LTE Link Connected!\n");
 	}
 	lte_lc_psm_req(true);
-	led_notif_lte(true);
+}
+
+static void cloud_publish(bool gps_fix, bool action)
+{
+	int err;
+
+	set_gps_found(gps_fix);
+
+	err = publish_data(action);
+	if (err != 0) {
+		printk("Error publishing data: %d", err);
+	}
 }
 
 #if defined(CONFIG_ADXL362)
@@ -159,6 +170,51 @@ static void adxl362_trigger_handler(struct device *dev,
 }
 #endif
 
+#if definede(CONFIG_NRF9160_GPS_ENABLE
+static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
+{
+	static struct gps_data gps_data;
+
+	switch (trigger->type) {
+	case GPS_TRIG_FIX:
+		printk("gps control handler triggered!\n");
+		gps_control_on_trigger();
+		gps_sample_fetch(dev);
+		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
+		attach_gps_data(gps_data);
+		k_sem_give(events[0].sem);
+		break;
+
+	default:
+		break;
+	}
+}
+#endif
+
+static void button_handler(u32_t button_states, u32_t has_changed)
+{
+	u8_t btn_num;
+
+	while (has_changed) {
+		btn_num = 0;
+
+		for (u8_t i = 0; i < 32; i++) {
+			if (has_changed & BIT(i)) {
+				btn_num = i + 1;
+				break;
+			}
+		}
+
+		has_changed &= ~(1UL << (btn_num - 1));
+
+		if (has_changed == 0 || has_changed == 1) {
+			gps_control_stop(K_NO_WAIT);
+			set_gps_found(false);
+			k_sem_give(events[0].sem);
+		}
+	}
+}
+
 static void adxl362_init(void)
 {
 #if defined(CONFIG_ADXL362)
@@ -180,36 +236,9 @@ static void adxl362_init(void)
 #endif
 }
 
-static void button_handler(u32_t button_states, u32_t has_changed)
-{
-	u8_t btn_num;
-
-	while (has_changed) {
-		btn_num = 0;
-
-		/* Get bit position for next button that changed state. */
-		for (u8_t i = 0; i < 32; i++) {
-			if (has_changed & BIT(i)) {
-				btn_num = i + 1;
-				break;
-			}
-		}
-
-		/* Button number has been stored, remove from bitmask. */
-		has_changed &= ~(1UL << (btn_num - 1));
-
-		if (has_changed == 0 || has_changed == 1) {
-			gps_control_stop(K_NO_WAIT);
-			set_gps_found(false);
-			k_sem_give(events[0].sem);
-		}
-	}
-}
-
 void main(void)
 {
 	int err;
-	work_init();
 	printk("The cat tracker has started\n");
 
 	leds_init();
@@ -232,7 +261,7 @@ void main(void)
 	gps_control_init(gps_control_handler);
 #endif
 
-	cloud_sync();
+	cloud_publish(NO_GPS_FIX, SYNCRONIZATION);
 
 check_mode:
 	attach_battery_data(request_battery_status());
@@ -261,7 +290,7 @@ passive:
 
 gps_search:
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
-	gps_control_start(K_NO_WAIT);
+	gps_control_start();
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
