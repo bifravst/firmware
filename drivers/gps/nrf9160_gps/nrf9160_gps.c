@@ -317,34 +317,34 @@ static int enable_gps(struct device *dev)
 		goto enable_gps_clean_exit;
 	}
 
-	if (gps_param_value != 1) {
+ 	if (gps_param_value != 1) {
 		char cmd[sizeof(AT_XSYSTEMMODE_PROTO)];
 		size_t len;
 		u16_t values[AT_XSYSTEMMODE_PARAMS_COUNT] = { 0 };
 
-		LOG_DBG("GPS mode is not enabled, attempting to enable it");
+ 		LOG_DBG("GPS mode is not enabled, attempting to enable it");
 
 		for (size_t i = 0; i < AT_XSYSTEMMODE_PARAMS_COUNT; i++) {
 			at_params_short_get(&at_resp_list, i, &values[i]);
 		}
 
-		values[AT_XSYSTEMMODE_GPS_PARAM_INDEX] = 1;
+ 		values[AT_XSYSTEMMODE_GPS_PARAM_INDEX] = 1;
 
-		len = snprintf(cmd, sizeof(cmd), AT_XSYSTEMMODE_PROTO,
+ 		len = snprintf(cmd, sizeof(cmd), AT_XSYSTEMMODE_PROTO,
 			       values[0], values[1], values[2], values[3]);
 
-		LOG_DBG("Sending AT command: %s", log_strdup(cmd));
+ 		LOG_DBG("Sending AT command: %s", log_strdup(cmd));
 
-		err = at_cmd_write(cmd, NULL, 0, NULL);
+ 		err = at_cmd_write(cmd, NULL, 0, NULL);
 		if (err) {
 			LOG_ERR("Could not enable GPS mode, error: %d", err);
 			goto enable_gps_clean_exit;
 		}
 	}
 
-	LOG_DBG("GPS mode is enabled");
+ 	LOG_DBG("GPS mode is enabled");
 
-	err = at_cmd_write(AT_CFUN_REQUEST, buf, sizeof(buf), NULL);
+ 	err = at_cmd_write(AT_CFUN_REQUEST, buf, sizeof(buf), NULL);
 	if (err) {
 		LOG_ERR("Could not get functional mode, error: %d", err);
 		goto enable_gps_clean_exit;
@@ -373,7 +373,7 @@ static int enable_gps(struct device *dev)
 		LOG_DBG("Functional mode was %d, attemping to set to %d",
 			functional_mode, FUNCTIONAL_MODE_ENABLED);
 
-		err = at_cmd_write(AT_CFUN_1, NULL, 0, NULL);
+ 		err = at_cmd_write(AT_CFUN_1, NULL, 0, NULL);
 		if (err) {
 			LOG_ERR("Could not set functional mode to %d",
 				FUNCTIONAL_MODE_ENABLED);
@@ -555,14 +555,10 @@ static int channel_get(struct device *dev, enum gps_channel chan,
 
 static int stop(struct device *dev)
 {
-
 	struct gps_drv_data *drv_data = dev->driver_data;
 	int retval;
-	
-	if (!gps_stopped) {
-		LOG_DBG("Stopping GPS");
 
-		atomic_set(&drv_data->gps_is_active, 0);
+ 	LOG_DBG("Stopping GPS");
 
 	atomic_set(&drv_data->gps_is_active, 0);
 
@@ -574,7 +570,7 @@ static int stop(struct device *dev)
 		return -EIO;
 	}
 
-	return 0;
+ 	return 0;
 }
 
 static int trigger_set(struct device *dev, const struct gps_trigger *trig,

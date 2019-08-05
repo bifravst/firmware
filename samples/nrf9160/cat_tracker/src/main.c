@@ -20,6 +20,9 @@
 #include <mqtt_codec.h>
 #include <dk_buttons_and_leds.h>
 
+#define NORMAL_OPERATION false
+#define SYNCRONIZATION true
+
 static bool active;
 
 K_SEM_DEFINE(gps_timing_sem, 0, 1);
@@ -37,34 +40,18 @@ struct k_poll_event events[2] = {
 static void publish_cloud()
 {
 	int err;
-
-	err = publish_data(false);
+	err = publish_data(NORMAL_OPERATION);
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
-	}
-
-	if (check_config_change()) {
-		err = publish_data(false);
-		if (err != 0) {
-			printk("Sync Error: %d", err);
-		}
 	}
 }
 
 static void cloud_sync()
 {
 	int err;
-
-	err = publish_data(true);
+	err = publish_data(SYNCRONIZATION);
 	if (err != 0) {
-		printk("Sync Error: %d", err);
-	}
-
-	if (check_config_change()) {
-		err = publish_data(false);
-		if (err != 0) {
-			printk("Sync Error: %d", err);
-		}
+		printk("Error syncronizing with brokerr: %d", err);
 	}
 }
 
@@ -80,12 +67,12 @@ static void gps_not_found_work_fn(struct k_work *work)
 
 static void gps_start_work_fn(struct k_work *work)
 {
-	gps_control_start(K_NO_WAIT);
+	gps_control_start();
 }
 
 static void gps_stop_work_fn(struct k_work *work)
 {
-	gps_control_stop(K_NO_WAIT);
+	gps_control_stop();
 }
 
 static void get_modem_info_work_fn(struct k_work *work)
