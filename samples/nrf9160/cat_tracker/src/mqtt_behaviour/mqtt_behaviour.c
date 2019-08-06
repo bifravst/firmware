@@ -15,13 +15,6 @@
 #define MAX_ITERATIONS 1
 #define EMPTY_STRING ""
 
-#define SUCCESS_OR_BREAK(err)                                                  \
-	{                                                                      \
-		if (err != 0) {                                                \
-			break;                                                 \
-		}                                                              \
-	}
-
 Sync_data sync_data = { .gps_timeout = 180,
 			.active = true,
 			.active_wait = 60,
@@ -174,16 +167,14 @@ static int topics_populate(void)
 	return 0;
 }
 
-int cloud_configuration_init(void)
+void cloud_configuration_init(void)
 {
 	int err;
 
 	err = topics_populate();
 	if (err) {
-		return err;
+		printk("Could not populate topics: %d\n", err);
 	}
-
-	return 0;
 }
 
 void set_gps_found(bool gps_found)
@@ -584,26 +575,47 @@ int publish_data(bool op)
 
 	while (i++ < MAX_ITERATIONS && connected) {
 		err = mqtt_ping(&client);
-		SUCCESS_OR_BREAK(err);
+		if (err != 0) {
+			printk("Could not ping broker: %d\n", err);
+			break;
+		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		SUCCESS_OR_BREAK(err);
+		if (err != 0) {
+			printk("Could not process data broker: %d\n", err);
+			break;
+		}
 
 		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
 				   transmit_data.buf, transmit_data.len,
 				   transmit_data.topic);
-		SUCCESS_OR_BREAK(err);
+		if (err != 0) {
+			printk("Could not publish data: %d\n", err);
+			break;
+		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		SUCCESS_OR_BREAK(err);
+		if (err != 0) {
+			printk("Could not process data broker: %d\n", err);
+			break;
+		}
 
 		if (check_config_change()) {
 			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
 				     transmit_data.buf, transmit_data.len,
 				     transmit_data.topic);
+			if (err != 0) {
+				printk("Could not publish configuration update: %d\n",
+				       err);
+				break;
+			}
 
 			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-			SUCCESS_OR_BREAK(err);
+			if (err != 0) {
+				printk("Could not process data broker: %d\n",
+				       err);
+				break;
+			}
 		}
 	}
 
