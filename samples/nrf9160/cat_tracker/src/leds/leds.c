@@ -9,6 +9,10 @@
 #define STACKSIZE 1024
 #define PRIORITY 7
 
+#define LED1 0
+#define LED2 1
+#define LED3 2
+
 static struct device *led_devs[ARRAY_SIZE(led_pins)];
 
 static const struct gpio_pin led_pins[] = {
@@ -37,6 +41,17 @@ static const struct gpio_pin led_pins[] = {
 	},
 #endif
 };
+
+//void led_lte_connected(bool connected, u8_t led)
+//{
+//	int err;
+//
+//	err = gpio_pin_write(led_devs[led], led_pins[led].number, 1);
+//	if (err) {
+//		LOG_ERR("Cannot write LED gpio");
+//	}
+//	return err;
+//}
 
 void blink(u32_t sleep_ms, u32_t led1, u32_t led2)
 {
@@ -100,3 +115,5 @@ void gps_search_led_stop()
 {
 	k_thread_abort(blink1_id);
 }
+
+//This thread should control all the leds through the function

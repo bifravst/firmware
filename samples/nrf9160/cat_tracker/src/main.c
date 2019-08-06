@@ -25,16 +25,16 @@
 
 static bool active;
 
-K_SEM_DEFINE(gps_timing_sem, 0, 1);
-K_SEM_DEFINE(idle_user_sem, 0, 1);
+K_SEM_DEFINE(gps_timeout_sem, 0, 1);
+K_SEM_DEFINE(accel_trig_sem, 0, 1);
 
 struct k_poll_event events[2] = {
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
 					K_POLL_MODE_NOTIFY_ONLY,
-					&gps_timing_sem, 0),
+					&gps_timeout_sem, 0),
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY, &idle_user_sem,
-					0)
+					K_POLL_MODE_NOTIFY_ONLY,
+					&accel_trig_sem, 0)
 };
 
 static void publish_cloud()
@@ -242,20 +242,15 @@ void main(void)
 	printk("The cat tracker has started\n");
 
 	leds_init();
+	adxl362_init();
 
 	err = dk_buttons_init(button_handler);
 	if (err != 0) {
 		printk("dk buttons not initialized correctly: %d\n", err);
 	}
 
-	err = cloud_configuration_init();
-	if (err != 0) {
-		printk("cloud not properly configured: %d\n", err);
-	}
-
+	cloud_configuration_init();
 	lte_connect();
-
-	adxl362_init();
 
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
 	gps_control_init(gps_control_handler);

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-int cloud_configuration_init(void);
+void cloud_configuration_init(void);
 
 void set_gps_found(bool gps_found);
 
