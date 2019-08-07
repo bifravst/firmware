@@ -13,10 +13,10 @@
 #include <mqtt_behaviour.h>
 #include <modem_data.h>
 #include <device.h>
-#include <dk_buttons_and_leds.h>
 #include <sensor.h>
 #include <gps_controller.h>
 #include <mqtt_codec.h>
+#include <leds.h>
 
 #define NORMAL_OPERATION false
 #define SYNCRONIZATION true
@@ -109,9 +109,11 @@ static void lte_connect(void)
 		int err;
 
 		printk("LTE Link Connecting ...\n");
+		lte_connecting_led_start();
 		err = lte_lc_init_and_connect();
 		__ASSERT(err == 0, "LTE link could not be established.");
 		printk("LTE Link Connected!\n");
+		lte_connecting_led_stop();
 	}
 	lte_lc_psm_req(true);
 }
@@ -170,7 +172,7 @@ static void adxl362_trigger_handler(struct device *dev,
 }
 #endif
 
-#if definede(CONFIG_NRF9160_GPS_ENABLE
+#if defined(CONFIG_ENABLE_NRF9160_GPS)
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 {
 	static struct gps_data gps_data;
@@ -238,10 +240,7 @@ static void adxl362_init(void)
 
 void main(void)
 {
-	int err;
 	printk("The cat tracker has started\n");
-
-	leds_init();
 	adxl362_init();
 
 	err = dk_buttons_init(button_handler);
@@ -255,6 +254,8 @@ void main(void)
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
 	gps_control_init(gps_control_handler);
 #endif
+
+	k_sleep(5000);
 
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION);
 
