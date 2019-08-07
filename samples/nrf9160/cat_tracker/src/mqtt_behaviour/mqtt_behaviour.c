@@ -9,8 +9,9 @@
 #include <time.h>
 #include <gps.h>
 #include <mqtt_codec.h>
+#include <leds.h>
 
-#define APP_SLEEP_MS 500
+#define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 5
 #define MAX_ITERATIONS 1
 #define EMPTY_STRING ""
@@ -131,15 +132,11 @@ static int topics_populate(void)
 		return -ENOMEM;
 	}
 
-	printk("Accepted topic set to %s\n", accepted_topic);
-
 	err = snprintf(rejected_topic, sizeof(rejected_topic), REJECTED_TOPIC,
 		       client_id_buf);
 	if (err != REJECTED_TOPIC_LEN) {
 		return -ENOMEM;
 	}
-
-	printk("Rejected topic set to %s\n", rejected_topic);
 
 	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
 		       UPDATE_DELTA_TOPIC, client_id_buf);
@@ -147,22 +144,16 @@ static int topics_populate(void)
 		return -ENOMEM;
 	}
 
-	printk("Update delta topic set to %s\n", update_delta_topic);
-
 	err = snprintf(update_topic, sizeof(update_topic), UPDATE_TOPIC,
 		       client_id_buf);
 	if (err != UPDATE_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
-	printk("Update topic set to %s\n", update_topic);
-
 	err = snprintf(get_topic, sizeof(get_topic), SHADOW_GET, client_id_buf);
 	if (err != SHADOW_GET_LEN) {
 		return -ENOMEM;
 	}
-
-	printk("Get topic set to %s\n", get_topic);
 
 	return 0;
 }
@@ -553,7 +544,7 @@ int mqtt_enable(struct mqtt_client *client)
 
 int publish_data(bool op)
 {
-	int err, i = 0;
+	int err;
 	struct Transmit_data transmit_data;
 
 	err = mqtt_enable(&client);
@@ -573,49 +564,47 @@ int publish_data(bool op)
 		transmit_data.topic = update_topic;
 	}
 
-	while (i++ < MAX_ITERATIONS && connected) {
-		err = mqtt_ping(&client);
+	publish_data_led();
+
+	err = mqtt_ping(&client);
+	if (err != 0) {
+		printk("Could not ping broker: %d\n", err);
+	}
+
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	if (err != 0) {
+		printk("Could not process data broker: %d\n", err);
+	}
+
+	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
+			   transmit_data.len, transmit_data.topic);
+	if (err != 0) {
+		printk("Could not publish data: %d\n", err);
+	}
+
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	if (err != 0) {
+		printk("Could not process data broker: %d\n", err);
+	}
+
+	if (check_config_change()) {
+		err = encode_message(&transmit_data, &sync_data);
 		if (err != 0) {
-			printk("Could not ping broker: %d\n", err);
-			break;
+			printk("ERROR when enconding message: %d\n", err);
+		}
+		transmit_data.topic = update_topic;
+
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			     transmit_data.buf, transmit_data.len,
+			     transmit_data.topic);
+		if (err != 0) {
+			printk("Could not publish configuration update: %d\n",
+			       err);
 		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		if (err != 0) {
 			printk("Could not process data broker: %d\n", err);
-			break;
-		}
-
-		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				   transmit_data.buf, transmit_data.len,
-				   transmit_data.topic);
-		if (err != 0) {
-			printk("Could not publish data: %d\n", err);
-			break;
-		}
-
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			printk("Could not process data broker: %d\n", err);
-			break;
-		}
-
-		if (check_config_change()) {
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				     transmit_data.buf, transmit_data.len,
-				     transmit_data.topic);
-			if (err != 0) {
-				printk("Could not publish configuration update: %d\n",
-				       err);
-				break;
-			}
-
-			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-			if (err != 0) {
-				printk("Could not process data broker: %d\n",
-				       err);
-				break;
-			}
 		}
 	}
 

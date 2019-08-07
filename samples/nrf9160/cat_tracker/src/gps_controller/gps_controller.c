@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(gps_control, CONFIG_GPS_CONTROL_LOG_LEVEL);
 /* Structure to hold GPS work information */
 static struct {
 	enum { GPS_WORK_START, GPS_WORK_STOP } type;
-	struct k_delayed_work work;
+	struct k_work work;
 	struct device *dev;
 	u32_t failed_fix_attempts;
 	u32_t fix_count;
@@ -52,21 +52,23 @@ static void gps_work_handler(struct k_work *work)
 
 void gps_control_stop()
 {
-	gps_search_led_stop();
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
+	gps_search_led_stop();
 }
 
 void gps_control_start()
 {
-	gps_search_led_start();
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);
+	gps_search_led_start();
 }
 
 void gps_control_on_trigger(void)
 {
-	k_delayed_work_cancel(&gps_work.work);
+	//k_delayed_work_cancel(&gps_work.work);
+
+	gps_search_led_stop_fix();
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {
 		gps_work.fix_count = 0;
@@ -97,12 +99,12 @@ int gps_control_init(gps_trigger_handler_t handler)
 
 	k_work_init(&gps_work.work, gps_work_handler);
 
-	//gps_work.dev = gps_dev;
-	//gps_work.type = GPS_WORK_STOP;
+	gps_work.dev = gps_dev;
+	gps_work.type = GPS_WORK_STOP;
 
-	//k_work_submit(&gps_work.work);
+	// k_work_submit(&gps_work.work);
 
-	printk("GPS initialized\n");
+	LOG_DBG("GPS initialized\n");
 
 	return 0;
 }
