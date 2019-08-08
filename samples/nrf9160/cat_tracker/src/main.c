@@ -131,6 +131,8 @@ static void cloud_publish(bool gps_fix, bool action)
 {
 	int err;
 
+	attach_battery_data(request_battery_status(), get_current_time());
+
 	set_gps_found(gps_fix);
 
 	err = publish_data(action);
@@ -266,33 +268,9 @@ void main(void)
 	gps_control_init(gps_control_handler);
 #endif
 
-	k_sleep(5000);
-
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION);
 
-check_mode:
-	attach_battery_data(request_battery_status(), get_current_time());
-	if (check_mode()) {
-		active = true;
-		goto active;
-	} else {
-		active = false;
-		goto passive;
-	}
-
-active:
-	printk("ACTIVE MODE\n");
-	goto gps_search;
-
-passive:
-	printk("PASSIVE MODE\n");
-#if defined(CONFIG_ADXL362)
-	k_poll(events, 2, K_FOREVER);
-	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(events[1].sem, 0);
-	}
-#endif
-	goto gps_search;
+	k_sleep(5000);
 
 gps_search:
 #if defined(CONFIG_ENABLE_NRF9160_GPS)
@@ -316,5 +294,47 @@ gps_search:
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #endif
 
-	goto check_mode;
+	// check_mode:
+	// 	if (check_mode()) {
+	// 		active = true;
+	// 		goto active;
+	// 	} else {
+	// 		active = false;
+	// 		goto passive;
+	// 	}
+
+	// active:
+	// 	printk("ACTIVE MODE\n");
+	// 	goto gps_search;
+
+	// passive:
+	// 	printk("PASSIVE MODE\n");
+	// #if defined(CONFIG_ADXL362)
+	// 	k_poll(events, 2, K_FOREVER);
+	// 	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+	// 		k_sem_take(events[1].sem, 0);
+	// 	}
+	// #endif
+	// 	goto gps_search;
+
+	// gps_search:
+	// #if defined(CONFIG_ENABLE_NRF9160_GPS)
+	// 	gps_control_start();
+	// 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
+	// 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+	// 		k_sem_take(events[0].sem, 0);
+	// 		cloud_publish(GPS_FIX, NORMAL_OPERATION);
+	// 	} else {
+	// 		gps_control_stop();
+	// 		cloud_publish(NO_GPS_FIX, NORMAL_OPERATION);
+	// 	}
+	// 	events[1].state = K_POLL_STATE_NOT_READY;
+	// 	events[0].state = K_POLL_STATE_NOT_READY;
+	// 	k_sleep(K_SECONDS(check_active_wait(active)));
+	// #else
+	// 	cloud_publish(NO_GPS_FIX, NORMAL_OPERATION);
+	// 	k_sleep(K_SECONDS(check_active_wait(active)));
+	// #endif
+
+	// 	goto check_mode;
 }

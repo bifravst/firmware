@@ -13,7 +13,7 @@ extern "C" {
 
 typedef struct Sync_data {
 	int bat_voltage;
-	long int bat_timestamp;
+	s64_t bat_timestamp;
 
 	double longitude;
 	double latitude;
@@ -21,10 +21,10 @@ typedef struct Sync_data {
 	float accuracy;
 	float speed;
 	float heading;
-	long int gps_timestamp;
+	s64_t gps_timestamp;
 
 	double acc[3];
-	long int acc_timestamp;
+	s64_t acc_timestamp;
 
 	int gps_timeout;
 	bool active;
