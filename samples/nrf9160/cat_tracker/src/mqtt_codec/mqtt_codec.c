@@ -23,18 +23,6 @@ static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 	return 0;
 }
 
-static int json_add_str(cJSON *parent, const char *str, const char *item)
-{
-	cJSON *json_str;
-
-	json_str = cJSON_CreateString(item);
-	if (json_str == NULL) {
-		return -ENOMEM;
-	}
-
-	return json_add_obj(parent, str, json_str);
-}
-
 static int json_add_number(cJSON *parent, const char *str, double item)
 {
 	cJSON *json_num;
@@ -215,11 +203,11 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 	/*BAT*/
 	err = json_add_number(bat_obj, "v", sync_data->bat_voltage);
-	err += json_add_str(bat_obj, "ts", sync_data->bat_timestamp);
+	err += json_add_number(bat_obj, "ts", sync_data->bat_timestamp);
 
 	/*ACC*/
 	err += json_add_DoubleArray(acc_obj, "v", sync_data->acc);
-	err += json_add_str(acc_obj, "ts", sync_data->acc_timestamp);
+	err += json_add_number(acc_obj, "ts", sync_data->acc_timestamp);
 
 	/*GPS*/
 	err += json_add_number(gps_val_obj, "lng", sync_data->longitude);
@@ -281,8 +269,8 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_str(gps_obj, "ts",
-					    sync_data->acc_timestamp);
+			err += json_add_number(gps_obj, "ts",
+					       sync_data->acc_timestamp);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
@@ -300,8 +288,8 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_str(gps_obj, "ts",
-					    sync_data->acc_timestamp);
+			err += json_add_number(gps_obj, "ts",
+					       sync_data->acc_timestamp);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 	}

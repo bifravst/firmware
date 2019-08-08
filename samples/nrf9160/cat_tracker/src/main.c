@@ -101,6 +101,8 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 
 static void lte_connect(void)
 {
+	int err;
+
 	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
 		/* Do nothing, modem is already turned on
 			* and connected.
@@ -116,6 +118,13 @@ static void lte_connect(void)
 		lte_connecting_led_stop();
 	}
 	lte_lc_psm_req(true);
+
+	k_sleep(5000);
+
+	err = modem_time_get();
+	if (err != 0) {
+		printk("Error fetching modem time\n");
+	}
 }
 
 static void cloud_publish(bool gps_fix, bool action)
@@ -156,7 +165,8 @@ static void adxl362_trigger_handler(struct device *dev,
 		     check_accel_thres())) {
 			attach_accel_data(sensor_value_to_double(&accel[0]),
 					  sensor_value_to_double(&accel[1]),
-					  sensor_value_to_double(&accel[2]));
+					  sensor_value_to_double(&accel[2]),
+					  get_current_time());
 
 			printf("x: %.1f, y: %.1f, z: %.1f (m/s^2)\n",
 			       sensor_value_to_double(&accel[0]),
@@ -183,7 +193,8 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_control_on_trigger();
 		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		attach_gps_data(gps_data);
+		set_current_time(gps_data);
+		attach_gps_data(gps_data, get_current_time());
 		k_sem_give(events[0].sem);
 		break;
 
@@ -260,7 +271,7 @@ void main(void)
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION);
 
 check_mode:
-	attach_battery_data(request_battery_status());
+	attach_battery_data(request_battery_status(), get_current_time());
 	if (check_mode()) {
 		active = true;
 		goto active;
