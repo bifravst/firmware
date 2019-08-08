@@ -19,6 +19,8 @@
 #define PUBLISH_DATA 0x1341
 #define PUBLISH_DATA_STOP 0x1342
 
+#define LED_PULSE_CYCLE 1000
+
 struct k_poll_signal signal_led;
 static int state;
 
@@ -50,7 +52,7 @@ static const struct gpio_pin led_pins[] = {
 
 static struct device *led_devs[ARRAY_SIZE(led_pins)];
 
-void blink(u32_t sleep_ms)
+void led_FSM()
 {
 	int err, cnt = 0;
 
@@ -59,7 +61,6 @@ void blink(u32_t sleep_ms)
 	struct k_poll_event events[1] = { K_POLL_EVENT_INITIALIZER(
 		K_POLL_TYPE_SIGNAL, K_POLL_MODE_NOTIFY_ONLY, &signal_led) };
 
-	/*LED INIT */
 	for (size_t i = 0; i < ARRAY_SIZE(led_pins); i++) {
 		led_devs[i] = device_get_binding(led_pins[i].port);
 		if (!led_devs[i]) {
@@ -92,7 +93,7 @@ void blink(u32_t sleep_ms)
 					       led_pins[LED1].number, cnt % 2);
 				cnt++;
 
-				k_poll(events, 1, sleep_ms);
+				k_poll(events, 1, LED_PULSE_CYCLE);
 
 				if (state == GPS_SEARCH) {
 					break;
@@ -110,6 +111,8 @@ void blink(u32_t sleep_ms)
 			break;
 
 		case GPS_SEARCH_STOP_FIX:
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
 			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
 				       true);
 			k_sleep(2000);
@@ -124,7 +127,7 @@ void blink(u32_t sleep_ms)
 					       led_pins[LED2].number, cnt % 2);
 				cnt++;
 
-				k_poll(events, 1, sleep_ms);
+				k_poll(events, 1, LED_PULSE_CYCLE);
 
 				if (state == LTE_CONNECTING) {
 					break;
@@ -149,7 +152,7 @@ void blink(u32_t sleep_ms)
 				gpio_pin_write(led_devs[LED3],
 					       led_pins[LED3].number, true);
 
-				k_poll(events, 1, sleep_ms);
+				k_poll(events, 1, LED_PULSE_CYCLE);
 
 				k_poll_signal_raise(&signal_led,
 						    PUBLISH_DATA_STOP);
@@ -176,12 +179,12 @@ void blink(u32_t sleep_ms)
 	}
 }
 
-void blink1(void)
+void led_work(void)
 {
-	blink(1000);
+	led_FSM();
 }
 
-K_THREAD_DEFINE(blink1_id, STACKSIZE, blink1, NULL, NULL, NULL, PRIORITY, 0,
+K_THREAD_DEFINE(led_work_id, STACKSIZE, led_work, NULL, NULL, NULL, PRIORITY, 0,
 		K_NO_WAIT);
 
 void gps_search_led_start()
