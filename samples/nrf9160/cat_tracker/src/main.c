@@ -280,7 +280,6 @@ passive:
 	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[1].sem, 0);
 	}
-	events[1].state = K_POLL_STATE_NOT_READY;
 #endif
 	goto gps_search;
 
@@ -297,6 +296,7 @@ gps_search:
 		set_gps_found(false);
 		publish_cloud();
 	}
+	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
 #else

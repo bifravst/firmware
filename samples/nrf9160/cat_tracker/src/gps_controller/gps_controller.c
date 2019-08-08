@@ -66,13 +66,10 @@ void gps_control_start()
 
 void gps_control_on_trigger(void)
 {
-	//k_delayed_work_cancel(&gps_work.work);
-
-	gps_search_led_stop_fix();
+	gps_control_stop();
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {
 		gps_work.fix_count = 0;
-		gps_control_stop();
 	}
 }
 
@@ -101,8 +98,6 @@ int gps_control_init(gps_trigger_handler_t handler)
 
 	gps_work.dev = gps_dev;
 	gps_work.type = GPS_WORK_STOP;
-
-	// k_work_submit(&gps_work.work);
 
 	LOG_DBG("GPS initialized\n");
 
