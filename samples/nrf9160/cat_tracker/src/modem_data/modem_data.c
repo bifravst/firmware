@@ -10,11 +10,8 @@
 #define TIME_LEN 28
 #define BAT_LEN 28
 
-s64_t update_time;
-
-s64_t epoch;
-
-s64_t multiplier = 1000;
+time_t update_time;
+time_t epoch;
 
 int get_time_info(char *datetime_string, int min, int max)
 {
@@ -85,15 +82,13 @@ int modem_time_get()
 	__ASSERT_NO_MSG(err == 0);
 
 	info.tm_year = get_time_info(modem_ts, 0, 1) + 2000 - 1900;
-	info.tm_mon = get_time_info(modem_ts, 3, 4);
+	info.tm_mon = get_time_info(modem_ts, 3, 4) - 1;
 	info.tm_mday = get_time_info(modem_ts, 6, 7);
 	info.tm_hour = get_time_info(modem_ts, 9, 10);
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
 
-	epoch = mktime(&info) * multiplier;
-
-	printk(" This is the EPOCH value: %llu\n", epoch);
+	epoch = mktime(&info);
 
 	update_time = k_uptime_get();
 
@@ -105,18 +100,18 @@ void set_current_time(struct gps_data gps_data)
 	struct tm info;
 
 	info.tm_year = gps_data.pvt.datetime.year - 1900;
-	info.tm_mon = gps_data.pvt.datetime.month;
+	info.tm_mon = gps_data.pvt.datetime.month - 1;
 	info.tm_mday = gps_data.pvt.datetime.day;
 	info.tm_hour = gps_data.pvt.datetime.hour;
 	info.tm_min = gps_data.pvt.datetime.minute;
 	info.tm_sec = gps_data.pvt.datetime.seconds;
 
-	epoch = mktime(&info) * multiplier;
+	epoch = mktime(&info);
 
 	update_time = k_uptime_get();
 }
 
-long int get_current_time()
+time_t get_current_time()
 {
-	return epoch + k_uptime_get() - update_time;
+	return (epoch * (time_t)1000) + k_uptime_get() - update_time;
 }
