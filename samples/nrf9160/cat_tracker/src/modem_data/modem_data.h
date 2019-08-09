@@ -16,6 +16,8 @@ time_t get_current_time();
 
 void set_current_time(struct gps_data gps_data);
 
+void get_modem_info();
+
 #ifdef __cplusplus
 }
 #endif
