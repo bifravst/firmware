@@ -2,6 +2,7 @@
 #define MODEM_DATA_H__
 
 #include <gps.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,7 +12,7 @@ int request_battery_status();
 
 int modem_time_get();
 
-long int get_current_time();
+time_t get_current_time();
 
 void set_current_time(struct gps_data gps_data);
 
