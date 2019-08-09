@@ -270,7 +270,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(gps_obj, "ts",
-					       sync_data->acc_timestamp);
+					       sync_data->gps_timestamp);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
@@ -289,7 +289,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(gps_obj, "ts",
-					       sync_data->acc_timestamp);
+					       sync_data->gps_timestamp);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 	}
