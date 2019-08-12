@@ -4,6 +4,7 @@
 #include <string.h>
 #include <zephyr.h>
 #include <zephyr/types.h>
+#include <modem_data.h>
 
 #include "cJSON.h"
 #include "cJSON_os.h"
@@ -170,6 +171,50 @@ get_data:
 	}
 end:
 	cJSON_Delete(root_obj);
+	return 0;
+}
+
+int encode_modem_data(struct Transmit_data *output)
+{
+	int err;
+	char *buffer;
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *state_obj = cJSON_CreateObject();
+	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *modem_data_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
+	    modem_data_obj == NULL) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(modem_data_obj);
+		return -ENOMEM;
+	}
+
+	err = get_modem_info(modem_data_obj);
+	if (err != 0) {
+		printk("Error getting modem data: %d\n", err);
+	}
+
+	err = json_add_obj(reported_obj, "modem_data", modem_data_obj);
+	err += json_add_obj(state_obj, "reported", reported_obj);
+	err += json_add_obj(root_obj, "state", state_obj);
+
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(modem_data_obj);
+		return -EAGAIN;
+	}
+
+	buffer = cJSON_Print(modem_data_obj);
+	output->buf = buffer;
+	output->len = strlen(buffer);
+
+	cJSON_Delete(root_obj);
+
 	return 0;
 }
 

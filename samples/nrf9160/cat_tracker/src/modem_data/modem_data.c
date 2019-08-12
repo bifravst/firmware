@@ -122,38 +122,39 @@ time_t get_current_time()
 	return (epoch * (time_t)1000) + k_uptime_get() - update_time;
 }
 
-void get_modem_info()
+int get_modem_info(cJSON *modem_data_obj)
 {
 	int err;
-	char *string = NULL;
-	cJSON *root_obj = cJSON_CreateObject();
 
 	err = modem_info_init();
 	if (err != 0) {
 		printk("Error initializing modem_info module: %d\n", err);
+		return err;
 	}
 
 	err = modem_info_params_init(&modem_param);
 	if (err != 0) {
 		printk("Error initializing modem_info structure: %d\n", err);
+		return err;
 	}
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
 		printk("Error getting modem_info: %d\n", err);
+		return err;
 	}
 
-	err = modem_info_json_object_encode(&modem_param, root_obj);
+	err = modem_info_json_object_encode(&modem_param, modem_data_obj);
 	if (err != 0) {
 		printk("Error encoding modem_info: %d\n", err);
+		return err;
 	}
 
-	string = cJSON_Print(root_obj);
-	if (string == NULL) {
-		printk("Failed to print modem_info_json.\n");
+	err = modem_info_uninit();
+	if (err != 0) {
+		printk("Error uninitializing modem_info: %d\n", err);
+		return err;
 	}
 
-	printk("Modem data %s\n", string);
-
-	cJSON_Delete(root_obj);
+	return 0;
 }

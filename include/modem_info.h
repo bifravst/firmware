@@ -63,7 +63,8 @@ enum modem_info {
 /**@brief LTE parameter data. **/
 struct lte_param {
 	u16_t value; /**< The retrieved value. */
-	char value_string[MODEM_INFO_MAX_RESPONSE_SIZE]; /**< The retrieved value in string format. */
+	char value_string
+		[MODEM_INFO_MAX_RESPONSE_SIZE]; /**< The retrieved value in string format. */
 	char *data_name; /**< The name of the information type. */
 	enum modem_info type; /**< The information type. */
 };
@@ -76,7 +77,8 @@ struct network_param {
 	struct lte_param current_operator; /**< Current operator. */
 	struct lte_param mcc; /**< Mobile country code. */
 	struct lte_param mnc; /**< Mobile network code. */
-	struct lte_param cellid_hex; /**< Cell ID of the device (in HEX format). */
+	struct lte_param
+		cellid_hex; /**< Cell ID of the device (in HEX format). */
 	struct lte_param ip_address; /**< IP address of the device. */
 	struct lte_param ue_mode; /**< Current mode. */
 	struct lte_param lte_mode; /**< LTE-M support mode. */
@@ -108,8 +110,8 @@ struct device_param {
 /**@brief Modem parameters. */
 struct modem_param_info {
 	struct network_param network; /**< Network parameters. */
-	struct sim_param     sim; /**< SIM card parameters. */
-	struct device_param  device;/**< Device parameters. */
+	struct sim_param sim; /**< SIM card parameters. */
+	struct device_param device; /**< Device parameters. */
 };
 
 /** @brief Initialize the modem information module.
@@ -119,6 +121,13 @@ struct modem_param_info {
  */
 int modem_info_init(void);
 
+/** @brief Uninitialize the modem information module.
+ *
+ * @retval 0 If the operation was successful.
+ *           Otherwise, a (negative) error code is returned.
+ */
+
+int modem_info_uninit(void);
 
 /** @brief Initialize the structure that stores modem information.
  *
@@ -200,7 +209,6 @@ enum at_param_type modem_info_type_get(enum modem_info info);
  */
 int modem_info_json_string_encode(struct modem_param_info *modem_param,
 				  char *buf);
-
 
 /** @brief Encode the modem parameters.
  *

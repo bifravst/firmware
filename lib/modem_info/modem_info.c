@@ -126,147 +126,147 @@ struct modem_info_data {
 };
 
 static const struct modem_info_data rsrp_data = {
-	.cmd		= AT_CMD_CESQ,
-	.data_name	= RSRP_DATA_NAME,
-	.param_index	= RSRP_PARAM_INDEX,
-	.param_count	= RSRP_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_CESQ,
+	.data_name = RSRP_DATA_NAME,
+	.param_index = RSRP_PARAM_INDEX,
+	.param_count = RSRP_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data band_data = {
-	.cmd		= AT_CMD_CURRENT_BAND,
-	.data_name	= CUR_BAND_DATA_NAME,
-	.param_index	= BAND_PARAM_INDEX,
-	.param_count	= BAND_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_CURRENT_BAND,
+	.data_name = CUR_BAND_DATA_NAME,
+	.param_index = BAND_PARAM_INDEX,
+	.param_count = BAND_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data band_sup_data = {
-	.cmd		= AT_CMD_SUPPORTED_BAND,
-	.data_name	= SUP_BAND_DATA_NAME,
-	.param_index	= BAND_PARAM_INDEX,
-	.param_count	= BAND_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_SUPPORTED_BAND,
+	.data_name = SUP_BAND_DATA_NAME,
+	.param_index = BAND_PARAM_INDEX,
+	.param_count = BAND_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data mode_data = {
-	.cmd		= AT_CMD_CURRENT_MODE,
-	.data_name	= UE_MODE_DATA_NAME,
-	.param_index	= MODE_PARAM_INDEX,
-	.param_count	= MODE_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_CURRENT_MODE,
+	.data_name = UE_MODE_DATA_NAME,
+	.param_index = MODE_PARAM_INDEX,
+	.param_count = MODE_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data operator_data = {
-	.cmd		= AT_CMD_CURRENT_OP,
-	.data_name	= OPERATOR_DATA_NAME,
-	.param_index	= OPERATOR_PARAM_INDEX,
-	.param_count	= OPERATOR_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_CURRENT_OP,
+	.data_name = OPERATOR_DATA_NAME,
+	.param_index = OPERATOR_PARAM_INDEX,
+	.param_count = OPERATOR_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data mcc_data = {
-	.cmd		= AT_CMD_CURRENT_OP,
-	.data_name	= MCC_DATA_NAME,
-	.param_index	= OPERATOR_PARAM_INDEX,
-	.param_count	= OPERATOR_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_CURRENT_OP,
+	.data_name = MCC_DATA_NAME,
+	.param_index = OPERATOR_PARAM_INDEX,
+	.param_count = OPERATOR_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data mnc_data = {
-	.cmd		= AT_CMD_CURRENT_OP,
-	.data_name	= MNC_DATA_NAME,
-	.param_index	= OPERATOR_PARAM_INDEX,
-	.param_count	= OPERATOR_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_CURRENT_OP,
+	.data_name = MNC_DATA_NAME,
+	.param_index = OPERATOR_PARAM_INDEX,
+	.param_count = OPERATOR_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data cellid_data = {
-	.cmd		= AT_CMD_NETWORK_STATUS,
-	.data_name	= CELLID_DATA_NAME,
-	.param_index	= CELLID_PARAM_INDEX,
-	.param_count	= CELLID_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_NETWORK_STATUS,
+	.data_name = CELLID_DATA_NAME,
+	.param_index = CELLID_PARAM_INDEX,
+	.param_count = CELLID_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data area_data = {
-	.cmd		= AT_CMD_NETWORK_STATUS,
-	.data_name	= AREA_CODE_DATA_NAME,
-	.param_index	= AREA_CODE_PARAM_INDEX,
-	.param_count	= AREA_CODE_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_NETWORK_STATUS,
+	.data_name = AREA_CODE_DATA_NAME,
+	.param_index = AREA_CODE_PARAM_INDEX,
+	.param_count = AREA_CODE_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data ip_data = {
-	.cmd		= AT_CMD_PDP_CONTEXT,
-	.data_name	= IP_ADDRESS_DATA_NAME,
-	.param_index	= IP_ADDRESS_PARAM_INDEX,
-	.param_count	= IP_ADDRESS_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_PDP_CONTEXT,
+	.data_name = IP_ADDRESS_DATA_NAME,
+	.param_index = IP_ADDRESS_PARAM_INDEX,
+	.param_count = IP_ADDRESS_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data uicc_data = {
-	.cmd		= AT_CMD_UICC_STATE,
-	.data_name	= UICC_DATA_NAME,
-	.param_index	= UICC_PARAM_INDEX,
-	.param_count	= UICC_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_UICC_STATE,
+	.data_name = UICC_DATA_NAME,
+	.param_index = UICC_PARAM_INDEX,
+	.param_count = UICC_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data battery_data = {
-	.cmd		= AT_CMD_VBAT,
-	.data_name	= BATTERY_DATA_NAME,
-	.param_index	= VBAT_PARAM_INDEX,
-	.param_count	= VBAT_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_VBAT,
+	.data_name = BATTERY_DATA_NAME,
+	.param_index = VBAT_PARAM_INDEX,
+	.param_count = VBAT_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data temp_data = {
-	.cmd		= AT_CMD_TEMP,
-	.data_name	= TEMPERATURE_DATA_NAME,
-	.param_index	= TEMP_PARAM_INDEX,
-	.param_count	= TEMP_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_TEMP,
+	.data_name = TEMPERATURE_DATA_NAME,
+	.param_index = TEMP_PARAM_INDEX,
+	.param_count = TEMP_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data fw_data = {
-	.cmd		= AT_CMD_FW_VERSION,
-	.data_name	= MODEM_FW_DATA_NAME,
-	.param_index	= MODEM_FW_PARAM_INDEX,
-	.param_count	= MODEM_FW_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_FW_VERSION,
+	.data_name = MODEM_FW_DATA_NAME,
+	.param_index = MODEM_FW_PARAM_INDEX,
+	.param_count = MODEM_FW_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data iccid_data = {
-	.cmd		= AT_CMD_ICCID,
-	.data_name	= ICCID_DATA_NAME,
-	.param_index	= ICCID_PARAM_INDEX,
-	.param_count	= ICCID_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_ICCID,
+	.data_name = ICCID_DATA_NAME,
+	.param_index = ICCID_PARAM_INDEX,
+	.param_count = ICCID_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data lte_mode_data = {
-	.cmd		= AT_CMD_SYSTEMMODE,
-	.data_name	= LTE_MODE_DATA_NAME,
-	.param_index	= LTE_MODE_PARAM_INDEX,
-	.param_count	= SYSTEMMODE_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_SYSTEMMODE,
+	.data_name = LTE_MODE_DATA_NAME,
+	.param_index = LTE_MODE_PARAM_INDEX,
+	.param_count = SYSTEMMODE_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data nbiot_mode_data = {
-	.cmd		= AT_CMD_SYSTEMMODE,
-	.data_name	= NBIOT_MODE_DATA_NAME,
-	.param_index	= NBIOT_MODE_PARAM_INDEX,
-	.param_count	= SYSTEMMODE_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_SYSTEMMODE,
+	.data_name = NBIOT_MODE_DATA_NAME,
+	.param_index = NBIOT_MODE_PARAM_INDEX,
+	.param_count = SYSTEMMODE_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data gps_mode_data = {
-	.cmd		= AT_CMD_SYSTEMMODE,
-	.data_name	= GPS_MODE_DATA_NAME,
-	.param_index	= GPS_MODE_PARAM_INDEX,
-	.param_count	= SYSTEMMODE_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_NUM_SHORT,
+	.cmd = AT_CMD_SYSTEMMODE,
+	.data_name = GPS_MODE_DATA_NAME,
+	.param_index = GPS_MODE_PARAM_INDEX,
+	.param_count = SYSTEMMODE_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_NUM_SHORT,
 };
 
 static const struct modem_info_data imsi_data = {
@@ -294,22 +294,22 @@ static const struct modem_info_data date_time_data = {
 };
 
 static const struct modem_info_data *const modem_data[] = {
-	[MODEM_INFO_RSRP]	= &rsrp_data,
-	[MODEM_INFO_CUR_BAND]	= &band_data,
-	[MODEM_INFO_SUP_BAND]	= &band_sup_data,
-	[MODEM_INFO_UE_MODE]	= &mode_data,
-	[MODEM_INFO_OPERATOR]	= &operator_data,
-	[MODEM_INFO_MCC]	= &mcc_data,
-	[MODEM_INFO_MNC]	= &mnc_data,
-	[MODEM_INFO_AREA_CODE]	= &area_data,
-	[MODEM_INFO_CELLID]	= &cellid_data,
-	[MODEM_INFO_IP_ADDRESS]	= &ip_data,
-	[MODEM_INFO_UICC]	= &uicc_data,
-	[MODEM_INFO_BATTERY]	= &battery_data,
-	[MODEM_INFO_TEMP]	= &temp_data,
-	[MODEM_INFO_FW_VERSION]	= &fw_data,
-	[MODEM_INFO_ICCID]	= &iccid_data,
-	[MODEM_INFO_LTE_MODE]	= &lte_mode_data,
+	[MODEM_INFO_RSRP] = &rsrp_data,
+	[MODEM_INFO_CUR_BAND] = &band_data,
+	[MODEM_INFO_SUP_BAND] = &band_sup_data,
+	[MODEM_INFO_UE_MODE] = &mode_data,
+	[MODEM_INFO_OPERATOR] = &operator_data,
+	[MODEM_INFO_MCC] = &mcc_data,
+	[MODEM_INFO_MNC] = &mnc_data,
+	[MODEM_INFO_AREA_CODE] = &area_data,
+	[MODEM_INFO_CELLID] = &cellid_data,
+	[MODEM_INFO_IP_ADDRESS] = &ip_data,
+	[MODEM_INFO_UICC] = &uicc_data,
+	[MODEM_INFO_BATTERY] = &battery_data,
+	[MODEM_INFO_TEMP] = &temp_data,
+	[MODEM_INFO_FW_VERSION] = &fw_data,
+	[MODEM_INFO_ICCID] = &iccid_data,
+	[MODEM_INFO_LTE_MODE] = &lte_mode_data,
 	[MODEM_INFO_NBIOT_MODE] = &nbiot_mode_data,
 	[MODEM_INFO_GPS_MODE]   = &gps_mode_data,
 	[MODEM_INFO_IMSI]	= &imsi_data,
@@ -383,9 +383,7 @@ int modem_info_name_get(enum modem_info info, char *name)
 		return -EINVAL;
 	}
 
-	memcpy(name,
-		modem_data[info]->data_name,
-		len);
+	memcpy(name, modem_data[info]->data_name, len);
 
 	return len;
 }
@@ -393,7 +391,7 @@ int modem_info_name_get(enum modem_info info, char *name)
 int modem_info_short_get(enum modem_info info, u16_t *buf)
 {
 	int err;
-	char recv_buf[CONFIG_MODEM_INFO_BUFFER_SIZE] = {0};
+	char recv_buf[CONFIG_MODEM_INFO_BUFFER_SIZE] = { 0 };
 	int cmd_length = 0;
 
 	if (buf == NULL) {
@@ -404,10 +402,8 @@ int modem_info_short_get(enum modem_info info, u16_t *buf)
 		return -EINVAL;
 	}
 
-	err = at_cmd_write(modem_data[info]->cmd,
-			   recv_buf,
-			   CONFIG_MODEM_INFO_BUFFER_SIZE,
-			   NULL);
+	err = at_cmd_write(modem_data[info]->cmd, recv_buf,
+			   CONFIG_MODEM_INFO_BUFFER_SIZE, NULL);
 
 	if (err != 0) {
 		return -EIO;
@@ -419,8 +415,7 @@ int modem_info_short_get(enum modem_info info, u16_t *buf)
 		return err;
 	}
 
-	err = at_params_short_get(&m_param_list,
-				  modem_data[info]->param_index,
+	err = at_params_short_get(&m_param_list, modem_data[info]->param_index,
 				  buf);
 
 	if (err) {
@@ -442,10 +437,8 @@ int modem_info_string_get(enum modem_info info, char *buf)
 		return -EINVAL;
 	}
 
-	err = at_cmd_write(modem_data[info]->cmd,
-			  recv_buf,
-			  CONFIG_MODEM_INFO_BUFFER_SIZE,
-			  NULL);
+	err = at_cmd_write(modem_data[info]->cmd, recv_buf,
+			   CONFIG_MODEM_INFO_BUFFER_SIZE, NULL);
 
 	if (err != 0) {
 		return -EIO;
@@ -536,7 +529,12 @@ int modem_info_init(void)
 {
 	/* Init at_cmd_parser storage module */
 	int err = at_params_list_init(&m_param_list,
-				CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
-
+				      CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
 	return err;
+}
+
+int modem_info_uninit(void)
+{
+	at_params_list_free(&m_param_list);
+	return 0;
 }
