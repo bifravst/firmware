@@ -47,9 +47,6 @@ config GPS_TRIGGER
 	bool
 	default GPS_SIM_TRIGGER if GPS_USE_SIM
 	
-config ENABLE_NRF9160_GPS
-	bool "Enable ENABLE_NRF9160_GPS"
-	default y
 
 endmenu	# GPS
 

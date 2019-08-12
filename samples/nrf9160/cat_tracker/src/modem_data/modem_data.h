@@ -3,6 +3,7 @@
 
 #include <gps.h>
 #include <time.h>
+#include <cJSON.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,7 +17,7 @@ time_t get_current_time();
 
 void set_current_time(struct gps_data gps_data);
 
-void get_modem_info();
+int get_modem_info(cJSON *modem_data_obj);
 
 #ifdef __cplusplus
 }
