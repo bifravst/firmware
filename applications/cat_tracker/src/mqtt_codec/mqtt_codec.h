@@ -9,8 +9,6 @@
 extern "C" {
 #endif
 
-/*This struct is too large, can be divided up */
-
 struct Sync_data {
 	int bat_voltage;
 	s64_t bat_timestamp;

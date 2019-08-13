@@ -1,15 +1,12 @@
 #include <mqtt_codec.h>
-
 #include <stdbool.h>
 #include <string.h>
 #include <zephyr.h>
 #include <zephyr/types.h>
 #include <modem_data.h>
 #include <modem_info.h>
-
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "cJSON.h"
 #include "cJSON_os.h"
 

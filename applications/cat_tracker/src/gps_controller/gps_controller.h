@@ -1,14 +1,3 @@
-/*
- * Copyright (c) 2019 Nordic Semiconductor ASA
- *
- * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
- */
-
-/**@file
- *
- * @brief   GPS module for asset tracker
- */
-
 #ifndef GPS_CONTROLLER_H__
 #define GPS_CONTROLLER_H__
 
