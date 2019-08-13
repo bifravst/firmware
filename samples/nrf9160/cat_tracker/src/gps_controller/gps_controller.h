@@ -23,9 +23,9 @@ int gps_control_init(gps_trigger_handler_t handler);
 
 void gps_control_on_trigger(void);
 
-void gps_control_stop();
+void gps_control_stop(void);
 
-void gps_control_start();
+void gps_control_start(void);
 
 #ifdef __cplusplus
 }

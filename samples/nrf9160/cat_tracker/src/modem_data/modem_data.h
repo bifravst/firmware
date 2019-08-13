@@ -17,10 +17,11 @@ time_t get_current_time();
 
 void set_current_time(struct gps_data gps_data);
 
-int get_modem_info(cJSON *modem_data_obj);
+struct modem_param_info *get_modem_info();
+
+int get_rsrp_values();
 
 #ifdef __cplusplus
 }
 #endif
-
 #endif

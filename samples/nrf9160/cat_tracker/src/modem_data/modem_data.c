@@ -13,6 +13,7 @@
 
 #define TIME_LEN 28
 #define BAT_LEN 28
+#define RSRP_LEN 50
 
 time_t update_time;
 time_t epoch;
@@ -122,39 +123,60 @@ time_t get_current_time()
 	return (epoch * (time_t)1000) + k_uptime_get() - update_time;
 }
 
-int get_modem_info(cJSON *modem_data_obj)
+struct modem_param_info *get_modem_info()
 {
 	int err;
 
 	err = modem_info_init();
 	if (err != 0) {
 		printk("Error initializing modem_info module: %d\n", err);
-		return err;
 	}
 
 	err = modem_info_params_init(&modem_param);
 	if (err != 0) {
 		printk("Error initializing modem_info structure: %d\n", err);
-		return err;
 	}
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
 		printk("Error getting modem_info: %d\n", err);
-		return err;
-	}
-
-	err = modem_info_json_object_encode(&modem_param, modem_data_obj);
-	if (err != 0) {
-		printk("Error encoding modem_info: %d\n", err);
-		return err;
 	}
 
 	err = modem_info_uninit();
 	if (err != 0) {
 		printk("Error uninitializing modem_info: %d\n", err);
-		return err;
 	}
 
-	return 0;
+	return &modem_param;
+}
+
+int get_rsrp_values()
+{
+	int err;
+	char rsrp_level[50];
+	int at_socket_fd;
+	int bytes_written;
+	int bytes_read;
+	char rsrp_buf[RSRP_LEN + 1];
+
+	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
+	__ASSERT_NO_MSG(at_socket_fd >= 0);
+
+	bytes_written = nrf_write(at_socket_fd, "AT+CESQ", 7);
+	__ASSERT_NO_MSG(bytes_written == 7);
+
+	bytes_read = nrf_read(at_socket_fd, rsrp_buf, RSRP_LEN);
+	__ASSERT_NO_MSG(bytes_read == RSRP_LEN);
+	rsrp_buf[RSRP_LEN] = 0;
+
+	for (int i = 25; i < strlen(rsrp_buf); i++) {
+		rsrp_level[i - 25] = rsrp_buf[i];
+	}
+
+	printk("%s\n", rsrp_buf);
+
+	err = nrf_close(at_socket_fd);
+	__ASSERT_NO_MSG(err == 0);
+
+	return atoi(rsrp_level);
 }

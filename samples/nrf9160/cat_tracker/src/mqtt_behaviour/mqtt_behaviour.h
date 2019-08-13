@@ -42,7 +42,7 @@ void data_print(u8_t *prefix, u8_t *data, size_t len);
 int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 		 size_t len, u8_t *topic);
 
-int subscribe();
+int subscribe(void);
 
 int publish_get_payload(struct mqtt_client *c, u8_t *write_buf, size_t length);
 
@@ -65,5 +65,4 @@ int publish_data(bool syncronization, bool pub_config);
 #ifdef __cplusplus
 }
 #endif
-
 #endif

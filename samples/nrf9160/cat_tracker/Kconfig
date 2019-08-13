@@ -47,7 +47,6 @@ config GPS_TRIGGER
 	bool
 	default GPS_SIM_TRIGGER if GPS_USE_SIM
 	
-
 endmenu	# GPS
 
 config CLOUD_CERT_SEC_TAG

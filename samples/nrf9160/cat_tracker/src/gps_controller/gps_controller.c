@@ -50,14 +50,14 @@ static void gps_work_handler(struct k_work *work)
 	}
 }
 
-void gps_control_stop()
+void gps_control_stop(void)
 {
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
 	gps_search_led_stop();
 }
 
-void gps_control_start()
+void gps_control_start(void)
 {
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);

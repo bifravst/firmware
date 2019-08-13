@@ -52,7 +52,7 @@ static const struct gpio_pin led_pins[] = {
 
 static struct device *led_devs[ARRAY_SIZE(led_pins)];
 
-void led_FSM()
+void led_FSM(void)
 {
 	int err, cnt = 0;
 
@@ -119,6 +119,7 @@ void led_FSM()
 			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
 				       false);
 			k_poll(events, 1, K_FOREVER);
+			break;
 
 		case LTE_CONNECTING:
 
@@ -173,7 +174,7 @@ void led_FSM()
 			break;
 
 		default:
-			printk("Unknown state \n");
+			printk("Unknown state\n");
 			break;
 		}
 	}
@@ -187,32 +188,32 @@ void led_work(void)
 K_THREAD_DEFINE(led_work_id, STACKSIZE, led_work, NULL, NULL, NULL, PRIORITY, 0,
 		K_NO_WAIT);
 
-void gps_search_led_start()
+void gps_search_led_start(void)
 {
 	k_poll_signal_raise(&signal_led, GPS_SEARCH);
 }
 
-void gps_search_led_stop()
+void gps_search_led_stop(void)
 {
 	k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP);
 }
 
-void gps_search_led_stop_fix()
+void gps_search_led_stop_fix(void)
 {
 	k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP_FIX);
 }
 
-void lte_connecting_led_start()
+void lte_connecting_led_start(void)
 {
 	k_poll_signal_raise(&signal_led, LTE_CONNECTING);
 }
 
-void lte_connecting_led_stop()
+void lte_connecting_led_stop(void)
 {
 	k_poll_signal_raise(&signal_led, LTE_CONNECTED);
 }
 
-void publish_data_led()
+void publish_data_led(void)
 {
 	k_poll_signal_raise(&signal_led, PUBLISH_DATA);
 }

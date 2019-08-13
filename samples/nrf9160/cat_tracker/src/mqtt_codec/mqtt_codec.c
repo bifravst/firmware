@@ -5,6 +5,10 @@
 #include <zephyr.h>
 #include <zephyr/types.h>
 #include <modem_data.h>
+#include <modem_info.h>
+
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "cJSON.h"
 #include "cJSON_os.h"
@@ -63,6 +67,18 @@ static int json_add_DoubleArray(cJSON *parent, const char *str, double *item)
 static cJSON *json_object_decode(cJSON *obj, const char *str)
 {
 	return obj ? cJSON_GetObjectItem(obj, str) : NULL;
+}
+
+static int json_add_str(cJSON *parent, const char *str, const char *item)
+{
+	cJSON *json_str;
+
+	json_str = cJSON_CreateString(item);
+	if (json_str == NULL) {
+		return -ENOMEM;
+	}
+
+	return json_add_obj(parent, str, json_str);
 }
 
 int decode_response(char *input, struct Sync_data *sync_data)
@@ -174,30 +190,108 @@ end:
 	return 0;
 }
 
-int encode_modem_data(struct Transmit_data *output)
+int encode_modem_data(struct Transmit_data *output, bool syncronization)
 {
 	int err;
 	char *buffer;
+	int rsrp;
+	struct modem_param_info *modem_info;
+
+	static char nw_mode[50];
+	static char lte_string[] = "LTE-M";
+	static char nbiot_string[] = "NB-IoT";
+	static char gps_string[] = " GPS";
+
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
-	cJSON *modem_data_obj = cJSON_CreateObject();
+	cJSON *static_m_data = cJSON_CreateObject();
+	cJSON *static_m_data_v = cJSON_CreateObject();
+	cJSON *dynamic_m_data = cJSON_CreateObject();
+	cJSON *dynamic_m_data_v = cJSON_CreateObject();
 
 	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
-	    modem_data_obj == NULL) {
+	    static_m_data == NULL || static_m_data_v == NULL ||
+	    dynamic_m_data == NULL || dynamic_m_data_v == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
-		cJSON_Delete(modem_data_obj);
+		cJSON_Delete(static_m_data);
+		cJSON_Delete(static_m_data_v);
+		cJSON_Delete(dynamic_m_data);
+		cJSON_Delete(dynamic_m_data_v);
 		return -ENOMEM;
 	}
 
-	err = get_modem_info(modem_data_obj);
-	if (err != 0) {
-		printk("Error getting modem data: %d\n", err);
+	modem_info = get_modem_info();
+
+	rsrp = get_rsrp_values();
+
+	if (modem_info->network.lte_mode.value) {
+		strcat(nw_mode, lte_string);
+	} else {
+		strcat(nw_mode, nbiot_string);
 	}
 
-	err = json_add_obj(reported_obj, "modem_data", modem_data_obj);
+	if (modem_info->network.gps_mode.value) {
+		strcat(nw_mode, gps_string);
+	}
+
+	err = json_add_number(static_m_data_v, "band",
+			      modem_info->network.current_band.value);
+
+	err += json_add_str(static_m_data_v, "nw", nw_mode);
+
+	err += json_add_str(static_m_data_v, "iccid",
+			    modem_info->sim.iccid.value_string);
+
+	err += json_add_str(static_m_data_v, "modV",
+			    modem_info->device.modem_fw.value_string);
+
+	err += json_add_str(static_m_data_v, "brdV", modem_info->device.board);
+
+	err += json_add_str(static_m_data_v, "appV",
+			    modem_info->device.app_version);
+
+	err += json_add_number(dynamic_m_data_v, "rsrp", rsrp);
+
+	err += json_add_number(dynamic_m_data_v, "area",
+			       modem_info->network.area_code.value);
+
+	err += json_add_number(
+		dynamic_m_data_v, "mccmnc",
+		atoi(modem_info->network.current_operator.value_string));
+
+	err += json_add_number(dynamic_m_data_v, "cell",
+			       modem_info->network.cellid_dec);
+
+	err += json_add_str(dynamic_m_data_v, "ip",
+			    modem_info->network.ip_address.value_string);
+
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(static_m_data);
+		cJSON_Delete(static_m_data_v);
+		cJSON_Delete(dynamic_m_data);
+		cJSON_Delete(dynamic_m_data_v);
+		return -ENOMEM;
+	}
+
+	err += json_add_obj(static_m_data, "v", static_m_data_v);
+	err += json_add_number(static_m_data, "ts", get_current_time());
+
+	err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
+	err += json_add_number(dynamic_m_data, "ts", get_current_time());
+
+	if (syncronization) {
+		err += json_add_obj(reported_obj, "dev", static_m_data);
+		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
+	} else {
+		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
+	}
+
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
@@ -205,11 +299,14 @@ int encode_modem_data(struct Transmit_data *output)
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
-		cJSON_Delete(modem_data_obj);
+		cJSON_Delete(static_m_data);
+		cJSON_Delete(static_m_data_v);
+		cJSON_Delete(dynamic_m_data);
+		cJSON_Delete(dynamic_m_data_v);
 		return -EAGAIN;
 	}
 
-	buffer = cJSON_Print(modem_data_obj);
+	buffer = cJSON_Print(root_obj);
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
@@ -374,7 +471,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	return 0;
 }
 
-bool check_config_change()
+bool check_config_change(void)
 {
 	return change_config;
 }

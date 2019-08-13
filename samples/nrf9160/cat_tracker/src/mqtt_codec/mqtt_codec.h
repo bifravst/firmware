@@ -47,9 +47,9 @@ int decode_response(char *input, struct Sync_data *sync_data);
 
 int encode_message(struct Transmit_data *output, struct Sync_data *sync_data);
 
-int encode_modem_data(struct Transmit_data *output);
+int encode_modem_data(struct Transmit_data *output, bool syncronization);
 
-bool check_config_change();
+bool check_config_change(void);
 
 #ifdef __cplusplus
 }
