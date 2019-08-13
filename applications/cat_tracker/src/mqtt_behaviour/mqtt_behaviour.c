@@ -18,7 +18,7 @@
 struct Sync_data sync_data = { .gps_timeout = 180,
 			       .active = false,
 			       .active_wait = 60,
-			       .passive_wait = 60,
+			       .passive_wait = 300,
 			       .movement_timeout = 3600,
 			       .accel_threshold = 100,
 			       .gps_found = false };
