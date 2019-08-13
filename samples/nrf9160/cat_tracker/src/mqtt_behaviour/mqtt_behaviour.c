@@ -264,7 +264,7 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	return mqtt_publish(c, &param);
 }
 
-int subscribe()
+int subscribe(void)
 {
 	const struct mqtt_subscription_list subscription_list = {
 		.list = (struct mqtt_topic *)&cc_rx_list,
@@ -555,70 +555,78 @@ int publish_data(bool syncronization, bool pub_config)
 		printk("Could not connect to client\n");
 	}
 
-	publish_data_led();
+	if (connected) {
+		publish_data_led();
 
-	if (syncronization) {
-		transmit_data.buf = EMPTY_STRING;
-		transmit_data.len = strlen(transmit_data.buf);
-		transmit_data.topic = get_topic;
-	} else {
-		err = encode_message(&transmit_data, &sync_data);
-		if (err != 0) {
-			printk("ERROR when enconding message: %d\n", err);
+		if (syncronization) {
+			transmit_data.buf = EMPTY_STRING;
+			transmit_data.len = strlen(transmit_data.buf);
+			transmit_data.topic = get_topic;
+		} else {
+			err = encode_message(&transmit_data, &sync_data);
+			if (err != 0) {
+				printk("ERROR when enconding message: %d\n",
+				       err);
+			}
+			transmit_data.topic = update_topic;
 		}
-		transmit_data.topic = update_topic;
-	}
 
-	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-			   transmit_data.len, transmit_data.topic);
-	if (err != 0) {
-		printk("Could not publish data: %d\n", err);
-	}
-
-	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-	if (err != 0) {
-		printk("Could not process data broker: %d\n", err);
-	}
-
-	if (check_config_change()) {
-		err = encode_message(&transmit_data, &sync_data);
+		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				   transmit_data.buf, transmit_data.len,
+				   transmit_data.topic);
 		if (err != 0) {
-			printk("ERROR when enconding message: %d\n", err);
-		}
-		transmit_data.topic = update_topic;
-
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			printk("Could not publish configuration update: %d\n",
-			       err);
+			printk("Could not publish data: %d\n", err);
 		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		if (err != 0) {
 			printk("Could not process data broker: %d\n", err);
 		}
-	}
 
-	if (pub_config) {
-		err = encode_modem_data(&transmit_data);
-		if (err != 0) {
-			printk("ERROR when enconding modem data: %d\n", err);
+		if (check_config_change()) {
+			err = encode_message(&transmit_data, &sync_data);
+			if (err != 0) {
+				printk("ERROR when enconding message: %d\n",
+				       err);
+			}
+			transmit_data.topic = update_topic;
+
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				     transmit_data.buf, transmit_data.len,
+				     transmit_data.topic);
+			if (err != 0) {
+				printk("Could not publish configuration update: %d\n",
+				       err);
+			}
+
+			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			if (err != 0) {
+				printk("Could not process data broker: %d\n",
+				       err);
+			}
 		}
-		transmit_data.topic = update_topic;
 
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			printk("Could not publish configuration update: %d\n",
-			       err);
-		}
+		if (pub_config) {
+			err = encode_modem_data(&transmit_data, syncronization);
+			if (err != 0) {
+				printk("ERROR when enconding modem data: %d\n",
+				       err);
+			}
+			transmit_data.topic = update_topic;
 
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			printk("Could not process data broker: %d\n", err);
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				     transmit_data.buf, transmit_data.len,
+				     transmit_data.topic);
+			if (err != 0) {
+				printk("Could not publish configuration update: %d\n",
+				       err);
+			}
+
+			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			if (err != 0) {
+				printk("Could not process data broker: %d\n",
+				       err);
+			}
 		}
 	}
 

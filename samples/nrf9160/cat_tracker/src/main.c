@@ -108,8 +108,8 @@ static void lte_connect(void)
 
 	if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
 		/* Do nothing, modem is already turned on
-			* and connected.
-			*/
+		 * and connected.
+		 */
 	} else {
 		int err;
 
@@ -232,6 +232,7 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 static void adxl362_init(void)
 {
 	struct device *dev = device_get_binding(DT_INST_0_ADI_ADXL362_LABEL);
+
 	if (dev == NULL) {
 		printk("Device get binding device\n");
 		return;
@@ -264,7 +265,7 @@ K_TIMER_DEFINE(mov_timer, movement_timer_handler, NULL);
 
 static void start_restart_mov_timer(void)
 {
-	k_timer_start(&mov_timer, K_SECONDS(check_gps_timeout()),
+	k_timer_start(&mov_timer, K_SECONDS(check_mov_timeout()),
 		      K_SECONDS(check_mov_timeout()));
 }
 
@@ -283,6 +284,8 @@ void main(void)
 	gps_control_init(gps_control_handler);
 
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_CFG);
+
+	start_restart_mov_timer();
 
 check_mode:
 	if (check_mode()) {
