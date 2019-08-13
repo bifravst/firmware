@@ -1,4 +1,5 @@
 #include <mqtt_behaviour.h>
+
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
@@ -16,9 +17,9 @@
 #define EMPTY_STRING ""
 
 struct Sync_data sync_data = { .gps_timeout = 180,
-			       .active = false,
+			       .active = true,
 			       .active_wait = 60,
-			       .passive_wait = 300,
+			       .passive_wait = 60,
 			       .movement_timeout = 3600,
 			       .accel_threshold = 100,
 			       .gps_found = false };
@@ -204,11 +205,7 @@ double check_accel_thres(void)
 {
 	double accel_threshold_double;
 
-	if (sync_data.accel_threshold == 0) {
-		accel_threshold_double = 0;
-	} else {
-		accel_threshold_double = sync_data.accel_threshold / 10;
-	}
+	accel_threshold_double = sync_data.accel_threshold / 10;
 
 	return accel_threshold_double;
 }
@@ -547,7 +544,7 @@ int mqtt_enable(struct mqtt_client *client)
 	return 0;
 }
 
-int publish_data(bool syncronization, bool pub_modem_d)
+int publish_data(bool syncronization, bool pub_config)
 {
 	int err;
 	struct Transmit_data transmit_data;
@@ -608,7 +605,7 @@ int publish_data(bool syncronization, bool pub_modem_d)
 			}
 		}
 
-		if (pub_modem_d) {
+		if (pub_config) {
 			err = encode_modem_data(&transmit_data, syncronization);
 			if (err != 0) {
 				printk("ERROR when enconding modem data: %d\n",

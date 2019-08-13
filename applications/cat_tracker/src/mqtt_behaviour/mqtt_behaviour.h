@@ -4,6 +4,7 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
+
 #include <gps.h>
 
 #ifdef __cplusplus
@@ -59,7 +60,7 @@ void wait(int timeout);
 
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
-int publish_data(bool syncronization, bool pub_modem_d);
+int publish_data(bool syncronization, bool pub_config);
 
 #ifdef __cplusplus
 }

@@ -7,11 +7,12 @@
 #include <time.h>
 #include <nrf_socket.h>
 #include <modem_info.h>
+
 #include "cJSON.h"
 #include "cJSON_os.h"
 
-#define TIME_LEN 50
-#define BAT_LEN 50
+#define TIME_LEN 28
+#define BAT_LEN 28
 #define RSRP_LEN 50
 
 time_t update_time;
@@ -168,9 +169,11 @@ int get_rsrp_values(void)
 	__ASSERT_NO_MSG(bytes_read == RSRP_LEN);
 	rsrp_buf[RSRP_LEN] = 0;
 
-	for (int i = 25; i < 28; i++) {
+	for (int i = 25; i < strlen(rsrp_buf); i++) {
 		rsrp_level[i - 25] = rsrp_buf[i];
 	}
+
+	printk("%s\n", rsrp_buf);
 
 	err = nrf_close(at_socket_fd);
 	__ASSERT_NO_MSG(err == 0);
