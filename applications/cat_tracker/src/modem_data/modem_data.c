@@ -31,7 +31,7 @@ int get_time_info(char *datetime_string, int min, int max)
 	return atoi(buf);
 }
 
-int request_battery_status()
+int request_battery_status(void)
 {
 	int err;
 	char battery_level[4];
@@ -61,7 +61,7 @@ int request_battery_status()
 	return atoi(battery_level);
 }
 
-int modem_time_get()
+int modem_time_get(void)
 {
 	int err;
 	int at_socket_fd;
@@ -118,12 +118,12 @@ void set_current_time(struct gps_data gps_data)
 	update_time = k_uptime_get();
 }
 
-time_t get_current_time()
+time_t get_current_time(void)
 {
 	return (epoch * (time_t)1000) + k_uptime_get() - update_time;
 }
 
-struct modem_param_info *get_modem_info()
+struct modem_param_info *get_modem_info(void)
 {
 	int err;
 
@@ -150,7 +150,7 @@ struct modem_param_info *get_modem_info()
 	return &modem_param;
 }
 
-int get_rsrp_values()
+int get_rsrp_values(void)
 {
 	int err;
 	char rsrp_level[50];

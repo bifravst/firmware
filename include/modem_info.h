@@ -64,7 +64,7 @@ enum modem_info {
 struct lte_param {
 	u16_t value; /**< The retrieved value. */
 	char value_string
-		[MODEM_INFO_MAX_RESPONSE_SIZE]; /**< The retrieved value in string format. */
+		[MODEM_INFO_MAX_RESPONSE_SIZE]; /**< Value in string format. */
 	char *data_name; /**< The name of the information type. */
 	enum modem_info type; /**< The information type. */
 };

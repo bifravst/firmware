@@ -282,9 +282,7 @@ void main(void)
 	cloud_configuration_init();
 	lte_connect();
 	gps_control_init(gps_control_handler);
-
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_CFG);
-
 	start_restart_mov_timer();
 
 check_mode:

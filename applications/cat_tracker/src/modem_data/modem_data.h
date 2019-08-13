@@ -9,17 +9,17 @@
 extern "C" {
 #endif
 
-int request_battery_status();
+int request_battery_status(void);
 
-int modem_time_get();
+int modem_time_get(void);
 
-time_t get_current_time();
+time_t get_current_time(void);
 
 void set_current_time(struct gps_data gps_data);
 
-struct modem_param_info *get_modem_info();
+struct modem_param_info *get_modem_info(void);
 
-int get_rsrp_values();
+int get_rsrp_values(void);
 
 #ifdef __cplusplus
 }

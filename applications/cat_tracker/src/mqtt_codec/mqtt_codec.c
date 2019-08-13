@@ -13,13 +13,13 @@
 #include "cJSON.h"
 #include "cJSON_os.h"
 
-bool change_gpst;
-bool change_active;
-bool change_active_wait;
-bool change_passive_wait;
-bool change_movement_timeout;
-bool change_accel_threshold;
-bool change_config;
+bool change_gpst = true;
+bool change_active = true;
+bool change_active_wait = true;
+bool change_passive_wait = true;
+bool change_movement_timeout = true;
+bool change_accel_threshold = true;
+bool change_config = true;
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {

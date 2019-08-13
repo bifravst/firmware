@@ -46,12 +46,12 @@ config GPS_DEV_NAME
 config GPS_TRIGGER
 	bool
 	default GPS_SIM_TRIGGER if GPS_USE_SIM
-	
+
 endmenu	# GPS
 
 config CLOUD_CERT_SEC_TAG
 	int "Secure tag fo TLS credentials"
-	default 1
+	default 42
 
 config MQTT_PUB_TOPIC
 	string "MQTT publish topic"

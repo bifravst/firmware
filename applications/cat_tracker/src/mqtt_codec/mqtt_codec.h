@@ -11,7 +11,7 @@ extern "C" {
 
 /*This struct is too large, can be divided up */
 
-typedef struct Sync_data {
+struct Sync_data {
 	int bat_voltage;
 	s64_t bat_timestamp;
 
@@ -34,8 +34,7 @@ typedef struct Sync_data {
 	int accel_threshold;
 
 	bool gps_found;
-
-} Sync_data;
+};
 
 struct Transmit_data {
 	char *buf;
@@ -54,5 +53,4 @@ bool check_config_change(void);
 #ifdef __cplusplus
 }
 #endif
-
 #endif

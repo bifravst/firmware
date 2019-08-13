@@ -16,13 +16,13 @@
 #define MAX_ITERATIONS 1
 #define EMPTY_STRING ""
 
-Sync_data sync_data = { .gps_timeout = 180,
-			.active = true,
-			.active_wait = 60,
-			.passive_wait = 60,
-			.movement_timeout = 3600,
-			.accel_threshold = 100,
-			.gps_found = false };
+struct Sync_data sync_data = { .gps_timeout = 180,
+			       .active = true,
+			       .active_wait = 60,
+			       .passive_wait = 60,
+			       .movement_timeout = 3600,
+			       .accel_threshold = 100,
+			       .gps_found = false };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -417,12 +417,11 @@ void broker_init(void)
 			printk("IPv4 Address found %s\n", ipv4_addr);
 
 			break;
-		} else {
-			printk("ai_addrlen = %u should be %u or %u\n",
-			       (unsigned int)addr->ai_addrlen,
-			       (unsigned int)sizeof(struct sockaddr_in),
-			       (unsigned int)sizeof(struct sockaddr_in6));
 		}
+		printk("ai_addrlen = %u should be %u or %u\n",
+		       (unsigned int)addr->ai_addrlen,
+		       (unsigned int)sizeof(struct sockaddr_in),
+		       (unsigned int)sizeof(struct sockaddr_in6));
 
 		addr = addr->ai_next;
 		break;
