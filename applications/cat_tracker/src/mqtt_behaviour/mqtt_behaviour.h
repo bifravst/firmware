@@ -4,7 +4,6 @@
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <lte_lc.h>
-
 #include <gps.h>
 
 #ifdef __cplusplus

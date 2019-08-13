@@ -7,7 +7,6 @@
 #include <time.h>
 #include <nrf_socket.h>
 #include <modem_info.h>
-
 #include "cJSON.h"
 #include "cJSON_os.h"
 
