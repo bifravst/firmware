@@ -1,0 +1,52 @@
+{
+  "name": "@bifravst/cat-tracker-fw",
+  "version": "0.0.0-development",
+  "description": "Cat Tracker Firmware for Thingy:91",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bifravst/cat-tracker-fw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bifravst/cat-tracker-fw/issues"
+  },
+  "homepage": "https://bifravst.github.io/",
+  "keywords": [
+    "Cloud",
+    "IoT",
+    "bifravst",
+    "AssetTracker",
+    "NordicSemiconductor"
+  ],
+  "author": "Nordic Semiconductor ASA | nordicsemi.no",
+  "license": "BSD-5-Clause-Nordic",
+  "devDependencies": {
+    "@commitlint/cli": "^8.1.0",
+    "@commitlint/config-angular": "^8.1.0",
+    "husky": "^3.0.1"
+  },
+  "husky": {
+    "hooks": {
+      "commit-msg": "commitlint -e"
+    }
+  },
+  "release": {
+    "branch": "saga",
+    "remoteTags": true,
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/github",
+        {
+          "assets": [
+            {
+              "path": "/root/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ",
+              "label": "Pre-build HEX file",
+              "name": "cat-tracker.hex"
+            }
+          ]
+        }
+      ]
+    ]
+  }
+}
