@@ -40,7 +40,7 @@
         {
           "assets": [
             {
-              "path": "/root/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ",
+              "path": "/root/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex",
               "label": "Pre-build HEX file",
               "name": "cat-tracker.hex"
             }
