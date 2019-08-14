@@ -1,7 +1,7 @@
 {
   "name": "@bifravst/cat-tracker-fw",
   "version": "0.0.0-development",
-  "description": "Cat Tracker Firmware for Thingy:91",
+  "description": "Cat Tracker Firmware",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bifravst/cat-tracker-fw.git"
