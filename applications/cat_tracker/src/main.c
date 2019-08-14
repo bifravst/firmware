@@ -34,68 +34,6 @@ struct k_poll_event events[2] = {
 					&accel_trig_sem, 0)
 };
 
-static void publish_cloud()
-{
-	int err;
-	err = publish_data(NORMAL_OPERATION);
-	if (err != 0) {
-		printk("Error publishing data: %d", err);
-	}
-}
-
-static void cloud_sync()
-{
-	int err;
-	err = publish_data(SYNCRONIZATION);
-	if (err != 0) {
-		printk("Error syncronizing with brokerr: %d", err);
-	}
-}
-
-static void gps_found_work_fn(struct k_work *work)
-{
-	set_gps_found(true);
-}
-
-static void gps_not_found_work_fn(struct k_work *work)
-{
-	set_gps_found(false);
-}
-
-static void gps_start_work_fn(struct k_work *work)
-{
-	gps_control_start();
-}
-
-static void gps_stop_work_fn(struct k_work *work)
-{
-	gps_control_stop();
-}
-
-static void get_modem_info_work_fn(struct k_work *work)
-{
-	attach_battery_data(request_battery_status());
-}
-
-static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
-{
-	static struct gps_data gps_data;
-
-	switch (trigger->type) {
-	case GPS_TRIG_FIX:
-		printk("gps control handler triggered!\n");
-		gps_control_on_trigger();
-		gps_sample_fetch(dev);
-		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		attach_gps_data(gps_data);
-		k_sem_give(events[0].sem);
-		break;
-
-	default:
-		break;
-	}
-}
-
 static void lte_connect(void)
 {
 	int err;
@@ -199,30 +137,6 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	}
 }
 
-static void button_handler(u32_t button_states, u32_t has_changed)
-{
-	u8_t btn_num;
-
-	while (has_changed) {
-		btn_num = 0;
-
-		for (u8_t i = 0; i < 32; i++) {
-			if (has_changed & BIT(i)) {
-				btn_num = i + 1;
-				break;
-			}
-		}
-
-		has_changed &= ~(1UL << (btn_num - 1));
-
-		if (has_changed == 0 || has_changed == 1) {
-			gps_control_stop(K_NO_WAIT);
-			set_gps_found(false);
-			k_sem_give(events[0].sem);
-		}
-	}
-}
-
 static void adxl362_init(void)
 {
 	struct device *dev = device_get_binding(DT_INST_0_ADI_ADXL362_LABEL);
@@ -267,12 +181,6 @@ void main(void)
 {
 	printk("The cat tracker has started\n");
 	adxl362_init();
-
-	err = dk_buttons_init(button_handler);
-	if (err != 0) {
-		printk("dk buttons not initialized correctly: %d\n", err);
-	}
-
 	cloud_configuration_init();
 	lte_connect();
 	gps_control_init(gps_control_handler);
@@ -315,57 +223,6 @@ gps_search:
 	events[0].state = K_POLL_STATE_NOT_READY;
 	start_restart_mov_timer();
 	k_sleep(K_SECONDS(check_active_wait(active)));
-
-#if defined(CONFIG_ENABLE_NRF9160_GPS)
-	gps_control_init(gps_control_handler);
-#endif
-
-	cloud_publish(NO_GPS_FIX, SYNCRONIZATION);
-
-check_mode:
-	if (check_mode()) {
-		active = true;
-		goto active;
-	} else {
-		active = false;
-		goto passive;
-	}
-
-active:
-	printk("ACTIVE MODE\n");
-	goto gps_search;
-
-passive:
-	printk("PASSIVE MODE\n");
-#if defined(CONFIG_ADXL362)
-	k_poll(events, 2, K_FOREVER);
-	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(events[1].sem, 0);
-	}
-#endif
-	goto gps_search;
-
-gps_search:
-#if defined(CONFIG_ENABLE_NRF9160_GPS)
-	gps_control_start();
-	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
-	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(events[0].sem, 0);
-		set_gps_found(true);
-		publish_cloud();
-	} else {
-		gps_control_stop(K_NO_WAIT);
-		set_gps_found(false);
-		publish_cloud();
-	}
-	events[1].state = K_POLL_STATE_NOT_READY;
-	events[0].state = K_POLL_STATE_NOT_READY;
-	k_sleep(K_SECONDS(check_active_wait(active)));
-#else
-	set_gps_found(false);
-	publish_cloud();
-	k_sleep(K_SECONDS(check_active_wait(active)));
-#endif
 
 	goto check_mode;
 }
