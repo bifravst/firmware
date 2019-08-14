@@ -31,7 +31,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - gcc-arm-none-eabi-7-2018-q2-update
+            - ncs-gcc-arm-none-eabi-7-2018-q2-update
       - run:
           name: GCC ARM Embed
           command: |
@@ -44,7 +44,7 @@ jobs:
       - save_cache:
           paths:
             - ~/ncs/gcc-arm-none-eabi-7-2018-q2-update
-          key: gcc-arm-none-eabi-7-2018-q2-update
+          key: ncs-gcc-arm-none-eabi-7-2018-q2-update
 
       - restore_cache:
           keys:
