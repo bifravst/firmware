@@ -40,12 +40,12 @@
         {
           "assets": [
             {
-              "path": "/root/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca20035ns.hex",
+              "path": "/root/ncs/cat-tracker-nrf9160_pca20035ns.hex",
               "label": "Pre-build HEX file for Thingy:91"
             },
             {
-              "path": "/root/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca10090ns.hex",
-              "label": "Pre-build HEX file for Thingy:91"
+              "path": "/root/ncs/cat-tracker-nrf9160_pca10090ns.hex",
+              "label": "Pre-build HEX file for nRF9160 DK"
             }
           ]
         }

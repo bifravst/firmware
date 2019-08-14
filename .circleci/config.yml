@@ -86,11 +86,11 @@ jobs:
           command: |
             cd ~/ncs/nrf/applications/cat_tracker
             west build -p auto -b nrf9160_pca20035ns
-            mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca20035ns.hex
-            sha256sum ~/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca20035ns.hex
+            mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/cat-tracker-nrf9160_pca20035ns.hex
+            sha256sum ~/ncs/cat-tracker-nrf9160_pca20035ns.hex
             west build -p auto -b nrf9160_pca10090ns
-            mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca10090ns.hex
-            sha256sum ~/ncs/nrf/applications/cat_tracker/build/zephyr/cat-tracker-nrf9160_pca10090ns.hex
+            mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/cat-tracker-nrf9160_pca10090ns.hex
+            sha256sum ~/ncs/cat-tracker-nrf9160_pca10090ns.hex
 
       - run:
           when: on_success
