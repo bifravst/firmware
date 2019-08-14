@@ -59,7 +59,7 @@ void wait(int timeout);
 
 int process_mqtt_and_sleep(struct mqtt_client *client, int timeout);
 
-int publish_data(bool syncronization, bool pub_config);
+int publish_data(bool syncronization, bool pub_modem_d);
 
 #ifdef __cplusplus
 }

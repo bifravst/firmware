@@ -16,9 +16,7 @@
 #define SYNCRONIZATION true
 #define NO_GPS_FIX false
 #define GPS_FIX true
-#define MODEM_DATA_SEND true
-#define INCLUDE_CFG true
-#define NOT_INCLUDE_CFG false
+#define INCLUDE_MOD_D true
 
 static bool active;
 
@@ -62,7 +60,7 @@ static void lte_connect(void)
 	}
 }
 
-static void cloud_publish(bool gps_fix, bool action, bool inc_config)
+static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 {
 	int err;
 
@@ -70,7 +68,7 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_config)
 
 	set_gps_found(gps_fix);
 
-	err = publish_data(action, inc_config);
+	err = publish_data(action, inc_modem_d);
 	if (err != 0) {
 		printk("Error publishing data: %d", err);
 	}
@@ -159,7 +157,7 @@ static void adxl362_init(void)
 
 void movement_timeout_handler(struct k_work *work)
 {
-	cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, INCLUDE_CFG);
+	cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, INCLUDE_MOD_D);
 }
 
 K_WORK_DEFINE(my_work, movement_timeout_handler);
@@ -184,7 +182,7 @@ void main(void)
 	cloud_configuration_init();
 	lte_connect();
 	gps_control_init(gps_control_handler);
-	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_CFG);
+	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
 	start_restart_mov_timer();
 
 check_mode:
@@ -214,10 +212,10 @@ gps_search:
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
-		cloud_publish(GPS_FIX, NORMAL_OPERATION, NOT_INCLUDE_CFG);
+		cloud_publish(GPS_FIX, NORMAL_OPERATION, active);
 	} else {
 		gps_control_stop();
-		cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, NOT_INCLUDE_CFG);
+		cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, active);
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
