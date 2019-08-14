@@ -17,6 +17,7 @@
 # Applications
 /applications/asset_tracker/              @joakimtoe @jtguggedal @rlubos
 /applications/nrf_desktop/                @pdunaj
+/applications/cat_tracker/                @simensrostad
 # Boards
 /boards/                                  @ioannisg @anangl
 # All cmake related files
