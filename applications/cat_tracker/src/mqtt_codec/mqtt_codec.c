@@ -194,10 +194,9 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	int rsrp;
 	struct modem_param_info *modem_info;
 
-	static char nw_mode[50];
-	static char lte_string[] = "LTE-M";
-	static char nbiot_string[] = "NB-IoT";
-	static char gps_string[] = " GPS";
+	static const char lte_string[] = "LTE-M";
+	static const char nbiot_string[] = "NB-IoT";
+	static const char gps_string[] = " GPS";
 
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
@@ -224,20 +223,21 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 
 	rsrp = get_rsrp_values();
 
-	if (modem_info->network.lte_mode.value) {
-		strcat(nw_mode, lte_string);
-	} else {
-		strcat(nw_mode, nbiot_string);
+	if (modem_info->network.lte_mode.value == 1) {
+		strcat(modem_info->network.network_mode, lte_string);
+	} else if (modem_info->network.nbiot_mode.value == 1) {
+		strcat(modem_info->network.network_mode, nbiot_string);
 	}
 
-	if (modem_info->network.gps_mode.value) {
-		strcat(nw_mode, gps_string);
+	if (modem_info->network.gps_mode.value == 1) {
+		strcat(modem_info->network.network_mode, gps_string);
 	}
 
 	err = json_add_number(static_m_data_v, "band",
 			      modem_info->network.current_band.value);
 
-	err += json_add_str(static_m_data_v, "nw", nw_mode);
+	err += json_add_str(static_m_data_v, "nw",
+			    modem_info->network.network_mode);
 
 	err += json_add_str(static_m_data_v, "iccid",
 			    modem_info->sim.iccid.value_string);

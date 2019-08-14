@@ -204,7 +204,11 @@ double check_accel_thres(void)
 {
 	double accel_threshold_double;
 
-	accel_threshold_double = sync_data.accel_threshold / 10;
+	if (sync_data.accel_threshold == 0) {
+		accel_threshold_double = 0;
+	} else {
+		accel_threshold_double = sync_data.accel_threshold / 10;
+	}
 
 	return accel_threshold_double;
 }
@@ -543,7 +547,7 @@ int mqtt_enable(struct mqtt_client *client)
 	return 0;
 }
 
-int publish_data(bool syncronization, bool pub_config)
+int publish_data(bool syncronization, bool pub_modem_d)
 {
 	int err;
 	struct Transmit_data transmit_data;
@@ -604,7 +608,7 @@ int publish_data(bool syncronization, bool pub_config)
 			}
 		}
 
-		if (pub_config) {
+		if (pub_modem_d) {
 			err = encode_modem_data(&transmit_data, syncronization);
 			if (err != 0) {
 				printk("ERROR when enconding modem data: %d\n",
