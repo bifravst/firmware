@@ -3,6 +3,7 @@
 #include <uart.h>
 #include <string.h>
 #include <logging/log.h>
+#include <logging/log_ctrl.h>
 #include <misc/reboot.h>
 #include <mqtt_behaviour.h>
 #include <modem_data.h>
@@ -31,6 +32,48 @@ struct k_poll_event events[2] = {
 					K_POLL_MODE_NOTIFY_ONLY,
 					&accel_trig_sem, 0)
 };
+
+enum error_type {
+	ERROR_BSD_RECOVERABLE,
+	ERROR_BSD_IRRECOVERABLE,
+	ERROR_LTE_LC,
+	ERROR_SYSTEM_FAULT
+};
+
+void error_handler(enum error_type err_type, int err_code)
+{
+#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
+	LOG_PANIC();
+	sys_reboot(0);
+#else
+	switch (err_type) {
+	case ERROR_BSD_RECOVERABLE:
+		printk("Error of type ERROR_BSD_RECOVERABLE: %d\n", err_code);
+		break;
+	case ERROR_BSD_IRRECOVERABLE:
+		printk("Error of type ERROR_BSD_IRRECOVERABLE: %d\n", err_code);
+		break;
+	default:
+		printk("Unknown error type: %d, code: %d\n", err_type,
+		       err_code);
+		break;
+	}
+
+	while (true) {
+		k_cpu_idle();
+	}
+#endif /* CONFIG_DEBUG */
+}
+
+void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
+{
+	ARG_UNUSED(esf);
+
+	LOG_PANIC();
+	z_fatal_print("Running main.c error handler");
+	error_handler(ERROR_SYSTEM_FAULT, reason);
+	CODE_UNREACHABLE;
+}
 
 static void lte_connect(void)
 {
@@ -178,9 +221,9 @@ static void start_restart_mov_timer(void)
 void main(void)
 {
 	printk("The cat tracker has started\n");
-	adxl362_init();
 	cloud_configuration_init();
 	lte_connect();
+	adxl362_init();
 	gps_control_init(gps_control_handler);
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
 	start_restart_mov_timer();
