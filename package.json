@@ -4,7 +4,7 @@
   "description": "Cat Tracker Firmware",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bifravst/cat-tracker-fw.git"
+    "url": "https://github.com/bifravst/cat-tracker-fw.git"
   },
   "bugs": {
     "url": "https://github.com/bifravst/cat-tracker-fw/issues"
