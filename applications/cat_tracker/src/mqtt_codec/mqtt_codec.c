@@ -18,6 +18,8 @@ bool change_movement_timeout = true;
 bool change_accel_threshold = true;
 bool change_config = true;
 
+struct Modem_data modem_data;
+
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
 	cJSON_AddItemToObject(parent, str, item);
@@ -76,6 +78,12 @@ static int json_add_str(cJSON *parent, const char *str, const char *item)
 	}
 
 	return json_add_obj(parent, str, json_str);
+}
+
+s64_t convert_to_timestamp(time_t timestamp_type)
+{
+	return (get_current_time() * (time_t)1000) + k_uptime_get() -
+	       timestamp_type;
 }
 
 int decode_response(char *input, struct Sync_data *sync_data)
@@ -223,6 +231,9 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 
 	rsrp = get_rsrp_values();
 
+	modem_data.dynamic_timestamp = k_uptime_get();
+	modem_data.static_timestamp = k_uptime_get();
+
 	if (modem_info->network.lte_mode.value == 1) {
 		strcat(modem_info->network.network_mode, lte_string);
 	} else if (modem_info->network.nbiot_mode.value == 1) {
@@ -277,10 +288,14 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	}
 
 	err += json_add_obj(static_m_data, "v", static_m_data_v);
-	err += json_add_number(static_m_data, "ts", get_current_time());
+	err += json_add_number(
+		static_m_data, "ts",
+		convert_to_timestamp(modem_data.static_timestamp));
 
 	err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
-	err += json_add_number(dynamic_m_data, "ts", get_current_time());
+	err += json_add_number(
+		dynamic_m_data, "ts",
+		convert_to_timestamp(modem_data.dynamic_timestamp));
 
 	if (syncronization) {
 		err += json_add_obj(reported_obj, "dev", static_m_data);
@@ -342,11 +357,12 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 	/*BAT*/
 	err = json_add_number(bat_obj, "v", sync_data->bat_voltage);
-	err += json_add_number(bat_obj, "ts", sync_data->bat_timestamp);
-
+	err += json_add_number(bat_obj, "ts",
+			       convert_to_timestamp(sync_data->bat_timestamp));
 	/*ACC*/
 	err += json_add_DoubleArray(acc_obj, "v", sync_data->acc);
-	err += json_add_number(acc_obj, "ts", sync_data->acc_timestamp);
+	err += json_add_number(acc_obj, "ts",
+			       convert_to_timestamp(sync_data->acc_timestamp));
 
 	/*GPS*/
 	err += json_add_number(gps_val_obj, "lng", sync_data->longitude);
@@ -408,8 +424,9 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(gps_obj, "ts",
-					       sync_data->gps_timestamp);
+			err += json_add_number(
+				gps_obj, "ts",
+				convert_to_timestamp(sync_data->gps_timestamp));
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
@@ -427,8 +444,9 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(gps_obj, "ts",
-					       sync_data->gps_timestamp);
+			err += json_add_number(
+				gps_obj, "ts",
+				convert_to_timestamp(sync_data->gps_timestamp));
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 	}

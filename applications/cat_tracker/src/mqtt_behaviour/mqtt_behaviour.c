@@ -213,7 +213,7 @@ double check_accel_thres(void)
 	return accel_threshold_double;
 }
 
-void attach_gps_data(struct gps_data gps_data, time_t timestamp)
+void attach_gps_data(struct gps_data gps_data)
 {
 	sync_data.longitude = gps_data.pvt.longitude;
 	sync_data.latitude = gps_data.pvt.latitude;
@@ -221,21 +221,21 @@ void attach_gps_data(struct gps_data gps_data, time_t timestamp)
 	sync_data.accuracy = gps_data.pvt.accuracy;
 	sync_data.speed = gps_data.pvt.speed;
 	sync_data.heading = gps_data.pvt.heading;
-	sync_data.gps_timestamp = timestamp;
+	sync_data.gps_timestamp = k_uptime_get();
 }
 
-void attach_battery_data(int battery_voltage, time_t timestamp)
+void attach_battery_data(int battery_voltage)
 {
 	sync_data.bat_voltage = battery_voltage;
-	sync_data.bat_timestamp = timestamp;
+	sync_data.bat_timestamp = k_uptime_get();
 }
 
-void attach_accel_data(double x, double y, double z, time_t timestamp)
+void attach_accel_data(double x, double y, double z)
 {
 	sync_data.acc[0] = x;
 	sync_data.acc[1] = y;
 	sync_data.acc[2] = z;
-	sync_data.acc_timestamp = timestamp;
+	sync_data.acc_timestamp = k_uptime_get();
 }
 
 void data_print(u8_t *prefix, u8_t *data, size_t len)

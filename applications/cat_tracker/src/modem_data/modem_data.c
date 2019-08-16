@@ -119,7 +119,7 @@ void set_current_time(struct gps_data gps_data)
 
 time_t get_current_time(void)
 {
-	return (epoch * (time_t)1000) + k_uptime_get() - update_time;
+	return epoch;
 }
 
 struct modem_param_info *get_modem_info(void)

@@ -26,11 +26,11 @@ int check_mov_timeout(void);
 
 double check_accel_thres(void);
 
-void attach_gps_data(struct gps_data gps_data, time_t timestamp);
+void attach_gps_data(struct gps_data gps_data);
 
-void attach_battery_data(int battery_voltage, time_t timestamp);
+void attach_battery_data(int battery_voltage);
 
-void attach_accel_data(double x, double y, double z, time_t timestamp);
+void attach_accel_data(double x, double y, double z);
 
 int fds_init(struct mqtt_client *c);
 

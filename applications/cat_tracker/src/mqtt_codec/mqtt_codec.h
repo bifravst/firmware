@@ -40,6 +40,11 @@ struct Transmit_data {
 	u8_t *topic;
 };
 
+struct Modem_data {
+	s64_t static_timestamp;
+	s64_t dynamic_timestamp;
+};
+
 int decode_response(char *input, struct Sync_data *sync_data);
 
 int encode_message(struct Transmit_data *output, struct Sync_data *sync_data);

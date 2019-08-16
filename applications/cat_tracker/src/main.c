@@ -107,7 +107,7 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 {
 	int err;
 
-	attach_battery_data(request_battery_status(), get_current_time());
+	attach_battery_data(request_battery_status());
 
 	set_gps_found(gps_fix);
 
@@ -142,13 +142,7 @@ static void adxl362_trigger_handler(struct device *dev,
 		     check_accel_thres())) {
 			attach_accel_data(sensor_value_to_double(&accel[0]),
 					  sensor_value_to_double(&accel[1]),
-					  sensor_value_to_double(&accel[2]),
-					  get_current_time());
-
-			printf("x: %.1f, y: %.1f, z: %.1f (m/s^2)\n",
-			       sensor_value_to_double(&accel[0]),
-			       sensor_value_to_double(&accel[1]),
-			       sensor_value_to_double(&accel[2]));
+					  sensor_value_to_double(&accel[2]));
 			k_sem_give(events[1].sem);
 		}
 
@@ -169,7 +163,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		set_current_time(gps_data);
-		attach_gps_data(gps_data, get_current_time());
+		attach_gps_data(gps_data);
 		k_sem_give(events[0].sem);
 		break;
 
