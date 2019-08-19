@@ -103,7 +103,7 @@ jobs:
           when: on_success
           name: Run semantic relase
           command: |
-            npm i --no-save semantic-release;
+            npm i --no-save semantic-release @bifravst/semantic-release-github@15.14.0-release-in-assets
             npx semantic-release || true
 
 workflows:

@@ -36,16 +36,18 @@
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
       [
-        "@semantic-release/github",
+        "@bifravst/semantic-release-github",
         {
           "assets": [
             {
               "path": "/root/ncs/cat-tracker-nrf9160_pca20035ns.hex",
-              "label": "Pre-build HEX file for Thingy:91"
+              "name": "cat-tracker-nrf9160_pca20035ns-%RELEASE%.hex",
+              "label": "Pre-build HEX file for Thingy:91 (%RELEASE%)"
             },
             {
               "path": "/root/ncs/cat-tracker-nrf9160_pca10090ns.hex",
-              "label": "Pre-build HEX file for nRF9160 DK"
+              "name": "cat-tracker-nrf9160_pca10090ns-%RELEASE%.hex",
+              "label": "Pre-build HEX file for nRF9160 DK (%RELEASE%)"
             }
           ]
         }
