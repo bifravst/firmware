@@ -89,6 +89,11 @@ jobs:
           key: deps-{{ checksum "west.yml" }}
 
       - run:
+          name: Patch West to enable nrf9160_pca10015ns
+          command: |
+            patch -b ~/ncs/zephyr/cmake/app/boilerplate.cmake < ~/ncs/nrf/.circleci/zephyr.patch
+
+      - run:
           name: Build
           command: |
             cd ~/ncs/nrf/applications/cat_tracker
@@ -101,6 +106,11 @@ jobs:
             west build -p auto -b nrf9160_pca10015ns
             mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/cat-tracker-nrf9160_pca10015ns.hex
             sha256sum ~/ncs/cat-tracker-nrf9160_pca10015ns.hex
+
+      - run:
+          name: Un-Patch West
+          command: |
+            mv ~/ncs/zephyr/cmake/app/boilerplate.cmake.orig ~/ncs/zephyr/cmake/app/boilerplate.cmake
 
       - run:
           when: on_success
