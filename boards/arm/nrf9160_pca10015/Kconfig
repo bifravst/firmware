@@ -1,0 +1,10 @@
+# Kconfig - nRF91 PCA10015 board configuration
+#
+# Copyright (c) 2019 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+
+module=BOARD
+module-dep=LOG
+module-str=Log level for board
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
