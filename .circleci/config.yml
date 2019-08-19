@@ -98,6 +98,9 @@ jobs:
             west build -p auto -b nrf9160_pca10090ns
             mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/cat-tracker-nrf9160_pca10090ns.hex
             sha256sum ~/ncs/cat-tracker-nrf9160_pca10090ns.hex
+            west build -p auto -b nrf9160_pca10015ns
+            mv ~/ncs/nrf/applications/cat_tracker/build/zephyr/merged.hex ~/ncs/cat-tracker-nrf9160_pca10015ns.hex
+            sha256sum ~/ncs/cat-tracker-nrf9160_pca10015ns.hex
 
       - run:
           when: on_success

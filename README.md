@@ -10,8 +10,9 @@ This application is built with [fw-nrfconnect-nrf](https://github.com/NordicPlay
 
 Supported boards:
 
-- nRF9160 DK (PCA10090) (`west build -b nrf9160_pca10090ns`)
+- Asset Tracker (PCA10015) (`west build -b nrf9160_pca10015ns`)
 - Thingy:91 (PCA20035) (`west build -b nrf9160_pca20035ns`)
+- nRF9160 DK (PCA10090) (`west build -b nrf9160_pca10090ns`)
 
 ## Automated releases
 
