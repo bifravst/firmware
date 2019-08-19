@@ -8,7 +8,7 @@ menu "GPS_CONTROL"
 
 config GPS_CONTROL
 	bool "GPS controller module for nRF9160 GPS"
-	default y if BOARD_NRF9160_PCA20035NS
+	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
 	select NRF9160_GPS
 
 if GPS_CONTROL

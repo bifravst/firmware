@@ -36,7 +36,6 @@ struct k_poll_event events[2] = {
 enum error_type {
 	ERROR_BSD_RECOVERABLE,
 	ERROR_BSD_IRRECOVERABLE,
-	ERROR_LTE_LC,
 	ERROR_SYSTEM_FAULT
 };
 
@@ -62,7 +61,7 @@ void error_handler(enum error_type err_type, int err_code)
 	while (true) {
 		k_cpu_idle();
 	}
-#endif /* CONFIG_DEBUG */
+#endif
 }
 
 void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
