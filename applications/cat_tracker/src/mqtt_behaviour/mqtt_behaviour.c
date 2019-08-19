@@ -16,7 +16,7 @@
 #define EMPTY_STRING ""
 
 struct Sync_data sync_data = { .gps_timeout = 180,
-			       .active = false,
+			       .active = true,
 			       .active_wait = 60,
 			       .passive_wait = 300,
 			       .movement_timeout = 3600,

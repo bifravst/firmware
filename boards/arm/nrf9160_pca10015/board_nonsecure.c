@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(board_nonsecure, CONFIG_BOARD_LOG_LEVEL);
 
 #define AT_CMD_MAX_READ_LENGTH 128
 #define AT_CMD_LEN(cmd) (sizeof(cmd) - 1)
-#define AT_CMD_COEX2 "AT%XCOEX2=1,0,1574,1577,1,1710,2200"
+#define AT_CMD_COEX2 "AT%XCOEX0=2,0,1710,2200,1,1574,1577"
 #define AT_CMD_TRACE "AT%XMODEMTRACE=0"
 
 static int pca10015_coex_configure(void)
