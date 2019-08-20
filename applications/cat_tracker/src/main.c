@@ -223,9 +223,9 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
-	start_restart_mov_timer();
 
 check_mode:
+	start_restart_mov_timer();
 	if (check_mode()) {
 		active = true;
 		goto active;
@@ -259,7 +259,6 @@ gps_search:
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
-	start_restart_mov_timer();
 	k_sleep(K_SECONDS(check_active_wait(active)));
 
 	goto check_mode;
