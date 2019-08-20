@@ -10,10 +10,8 @@
 #include <mqtt_codec.h>
 #include <leds.h>
 
-#define APP_SLEEP_MS 5000
+#define APP_SLEEP_MS 500
 #define APP_CONNECT_TRIES 5
-#define MAX_ITERATIONS 1
-#define EMPTY_STRING ""
 
 struct Sync_data sync_data = { .gps_timeout = 180,
 			       .active = true,
@@ -544,7 +542,7 @@ int mqtt_enable(struct mqtt_client *client)
 		return 0;
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 int publish_data(bool syncronization, bool pub_modem_d)
@@ -557,11 +555,16 @@ int publish_data(bool syncronization, bool pub_modem_d)
 		printk("Could not connect to client\n");
 	}
 
+	err = mqtt_ping(&client);
+	if (err != 0) {
+		printk("Could not ping broker: %d\n", err);
+	}
+
 	if (connected) {
 		publish_data_led();
 
 		if (syncronization) {
-			transmit_data.buf = EMPTY_STRING;
+			transmit_data.buf = "";
 			transmit_data.len = strlen(transmit_data.buf);
 			transmit_data.topic = get_topic;
 		} else {

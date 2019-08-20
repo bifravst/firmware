@@ -52,6 +52,10 @@ void error_handler(enum error_type err_type, int err_code)
 	case ERROR_BSD_IRRECOVERABLE:
 		printk("Error of type ERROR_BSD_IRRECOVERABLE: %d\n", err_code);
 		break;
+
+	case ERROR_SYSTEM_FAULT:
+		printk("Error of type ERROR_SYSTEM_FAULT: %d\n", err_code);
+		break;
 	default:
 		printk("Unknown error type: %d, code: %d\n", err_type,
 		       err_code);

@@ -49,6 +49,7 @@ void gps_control_stop(void)
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
 	gps_search_led_stop();
+	k_sleep(1000);
 }
 
 void gps_control_start(void)
