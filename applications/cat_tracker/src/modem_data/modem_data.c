@@ -96,8 +96,6 @@ int modem_time_get(void)
 
 	epoch = mktime(&info);
 
-	update_time = k_uptime_get();
-
 	return 0;
 }
 
@@ -113,8 +111,6 @@ void set_current_time(struct gps_data gps_data)
 	info.tm_sec = gps_data.pvt.datetime.seconds;
 
 	epoch = mktime(&info);
-
-	update_time = k_uptime_get();
 }
 
 time_t get_current_time(void)
