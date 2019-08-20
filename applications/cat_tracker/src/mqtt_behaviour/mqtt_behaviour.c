@@ -565,8 +565,7 @@ int publish_data(bool syncronization, bool pub_modem_d)
 		} else {
 			err = encode_message(&transmit_data, &sync_data);
 			if (err != 0) {
-				printk("ERROR when enconding message: %d\n",
-				       err);
+				goto end;
 			}
 			transmit_data.topic = update_topic;
 		}
@@ -575,19 +574,18 @@ int publish_data(bool syncronization, bool pub_modem_d)
 				   transmit_data.buf, transmit_data.len,
 				   transmit_data.topic);
 		if (err != 0) {
-			printk("Could not publish data: %d\n", err);
+			goto end;
 		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		if (err != 0) {
-			printk("Could not process data broker: %d\n", err);
+			goto end;
 		}
 
 		if (check_config_change()) {
 			err = encode_message(&transmit_data, &sync_data);
 			if (err != 0) {
-				printk("ERROR when enconding message: %d\n",
-				       err);
+				goto end;
 			}
 			transmit_data.topic = update_topic;
 
@@ -595,22 +593,19 @@ int publish_data(bool syncronization, bool pub_modem_d)
 				     transmit_data.buf, transmit_data.len,
 				     transmit_data.topic);
 			if (err != 0) {
-				printk("Could not publish configuration update: %d\n",
-				       err);
+				goto end;
 			}
 
 			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 			if (err != 0) {
-				printk("Could not process data broker: %d\n",
-				       err);
+				goto end;
 			}
 		}
 
 		if (pub_modem_d) {
 			err = encode_modem_data(&transmit_data, syncronization);
 			if (err != 0) {
-				printk("ERROR when enconding modem data: %d\n",
-				       err);
+				goto end;
 			}
 			transmit_data.topic = update_topic;
 
@@ -618,14 +613,12 @@ int publish_data(bool syncronization, bool pub_modem_d)
 				     transmit_data.buf, transmit_data.len,
 				     transmit_data.topic);
 			if (err != 0) {
-				printk("Could not publish configuration update: %d\n",
-				       err);
+				goto end;
 			}
 
 			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 			if (err != 0) {
-				printk("Could not process data broker: %d\n",
-				       err);
+				goto end;
 			}
 		}
 	}
@@ -642,4 +635,18 @@ int publish_data(bool syncronization, bool pub_modem_d)
 	}
 
 	return 0;
+
+end:
+	err = mqtt_disconnect(&client);
+	if (err) {
+		printk("Could not disconnect\n");
+	}
+
+	wait(APP_SLEEP_MS);
+	err = mqtt_input(&client);
+	if (err) {
+		printk("Could not input data\n");
+	}
+
+	return err;
 }

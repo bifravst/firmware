@@ -110,7 +110,7 @@ int decode_response(char *input, struct Sync_data *sync_data)
 
 	string = cJSON_Print(root_obj);
 	if (string == NULL) {
-		printk("Failed to print monitor.\n");
+		printk("Failed to print message.\n");
 	}
 
 	printk("Incoming message %s\n", string);
@@ -276,17 +276,6 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	err += json_add_str(dynamic_m_data_v, "ip",
 			    modem_info->network.ip_address.value_string);
 
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(static_m_data);
-		cJSON_Delete(static_m_data_v);
-		cJSON_Delete(dynamic_m_data);
-		cJSON_Delete(dynamic_m_data_v);
-		return -ENOMEM;
-	}
-
 	err += json_add_obj(static_m_data, "v", static_m_data_v);
 	err += json_add_number(
 		static_m_data, "ts",
@@ -319,10 +308,10 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	}
 
 	buffer = cJSON_Print(root_obj);
+	cJSON_Delete(root_obj);
+
 	output->buf = buffer;
 	output->len = strlen(buffer);
-
-	cJSON_Delete(root_obj);
 
 	return 0;
 }
@@ -402,18 +391,6 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 				       sync_data->accel_threshold);
 	}
 
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(bat_obj);
-		cJSON_Delete(acc_obj);
-		cJSON_Delete(gps_obj);
-		cJSON_Delete(cfg_obj);
-		cJSON_Delete(gps_val_obj);
-		return -ENOMEM;
-	}
-
 	if (!change_config) {
 		if (sync_data->active == true &&
 		    sync_data->gps_found == false) {
@@ -453,7 +430,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 
 	if (change_gpst || change_active || change_active_wait ||
 	    change_passive_wait || change_movement_timeout ||
-	    change_accel_threshold) {
+	    change_accel_threshold || change_config) {
 		err += json_add_obj(reported_obj, "cfg", cfg_obj);
 		change_gpst = change_active = change_active_wait =
 			change_passive_wait = change_movement_timeout =
@@ -477,11 +454,10 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 	}
 
 	buffer = cJSON_Print(root_obj);
+	cJSON_Delete(root_obj);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
-
-	cJSON_Delete(root_obj);
 
 	return 0;
 }
