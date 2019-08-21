@@ -82,8 +82,7 @@ static int json_add_str(cJSON *parent, const char *str, const char *item)
 
 s64_t convert_to_timestamp(time_t timestamp_type)
 {
-	return (get_current_time() * (time_t)1000) + k_uptime_get() -
-	       timestamp_type;
+	return get_current_time() + timestamp_type;
 }
 
 int decode_response(char *input, struct Sync_data *sync_data)

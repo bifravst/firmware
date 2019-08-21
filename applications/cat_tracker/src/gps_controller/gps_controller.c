@@ -79,6 +79,7 @@ void gps_control_start(void)
 
 void gps_control_on_trigger(void)
 {
+	gps_search_led_stop_fix();
 	gps_control_stop();
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {
