@@ -552,7 +552,7 @@ int publish_data(bool syncronization, bool pub_modem_d)
 
 	err = mqtt_enable(&client);
 	if (err) {
-		printk("Could not connect to client\n");
+		printk("Could not connect to client: %d\n", err);
 	}
 
 	if (connected) {

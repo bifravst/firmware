@@ -46,6 +46,11 @@ enum lte_lc_func_mode {
 	LTE_LC_FUNC_MODE_OFFLINE		= 4,
 	LTE_LC_FUNC_MODE_OFFLINE_UICC_ON	= 44
 };
+=======
+#include <at_cmd.h>
+
+int lte_lc_init_connect_manager(at_cmd_handler_t connection_handler);
+>>>>>>> feat: connection handler
 
 /** @brief Function for initializing
  * the modem.  NOTE: a follow-up call to lte_lc_connect()

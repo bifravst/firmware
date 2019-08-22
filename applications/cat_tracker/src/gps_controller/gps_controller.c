@@ -56,6 +56,8 @@ static void gps_work_handler(struct k_work *work)
 
 void gps_control_stop(void)
 {
+	lte_lc_psm_req(false);
+
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
 	gps_search_led_stop();
@@ -72,6 +74,8 @@ void gps_control_stop(void)
 
 void gps_control_start(void)
 {
+	lte_lc_psm_req(true);
+
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);
 	gps_search_led_start();
