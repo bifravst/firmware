@@ -115,7 +115,6 @@ static void work_init(void)
 	k_work_init(&cloud_get_work, cloud_get_work_fn);
 }
 
-/*Fix*/
 static const char status1[] = "+CEREG: 1";
 static const char status2[] = "+CEREG:1";
 static const char status3[] = "+CEREG: 5";
@@ -272,7 +271,6 @@ void main(void)
 	printk("The cat tracker has started\n");
 	work_init();
 	adxl362_init();
-	// led_init(); led thread should be fixed to use thread start
 	cloud_configuration_init();
 	lte_connect();
 	gps_control_init(gps_control_handler);
