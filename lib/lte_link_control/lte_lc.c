@@ -347,7 +347,15 @@ int lte_lc_init_and_connect(void)
 
 int lte_lc_gps_mode(void)
 {
+	if (at_cmd_write(offline, NULL, 0, NULL) != 0) {
+		return -EIO;
+	}
+
 	if (at_cmd_write(gps_mode, NULL, 0, NULL) != 0) {
+		return -EIO;
+	}
+
+	if (at_cmd_write(normal, NULL, 0, NULL) != 0) {
 		return -EIO;
 	}
 

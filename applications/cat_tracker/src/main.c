@@ -260,9 +260,7 @@ static void lte_connect()
 		lte_lc_psm_req(true);
 		cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
 	} else {
-		lte_lc_offline();
 		lte_lc_gps_mode();
-		lte_lc_normal();
 	}
 }
 
