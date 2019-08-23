@@ -21,8 +21,12 @@
 
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
+#define LTE_CONN_TIMEOUT 1
+
 static bool active;
 static bool lte_connected = false;
+
+static struct k_sem connect_sem;
 
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
@@ -111,6 +115,7 @@ static void work_init(void)
 	k_work_init(&cloud_get_work, cloud_get_work_fn);
 }
 
+/*Fix*/
 static const char status1[] = "+CEREG: 1";
 static const char status2[] = "+CEREG:1";
 static const char status3[] = "+CEREG: 5";
@@ -136,9 +141,8 @@ void connection_handler(char *response)
 				printk("Error fetching modem time\n");
 			}
 
-			k_work_submit(&cloud_get_work);
-
 			lte_connected = true;
+			k_sem_give(&connect_sem);
 		}
 
 	} else {
@@ -243,13 +247,34 @@ static void start_restart_mov_timer(void)
 		      K_SECONDS(check_mov_timeout()));
 }
 
+static void lte_connect()
+{
+	int err;
+
+	k_sem_init(&connect_sem, 0, 1);
+	err = lte_lc_init_connect_manager(connection_handler);
+	if (err != 0) {
+		printk("Error setting lte_connect manager: %d\n", err);
+	}
+
+	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
+		lte_lc_psm_req(true);
+		cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
+	} else {
+		lte_lc_offline();
+		lte_lc_gps_mode();
+		lte_lc_normal();
+	}
+}
+
 void main(void)
 {
-	work_init();
 	printk("The cat tracker has started\n");
-	cloud_configuration_init();
-	lte_lc_init_connect_manager(connection_handler);
+	work_init();
 	adxl362_init();
+	// led_init(); led thread should be fixed to use thread start
+	cloud_configuration_init();
+	lte_connect();
 	gps_control_init(gps_control_handler);
 
 check_mode:
@@ -288,6 +313,10 @@ gps_search:
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
+
+	if (!lte_connected) {
+		lte_connect();
+	}
 
 	goto check_mode;
 }

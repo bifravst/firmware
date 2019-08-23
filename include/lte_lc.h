@@ -93,6 +93,12 @@ int lte_lc_power_off(void);
  */
 int lte_lc_normal(void);
 
+/** @brief Function for requesting gps mode
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int lte_lc_gps_mode(void);
+
 /** @brief Function for requesting modem to go to or disable
  * power saving mode (PSM) with default settings defined in kconfig.
  * For reference see 3GPP 27.007 Ch. 7.38.
