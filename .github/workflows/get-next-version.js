@@ -14,7 +14,8 @@ const main = async () => {
     repositoryUrl: pjson.repository.url,
     plugins: [
       '@semantic-release/commit-analyzer'
-    ]
+    ],
+    dryRun: true
   }, {
     cwd: process.cwd(),
     stdout: stdoutBuffer,
