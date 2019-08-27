@@ -21,7 +21,7 @@
 
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
-#define LTE_CONN_TIMEOUT 3
+#define LTE_CONN_TIMEOUT 10
 
 static bool active;
 static bool lte_connected = false;
@@ -197,7 +197,6 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 	case GPS_TRIG_FIX:
 		printk("gps control handler triggered!\n");
 		gps_control_on_trigger();
-		gps_sample_fetch(dev);
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		set_current_time(gps_data);
 		attach_gps_data(gps_data);

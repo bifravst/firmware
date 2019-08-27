@@ -12,7 +12,11 @@
 #define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 5
 
-struct Sync_data sync_data = { .gps_timeout = 180,
+struct Sync_data_GPS cir_buf_gps[MAX_CIR_BUF];
+
+int head_cir_buf = 0;
+
+struct Sync_data sync_data = { .gps_timeout = 1000,
 			       .active = true,
 			       .active_wait = 60,
 			       .passive_wait = 300,
@@ -212,13 +216,21 @@ double check_accel_thres(void)
 
 void attach_gps_data(struct gps_data gps_data)
 {
-	sync_data.longitude = gps_data.pvt.longitude;
-	sync_data.latitude = gps_data.pvt.latitude;
-	sync_data.altitude = gps_data.pvt.altitude;
-	sync_data.accuracy = gps_data.pvt.accuracy;
-	sync_data.speed = gps_data.pvt.speed;
-	sync_data.heading = gps_data.pvt.heading;
-	sync_data.gps_timestamp = k_uptime_get();
+	head_cir_buf += 1;
+	if (head_cir_buf == MAX_CIR_BUF - 1) {
+		head_cir_buf = 0;
+	}
+
+	cir_buf_gps[head_cir_buf].longitude = gps_data.pvt.longitude;
+	cir_buf_gps[head_cir_buf].latitude = gps_data.pvt.latitude;
+	cir_buf_gps[head_cir_buf].altitude = gps_data.pvt.altitude;
+	cir_buf_gps[head_cir_buf].accuracy = gps_data.pvt.accuracy;
+	cir_buf_gps[head_cir_buf].speed = gps_data.pvt.speed;
+	cir_buf_gps[head_cir_buf].heading = gps_data.pvt.heading;
+	cir_buf_gps[head_cir_buf].gps_timestamp = k_uptime_get();
+	cir_buf_gps[head_cir_buf].queued = true;
+
+	printk("Entry: %d in gps_buffer filled\n", head_cir_buf);
 }
 
 void attach_battery_data(int battery_voltage)
@@ -560,16 +572,20 @@ int publish_data(bool syncronization, bool pub_modem_d)
 			transmit_data.len = strlen(transmit_data.buf);
 			transmit_data.topic = get_topic;
 		} else {
-			err = encode_message(&transmit_data, &sync_data);
+			err = encode_message(&transmit_data, &sync_data,
+					     &cir_buf_gps[head_cir_buf]);
 			if (err != 0) {
 				goto end;
 			}
 			transmit_data.topic = update_topic;
+			printk("Entry: %d in gps_buffer published\n",
+			       head_cir_buf);
 		}
 
 		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
 				   transmit_data.buf, transmit_data.len,
 				   transmit_data.topic);
+
 		if (err != 0) {
 			goto end;
 		}
@@ -580,7 +596,8 @@ int publish_data(bool syncronization, bool pub_modem_d)
 		}
 
 		if (check_config_change()) {
-			err = encode_message(&transmit_data, &sync_data);
+			err = encode_message(&transmit_data, &sync_data,
+					     &cir_buf_gps[head_cir_buf]);
 			if (err != 0) {
 				goto end;
 			}
@@ -618,6 +635,39 @@ int publish_data(bool syncronization, bool pub_modem_d)
 				goto end;
 			}
 		}
+
+		/*Experimental */
+
+		for (int i = 0; i < MAX_CIR_BUF; i++) {
+			if (cir_buf_gps[i].queued) {
+				err = encode_gps_buffer(&transmit_data,
+							&cir_buf_gps[i]);
+				if (err != 0) {
+					goto end;
+				}
+				transmit_data.topic = update_topic;
+
+				data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+					     transmit_data.buf,
+					     transmit_data.len,
+					     transmit_data.topic);
+				if (err != 0) {
+					goto end;
+				}
+
+				printk("Entry: %d in gps_buffer published\n",
+				       i);
+
+				err = process_mqtt_and_sleep(&client,
+							     APP_SLEEP_MS);
+				if (err != 0) {
+					goto end;
+				}
+			}
+		}
+
+		head_cir_buf = 0;
+		/*End experimental */
 	}
 
 	err = mqtt_disconnect(&client);

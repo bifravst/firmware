@@ -95,7 +95,7 @@ int gps_control_init(gps_trigger_handler_t handler)
 	struct device *gps_dev;
 
 	struct gps_trigger gps_trig = { .type = GPS_TRIG_FIX,
-					.chan = GPS_CHAN_NMEA };
+					.chan = GPS_CHAN_PVT };
 
 	gps_dev = device_get_binding(CONFIG_GPS_DEV_NAME);
 	if (gps_dev == NULL) {

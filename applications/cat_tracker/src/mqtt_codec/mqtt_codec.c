@@ -195,6 +195,65 @@ end:
 	return 0;
 }
 
+int encode_gps_buffer(struct Transmit_data *output,
+		      struct Sync_data_GPS *cir_buf_gps)
+{
+	int err;
+	char *buffer;
+
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *state_obj = cJSON_CreateObject();
+	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *gps_obj = cJSON_CreateObject();
+	cJSON *gps_val_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
+	    gps_obj == NULL || gps_val_obj == NULL) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(gps_val_obj);
+		return -ENOMEM;
+	}
+
+	err = json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
+	err += json_add_number(gps_val_obj, "lat", cir_buf_gps->latitude);
+	err += json_add_number(gps_val_obj, "acc", cir_buf_gps->accuracy);
+	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
+	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
+	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
+
+	cir_buf_gps->queued = false;
+
+	err += json_add_obj(gps_obj, "v", gps_val_obj);
+	err += json_add_number(
+		gps_obj, "ts",
+		convert_to_timestamp(cir_buf_gps->gps_timestamp));
+
+	err += json_add_obj(reported_obj, "gps", gps_obj);
+
+	err += json_add_obj(state_obj, "reported", reported_obj);
+	err += json_add_obj(root_obj, "state", state_obj);
+
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(gps_val_obj);
+		return -EAGAIN;
+	}
+
+	buffer = cJSON_Print(root_obj);
+	cJSON_Delete(root_obj);
+
+	output->buf = buffer;
+	output->len = strlen(buffer);
+
+	return 0;
+}
+
 int encode_modem_data(struct Transmit_data *output, bool syncronization)
 {
 	int err;
@@ -315,7 +374,8 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	return 0;
 }
 
-int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
+int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
+		   struct Sync_data_GPS *cir_buf_gps)
 {
 	int err;
 	char *buffer;
@@ -353,12 +413,14 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			       convert_to_timestamp(sync_data->acc_timestamp));
 
 	/*GPS*/
-	err += json_add_number(gps_val_obj, "lng", sync_data->longitude);
-	err += json_add_number(gps_val_obj, "lat", sync_data->latitude);
-	err += json_add_number(gps_val_obj, "acc", sync_data->accuracy);
-	err += json_add_number(gps_val_obj, "alt", sync_data->altitude);
-	err += json_add_number(gps_val_obj, "spd", sync_data->speed);
-	err += json_add_number(gps_val_obj, "hdg", sync_data->heading);
+	err += json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
+	err += json_add_number(gps_val_obj, "lat", cir_buf_gps->latitude);
+	err += json_add_number(gps_val_obj, "acc", cir_buf_gps->accuracy);
+	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
+	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
+	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
+
+	cir_buf_gps->queued = false;
 
 	/*CFG*/
 
@@ -402,7 +464,8 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(
 				gps_obj, "ts",
-				convert_to_timestamp(sync_data->gps_timestamp));
+				convert_to_timestamp(
+					cir_buf_gps->gps_timestamp));
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
@@ -422,7 +485,8 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data)
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(
 				gps_obj, "ts",
-				convert_to_timestamp(sync_data->gps_timestamp));
+				convert_to_timestamp(
+					cir_buf_gps->gps_timestamp));
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 	}
