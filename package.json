@@ -22,7 +22,11 @@
   "devDependencies": {
     "@commitlint/cli": "^8.1.0",
     "@commitlint/config-angular": "^8.1.0",
-    "husky": "^3.0.1"
+    "@semantic-release/commit-analyzer": "^6.3.0",
+    "husky": "^3.0.1",
+    "semantic-release": "^15.13.24",
+    "standard": "^14.0.2",
+    "stream-buffers": "^3.0.2"
   },
   "husky": {
     "hooks": {
