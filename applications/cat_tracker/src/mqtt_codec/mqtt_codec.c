@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include "cJSON.h"
 #include "cJSON_os.h"
+#include "version.h"
 
 bool change_gpst = true;
 bool change_active = true;
@@ -257,8 +258,7 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 
 	err += json_add_str(static_m_data_v, "brdV", modem_info->device.board);
 
-	err += json_add_str(static_m_data_v, "appV",
-			    modem_info->device.app_version);
+	err += json_add_str(static_m_data_v, "appV", DEVICE_APP_VERSION);
 
 	err += json_add_number(dynamic_m_data_v, "rsrp", rsrp);
 

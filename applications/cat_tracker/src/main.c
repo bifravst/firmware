@@ -21,7 +21,7 @@
 
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
-#define LTE_CONN_TIMEOUT 1
+#define LTE_CONN_TIMEOUT 3
 
 static bool active;
 static bool lte_connected = false;
