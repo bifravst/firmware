@@ -68,5 +68,5 @@ jobs:
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          npm i --no-save semantic-release @bifravst/semantic-release-github@15.14.0-release-in-assets
+          npm i --no-save @bifravst/semantic-release-github@15.14.0-release-in-assets
           npx semantic-release
