@@ -39,6 +39,9 @@ jobs:
         run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
       - name: Determin next release version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
           npm ci
           export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
@@ -66,7 +69,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           npm i --no-save @bifravst/semantic-release-github@15.14.0-release-in-assets
           npx semantic-release
