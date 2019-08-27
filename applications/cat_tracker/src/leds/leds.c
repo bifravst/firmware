@@ -18,8 +18,11 @@
 #define LTE_CONNECTED 0x1340
 #define PUBLISH_DATA 0x1341
 #define PUBLISH_DATA_STOP 0x1342
+#define LTE_NOT_CONNECTED 0x1343
 
 #define LED_PULSE_CYCLE 1000
+#define PROLONGED_DELAY 3500
+#define MID_DELAY 2000
 
 struct k_poll_signal signal_led;
 static int state;
@@ -84,7 +87,7 @@ void led_FSM(void)
 					       led_pins[LED1].number, cnt % 2);
 				cnt++;
 
-				k_poll(events, 1, LED_PULSE_CYCLE);
+				k_poll(events, 1, MID_DELAY);
 
 				if (state == GPS_SEARCH) {
 					break;
@@ -131,7 +134,21 @@ void led_FSM(void)
 
 			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
 				       true);
-			k_sleep(2000);
+			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
+				       true);
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       true);
+			k_sleep(PROLONGED_DELAY);
+			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
+				       false);
+			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
+				       false);
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
+			k_poll(events, 1, K_FOREVER);
+			break;
+
+		case LTE_NOT_CONNECTED:
 			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
 				       false);
 
@@ -144,10 +161,22 @@ void led_FSM(void)
 				gpio_pin_write(led_devs[LED3],
 					       led_pins[LED3].number, true);
 
-				k_poll(events, 1, LED_PULSE_CYCLE);
+				k_sleep(250);
 
-				k_poll_signal_raise(&signal_led,
-						    PUBLISH_DATA_STOP);
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, false);
+
+				k_sleep(250);
+
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, true);
+
+				k_sleep(300);
+
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, false);
+
+				k_poll(events, 1, PROLONGED_DELAY);
 
 				if (state == PUBLISH_DATA) {
 					break;
@@ -179,32 +208,42 @@ void led_work(void)
 K_THREAD_DEFINE(led_work_id, STACKSIZE, led_work, NULL, NULL, NULL, PRIORITY, 0,
 		K_NO_WAIT);
 
-void gps_search_led_start(void)
+void set_led_state(enum led_events led_event)
 {
-	k_poll_signal_raise(&signal_led, GPS_SEARCH);
-}
+	switch (led_event) {
+	case GPS_SEARCH_E:
+		k_poll_signal_raise(&signal_led, GPS_SEARCH);
+		break;
 
-void gps_search_led_stop(void)
-{
-	k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP);
-}
+	case GPS_SEARCH_STOP_E:
+		k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP);
+		break;
 
-void gps_search_led_stop_fix(void)
-{
-	k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP_FIX);
-}
+	case GPS_SEARCH_STOP_FIX_E:
+		k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP_FIX);
+		break;
 
-void lte_connecting_led_start(void)
-{
-	k_poll_signal_raise(&signal_led, LTE_CONNECTING);
-}
+	case LTE_CONNECTING_E:
+		k_poll_signal_raise(&signal_led, LTE_CONNECTING);
+		break;
 
-void lte_connecting_led_stop(void)
-{
-	k_poll_signal_raise(&signal_led, LTE_CONNECTED);
-}
+	case LTE_CONNECTED_E:
+		k_poll_signal_raise(&signal_led, LTE_CONNECTED);
+		break;
 
-void publish_data_led(void)
-{
-	k_poll_signal_raise(&signal_led, PUBLISH_DATA);
+	case LTE_NOT_CONNECTED_E:
+		k_poll_signal_raise(&signal_led, LTE_NOT_CONNECTED);
+		break;
+
+	case PUBLISH_DATA_E:
+		k_poll_signal_raise(&signal_led, PUBLISH_DATA);
+		break;
+
+	case PUBLISH_DATA_STOP_E:
+		k_poll_signal_raise(&signal_led, PUBLISH_DATA_STOP);
+		break;
+
+	default:
+		break;
+	}
 }

@@ -56,11 +56,10 @@ static void gps_work_handler(struct k_work *work)
 
 void gps_control_stop(void)
 {
-	// lte_lc_psm_req(false);
+	set_led_state(GPS_SEARCH_STOP_E);
 
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
-	gps_search_led_stop();
 	k_poll(gps_events, 1, K_SECONDS(GPS_THREAD_DEADLINE));
 
 	if (gps_events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -74,16 +73,14 @@ void gps_control_stop(void)
 
 void gps_control_start(void)
 {
-	// lte_lc_psm_req(true);
+	set_led_state(GPS_SEARCH_E);
 
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);
-	gps_search_led_start();
 }
 
 void gps_control_on_trigger(void)
 {
-	gps_search_led_stop_fix();
 	gps_control_stop();
 
 	if (++gps_work.fix_count == CONFIG_GPS_CONTROL_FIX_COUNT) {

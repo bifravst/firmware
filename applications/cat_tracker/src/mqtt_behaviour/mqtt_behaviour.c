@@ -8,7 +8,6 @@
 #include <time.h>
 #include <gps.h>
 #include <mqtt_codec.h>
-#include <leds.h>
 
 #define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 5
@@ -556,8 +555,6 @@ int publish_data(bool syncronization, bool pub_modem_d)
 	}
 
 	if (connected) {
-		publish_data_led();
-
 		if (syncronization) {
 			transmit_data.buf = "";
 			transmit_data.len = strlen(transmit_data.buf);

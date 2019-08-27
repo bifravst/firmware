@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include "cJSON.h"
 #include "cJSON_os.h"
-#include "version.h"
+#include "../version.h"
 
 bool change_gpst = true;
 bool change_active = true;

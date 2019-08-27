@@ -90,6 +90,7 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 	int err;
 
 	if (lte_connected) {
+		set_led_state(PUBLISH_DATA_E);
 		attach_battery_data(request_battery_status());
 
 		set_gps_found(gps_fix);
@@ -98,6 +99,8 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 		if (err != 0) {
 			printk("Error publishing data: %d", err);
 		}
+		set_led_state(PUBLISH_DATA_STOP_E);
+
 	} else {
 		printk("Publish of data denied, LTE not connected\n");
 	}
@@ -250,6 +253,8 @@ static void lte_connect()
 {
 	int err;
 
+	set_led_state(LTE_CONNECTING_E);
+
 	k_sem_init(&connect_sem, 0, 1);
 	err = lte_lc_init_connect_manager(connection_handler);
 	if (err != 0) {
@@ -257,9 +262,14 @@ static void lte_connect()
 	}
 
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
-		lte_lc_psm_req(true);
+		set_led_state(LTE_CONNECTED_E);
+
+		k_sleep(5000);
+
 		cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
+		lte_lc_psm_req(true);
 	} else {
+		set_led_state(LTE_NOT_CONNECTED_E);
 		lte_lc_gps_mode();
 	}
 }
