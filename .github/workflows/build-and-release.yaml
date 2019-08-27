@@ -38,12 +38,14 @@ jobs:
       - name: Patch West to enable nrf9160_pca10015ns
         run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
+      - name: Install Node dependencies
+        run: npm ci
+
       - name: Determin next release version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
-          npm ci
           export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
           echo "#define DEVICE_APP_VERSION \"$NEXT_VERSION\"" > ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
           cat ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h

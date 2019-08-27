@@ -16,4 +16,4 @@ Supported boards:
 
 ## Automated releases
 
-This project uses [Semantic Release](https://github.com/semantic-release/semantic-release) to automate releases. Every commit is run on [Circle CI](https://circleci.com/gh/bifravst/cat-tracker-fw/tree/saga) and depending on the commit message an new GitHub [release](https://github.com/bifravst/cat-tracker-fw/releases) is created and pre-build hex-files for all supported boards are attached.
+This project uses [Semantic Release](https://github.com/semantic-release/semantic-release) to automate releases. Every commit is run using [GitHub Actions](https://github.com/features/actions) and depending on the commit message an new GitHub [release](https://github.com/bifravst/cat-tracker-fw/releases) is created and pre-build hex-files for all supported boards are attached.
