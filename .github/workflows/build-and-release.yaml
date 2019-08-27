@@ -41,7 +41,7 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Determin next release version
+      - name: Determine next release version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
