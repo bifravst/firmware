@@ -580,6 +580,7 @@ int publish_data(bool syncronization, bool pub_modem_d)
 			transmit_data.topic = update_topic;
 			printk("Entry: %d in gps_buffer published\n",
 			       head_cir_buf);
+			cir_buf_gps[head_cir_buf].queued = false;
 		}
 
 		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
@@ -657,6 +658,7 @@ int publish_data(bool syncronization, bool pub_modem_d)
 
 				printk("Entry: %d in gps_buffer published\n",
 				       i);
+				cir_buf_gps[i].queued = false;
 
 				err = process_mqtt_and_sleep(&client,
 							     APP_SLEEP_MS);

@@ -224,8 +224,6 @@ int encode_gps_buffer(struct Transmit_data *output,
 	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
 	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
 
-	cir_buf_gps->queued = false;
-
 	err += json_add_obj(gps_obj, "v", gps_val_obj);
 	err += json_add_number(
 		gps_obj, "ts",
@@ -419,8 +417,6 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
 	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
 	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
-
-	cir_buf_gps->queued = false;
 
 	/*CFG*/
 
