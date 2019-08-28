@@ -12,6 +12,7 @@
 #include <gps_controller.h>
 #include <mqtt_codec.h>
 #include <leds.h>
+#include <net/cloud.h>
 
 #define NORMAL_OPERATION false
 #define SYNCRONIZATION true
@@ -22,6 +23,8 @@
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
 #define LTE_CONN_TIMEOUT 10
+
+static struct cloud_backend *cloud_backend;
 
 static bool active;
 static bool lte_connected = false;
@@ -43,7 +46,8 @@ struct k_poll_event events[2] = {
 enum error_type {
 	ERROR_BSD_RECOVERABLE,
 	ERROR_BSD_IRRECOVERABLE,
-	ERROR_SYSTEM_FAULT
+	ERROR_SYSTEM_FAULT,
+	ERROR_CLOUD
 };
 
 void error_handler(enum error_type err_type, int err_code)
@@ -63,6 +67,11 @@ void error_handler(enum error_type err_type, int err_code)
 	case ERROR_SYSTEM_FAULT:
 		printk("Error of type ERROR_SYSTEM_FAULT: %d\n", err_code);
 		break;
+
+	case ERROR_CLOUD:
+		printk("Error of type ERROR_CLOUD: %d\n", err_code);
+		break;
+
 	default:
 		printk("Unknown error type: %d, code: %d\n", err_type,
 		       err_code);
@@ -85,7 +94,12 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	CODE_UNREACHABLE;
 }
 
-static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
+void cloud_error_handler(int err)
+{
+	error_handler(ERROR_CLOUD, err);
+}
+
+static void cloud_report(bool gps_fix)
 {
 	int err;
 
@@ -95,10 +109,12 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 
 		set_gps_found(gps_fix);
 
-		err = publish_data(action, inc_modem_d);
-		if (err != 0) {
-			printk("Error publishing data: %d", err);
+		err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
+		if (err) {
+			printk("cloud_report_and_update failed: %d\n", err);
+			cloud_error_handler(err);
 		}
+
 		set_led_state(PUBLISH_DATA_STOP_E);
 
 	} else {
@@ -106,16 +122,27 @@ static void cloud_publish(bool gps_fix, bool action, bool inc_modem_d)
 	}
 }
 
-static struct k_work cloud_get_work;
-
-static void cloud_get_work_fn(struct k_work *work)
+static void cloud_pair(bool gps_fix)
 {
-	cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
-}
+	int err;
 
-static void work_init(void)
-{
-	k_work_init(&cloud_get_work, cloud_get_work_fn);
+	if (lte_connected) {
+		set_led_state(PUBLISH_DATA_E);
+		attach_battery_data(request_battery_status());
+
+		set_gps_found(gps_fix);
+
+		err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
+		if (err) {
+			printk("cloud_report_and_update failed: %d\n", err);
+			cloud_error_handler(err);
+		}
+
+		set_led_state(PUBLISH_DATA_STOP_E);
+
+	} else {
+		printk("Publish of data denied, LTE not connected\n");
+	}
 }
 
 static const char status1[] = "+CEREG: 1";
@@ -230,7 +257,7 @@ static void adxl362_init(void)
 
 void movement_timeout_handler(struct k_work *work)
 {
-	cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, INCLUDE_MOD_D);
+	cloud_report(NO_GPS_FIX);
 }
 
 K_WORK_DEFINE(my_work, movement_timeout_handler);
@@ -265,7 +292,7 @@ static void lte_connect()
 
 		k_sleep(5000);
 
-		cloud_publish(NO_GPS_FIX, SYNCRONIZATION, INCLUDE_MOD_D);
+		cloud_pair(NO_GPS_FIX);
 		lte_lc_psm_req(true);
 	} else {
 		set_led_state(LTE_NOT_CONNECTED_E);
@@ -275,10 +302,21 @@ static void lte_connect()
 
 void main(void)
 {
+	int err;
+
 	printk("The cat tracker has started\n");
-	work_init();
+
+	cloud_backend = cloud_get_binding("CAT_CLOUD");
+	__ASSERT(cloud_backend != NULL, "Cat Cloud backend not found");
+
+	err = cloud_init_config(cloud_backend);
+	if (err) {
+		printk("Cloud backend could not be initialized, error: %d\n",
+		       err);
+		cloud_error_handler(err);
+	}
+
 	adxl362_init();
-	cloud_configuration_init();
 	lte_connect();
 	gps_control_init(gps_control_handler);
 
@@ -310,10 +348,10 @@ gps_search:
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
-		cloud_publish(GPS_FIX, NORMAL_OPERATION, active);
+		cloud_report(GPS_FIX);
 	} else {
 		gps_control_stop();
-		cloud_publish(NO_GPS_FIX, NORMAL_OPERATION, active);
+		cloud_report(NO_GPS_FIX);
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;

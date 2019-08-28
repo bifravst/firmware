@@ -109,6 +109,7 @@ typedef void (*cloud_evt_handler_t)(const struct cloud_backend *const backend,
 struct cloud_api {
 	int (*init)(const struct cloud_backend *const backend,
 		    cloud_evt_handler_t handler);
+	int (*init_config)(const struct cloud_backend *const backend);
 	int (*uninit)(const struct cloud_backend *const backend);
 	int (*connect)(const struct cloud_backend *const backend);
 	int (*disconnect)(const struct cloud_backend *const backend);
@@ -125,6 +126,8 @@ struct cloud_api {
 				size_t list_count);
 	int (*user_data_set)(const struct cloud_backend *const backend,
 			     void *user_data);
+	int (*report_and_update)(const struct cloud_backend *const backend,
+				 const enum cloud_action_type action);
 };
 
 /**@brief Structure for cloud backend configuration. */
@@ -163,6 +166,16 @@ static inline int cloud_init(struct cloud_backend *const backend,
 	}
 
 	return backend->api->init(backend, handler);
+}
+
+static inline int cloud_init_config(struct cloud_backend *const backend)
+{
+	if (backend == NULL || backend->api == NULL ||
+	    backend->api->init_config == NULL) {
+		return -ENOTSUP;
+	}
+
+	return backend->api->init_config(backend);
 }
 
 /**@brief Uninitialize a cloud backend. Gracefully disconnects
@@ -343,19 +356,15 @@ static inline int cloud_user_data_set(struct cloud_backend *const backend,
  **/
 struct cloud_backend *cloud_get_binding(const char *name);
 
-#define CLOUD_BACKEND_DEFINE(_name, _api)			               \
-									       \
-	static struct cloud_backend_config UTIL_CAT(_name, _config) =	       \
-	{								       \
-		.name = STRINGIFY(_name)				       \
-	};								       \
-									       \
-	static const struct cloud_backend _name				       \
-	__attribute__ ((section(".cloud_backends"))) __attribute__((used)) =   \
-	{								       \
-		.api = &_api,						       \
-		.config = &UTIL_CAT(_name, _config)			       \
-	};
+#define CLOUD_BACKEND_DEFINE(_name, _api)                                      \
+                                                                               \
+	static struct cloud_backend_config UTIL_CAT(                           \
+		_name, _config) = { .name = STRINGIFY(_name) };                \
+                                                                               \
+	static const struct cloud_backend _name                                \
+		__attribute__((section(".cloud_backends"))) __attribute__(     \
+			(used)) = { .api = &_api,                              \
+				    .config = &UTIL_CAT(_name, _config) };
 
 /**
  * @}

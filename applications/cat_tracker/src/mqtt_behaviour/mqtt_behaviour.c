@@ -1,6 +1,8 @@
 #include <mqtt_behaviour.h>
 #include <net/mqtt.h>
 #include <net/socket.h>
+#include <net/cloud.h>
+#include <net/cloud_backend.h>
 #include <lte_lc.h>
 #include <nrf_socket.h>
 #include <stdio.h>
@@ -11,32 +13,6 @@
 
 #define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 5
-
-struct Sync_data_GPS cir_buf_gps[MAX_CIR_BUF];
-
-int head_cir_buf = 0;
-
-struct Sync_data sync_data = { .gps_timeout = 1000,
-			       .active = true,
-			       .active_wait = 60,
-			       .passive_wait = 300,
-			       .movement_timeout = 3600,
-			       .accel_threshold = 100,
-			       .gps_found = false };
-
-static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
-
-static struct mqtt_client client;
-
-static struct sockaddr_storage broker;
-
-static struct pollfd fds;
-
-static bool connected;
-
-static int nfds;
 
 #define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
 #define CLOUD_PORT CONFIG_CLOUD_PORT
@@ -85,88 +61,31 @@ static const struct mqtt_topic cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-static int client_id_get(char *id)
-{
-	int at_socket_fd;
-	int bytes_written;
-	int bytes_read;
-	char imei_buf[IMEI_LEN + 1];
-	int ret;
+struct Sync_data_GPS cir_buf_gps[MAX_CIR_BUF];
 
-	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
-	__ASSERT_NO_MSG(at_socket_fd >= 0);
+int head_cir_buf = 0;
 
-	bytes_written = nrf_write(at_socket_fd, "AT+CGSN", 7);
-	__ASSERT_NO_MSG(bytes_written == 7);
+struct Sync_data sync_data = { .gps_timeout = 1000,
+			       .active = true,
+			       .active_wait = 60,
+			       .passive_wait = 300,
+			       .movement_timeout = 3600,
+			       .accel_threshold = 100,
+			       .gps_found = false };
 
-	bytes_read = nrf_read(at_socket_fd, imei_buf, IMEI_LEN);
-	__ASSERT_NO_MSG(bytes_read == IMEI_LEN);
-	imei_buf[IMEI_LEN] = 0;
+static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
+static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
+static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
 
-	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
+static struct mqtt_client client;
 
-	ret = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(ret == 0);
+static struct sockaddr_storage broker;
 
-	return 0;
-}
+static struct pollfd fds;
 
-static int topics_populate(void)
-{
-	int err;
+static bool connected;
 
-	err = client_id_get(client_id_buf);
-	if (err != 0) {
-		return err;
-	}
-
-	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
-		       SHADOW_BASE_TOPIC, client_id_buf);
-	if (err != SHADOW_BASE_TOPIC_LEN) {
-		return -ENOMEM;
-	}
-
-	err = snprintf(accepted_topic, sizeof(accepted_topic), ACCEPTED_TOPIC,
-		       client_id_buf);
-	if (err != ACCEPTED_TOPIC_LEN) {
-		return -ENOMEM;
-	}
-
-	err = snprintf(rejected_topic, sizeof(rejected_topic), REJECTED_TOPIC,
-		       client_id_buf);
-	if (err != REJECTED_TOPIC_LEN) {
-		return -ENOMEM;
-	}
-
-	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
-		       UPDATE_DELTA_TOPIC, client_id_buf);
-	if (err != UPDATE_DELTA_TOPIC_LEN) {
-		return -ENOMEM;
-	}
-
-	err = snprintf(update_topic, sizeof(update_topic), UPDATE_TOPIC,
-		       client_id_buf);
-	if (err != UPDATE_TOPIC_LEN) {
-		return -ENOMEM;
-	}
-
-	err = snprintf(get_topic, sizeof(get_topic), SHADOW_GET, client_id_buf);
-	if (err != SHADOW_GET_LEN) {
-		return -ENOMEM;
-	}
-
-	return 0;
-}
-
-void cloud_configuration_init(void)
-{
-	int err;
-
-	err = topics_populate();
-	if (err) {
-		printk("Could not populate topics: %d\n", err);
-	}
-}
+static int nfds;
 
 void set_gps_found(bool gps_found)
 {
@@ -247,7 +166,93 @@ void attach_accel_data(double x, double y, double z)
 	sync_data.acc_timestamp = k_uptime_get();
 }
 
-void data_print(u8_t *prefix, u8_t *data, size_t len)
+static int client_id_get(char *id)
+{
+	int at_socket_fd;
+	int bytes_written;
+	int bytes_read;
+	char imei_buf[IMEI_LEN + 1];
+	int ret;
+
+	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
+	__ASSERT_NO_MSG(at_socket_fd >= 0);
+
+	bytes_written = nrf_write(at_socket_fd, "AT+CGSN", 7);
+	__ASSERT_NO_MSG(bytes_written == 7);
+
+	bytes_read = nrf_read(at_socket_fd, imei_buf, IMEI_LEN);
+	__ASSERT_NO_MSG(bytes_read == IMEI_LEN);
+	imei_buf[IMEI_LEN] = 0;
+
+	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
+
+	ret = nrf_close(at_socket_fd);
+	__ASSERT_NO_MSG(ret == 0);
+
+	return 0;
+}
+
+static int topics_populate(void)
+{
+	int err;
+
+	err = client_id_get(client_id_buf);
+	if (err != 0) {
+		return err;
+	}
+
+	err = snprintf(shadow_base_topic, sizeof(shadow_base_topic),
+		       SHADOW_BASE_TOPIC, client_id_buf);
+	if (err != SHADOW_BASE_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(accepted_topic, sizeof(accepted_topic), ACCEPTED_TOPIC,
+		       client_id_buf);
+	if (err != ACCEPTED_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(rejected_topic, sizeof(rejected_topic), REJECTED_TOPIC,
+		       client_id_buf);
+	if (err != REJECTED_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
+		       UPDATE_DELTA_TOPIC, client_id_buf);
+	if (err != UPDATE_DELTA_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(update_topic, sizeof(update_topic), UPDATE_TOPIC,
+		       client_id_buf);
+	if (err != UPDATE_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(get_topic, sizeof(get_topic), SHADOW_GET, client_id_buf);
+	if (err != SHADOW_GET_LEN) {
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int init_config(const struct cloud_backend *const backend)
+{
+	int err;
+
+	err = topics_populate();
+	if (err) {
+		printk("Could not populate topics: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
+static void data_print(u8_t *prefix, u8_t *data, size_t len)
 {
 	char buf[len + 1];
 
@@ -256,8 +261,8 @@ void data_print(u8_t *prefix, u8_t *data, size_t len)
 	printk("%s%s\n", prefix, buf);
 }
 
-int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
-		 size_t len, u8_t *topic)
+static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
+			size_t len, u8_t *topic)
 {
 	struct mqtt_publish_param param;
 
@@ -276,7 +281,7 @@ int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	return mqtt_publish(c, &param);
 }
 
-int subscribe(void)
+static int subscribe(void)
 {
 	const struct mqtt_subscription_list subscription_list = {
 		.list = (struct mqtt_topic *)&cc_rx_list,
@@ -292,7 +297,8 @@ int subscribe(void)
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-int publish_get_payload(struct mqtt_client *c, u8_t *write_buf, size_t length)
+static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
+			       size_t length)
 {
 	u8_t *buf = write_buf;
 	u8_t *end = buf + length;
@@ -313,7 +319,13 @@ int publish_get_payload(struct mqtt_client *c, u8_t *write_buf, size_t length)
 	return 0;
 }
 
-void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
+static void clear_fds(void)
+{
+	nfds = 0;
+}
+
+static void mqtt_evt_handler(struct mqtt_client *const c,
+			     const struct mqtt_evt *evt)
 {
 	int err;
 
@@ -392,7 +404,7 @@ void mqtt_evt_handler(struct mqtt_client *const c, const struct mqtt_evt *evt)
 	}
 }
 
-void broker_init(void)
+static void broker_init(void)
 {
 	int err;
 	struct addrinfo *result;
@@ -442,7 +454,7 @@ void broker_init(void)
 	freeaddrinfo(result);
 }
 
-void client_init(struct mqtt_client *client)
+static void client_init(struct mqtt_client *client)
 {
 	mqtt_client_init(client);
 
@@ -477,12 +489,7 @@ void client_init(struct mqtt_client *client)
 #endif
 }
 
-void clear_fds(void)
-{
-	nfds = 0;
-}
-
-void wait(int timeout)
+static void wait(int timeout)
 {
 	if (nfds > 0) {
 		if (poll(&fds, nfds, timeout) < 0) {
@@ -491,7 +498,7 @@ void wait(int timeout)
 	}
 }
 
-int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
+static int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
 {
 	s64_t remaining = timeout;
 	s64_t start_time = k_uptime_get();
@@ -518,7 +525,7 @@ int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
 	return 0;
 }
 
-int mqtt_enable(struct mqtt_client *client)
+static int mqtt_enable(struct mqtt_client *client)
 {
 	int err, i = 0;
 
@@ -556,7 +563,8 @@ int mqtt_enable(struct mqtt_client *client)
 	return -EINVAL;
 }
 
-int publish_data(bool syncronization, bool pub_modem_d)
+static int report_and_update(const struct cloud_backend *const backend,
+			     const enum cloud_action_type action)
 {
 	int err;
 	struct Transmit_data transmit_data;
@@ -566,22 +574,12 @@ int publish_data(bool syncronization, bool pub_modem_d)
 		printk("Could not connect to client: %d\n", err);
 	}
 
-	if (connected) {
-		if (syncronization) {
-			transmit_data.buf = "";
-			transmit_data.len = strlen(transmit_data.buf);
-			transmit_data.topic = get_topic;
-		} else {
-			err = encode_message(&transmit_data, &sync_data,
-					     &cir_buf_gps[head_cir_buf]);
-			if (err != 0) {
-				goto end;
-			}
-			transmit_data.topic = update_topic;
-			printk("Entry: %d in gps_buffer published\n",
-			       head_cir_buf);
-			cir_buf_gps[head_cir_buf].queued = false;
-		}
+	switch (action) {
+	case CLOUD_PAIR:
+
+		transmit_data.buf = "";
+		transmit_data.len = strlen(transmit_data.buf);
+		transmit_data.topic = get_topic;
 
 		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
 				   transmit_data.buf, transmit_data.len,
@@ -596,81 +594,126 @@ int publish_data(bool syncronization, bool pub_modem_d)
 			goto end;
 		}
 
-		if (check_config_change()) {
-			err = encode_message(&transmit_data, &sync_data,
-					     &cir_buf_gps[head_cir_buf]);
-			if (err != 0) {
-				goto end;
-			}
-			transmit_data.topic = update_topic;
+		err = encode_modem_data(&transmit_data, true);
+		if (err != 0) {
+			goto end;
+		}
+		transmit_data.topic = update_topic;
 
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				     transmit_data.buf, transmit_data.len,
-				     transmit_data.topic);
-			if (err != 0) {
-				goto end;
-			}
-
-			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-			if (err != 0) {
-				goto end;
-			}
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			     transmit_data.buf, transmit_data.len,
+			     transmit_data.topic);
+		if (err != 0) {
+			goto end;
 		}
 
-		if (pub_modem_d) {
-			err = encode_modem_data(&transmit_data, syncronization);
-			if (err != 0) {
-				goto end;
-			}
-			transmit_data.topic = update_topic;
-
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				     transmit_data.buf, transmit_data.len,
-				     transmit_data.topic);
-			if (err != 0) {
-				goto end;
-			}
-
-			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-			if (err != 0) {
-				goto end;
-			}
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
 		}
 
-		/*Experimental */
+		break;
 
-		for (int i = 0; i < MAX_CIR_BUF; i++) {
-			if (cir_buf_gps[i].queued) {
-				err = encode_gps_buffer(&transmit_data,
-							&cir_buf_gps[i]);
-				if (err != 0) {
-					goto end;
-				}
-				transmit_data.topic = update_topic;
+	case CLOUD_REPORT:
 
-				data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-					     transmit_data.buf,
-					     transmit_data.len,
-					     transmit_data.topic);
-				if (err != 0) {
-					goto end;
-				}
+		err = encode_message(&transmit_data, &sync_data,
+				     &cir_buf_gps[head_cir_buf]);
+		if (err != 0) {
+			goto end;
+		}
+		transmit_data.topic = update_topic;
 
-				printk("Entry: %d in gps_buffer published\n",
-				       i);
-				cir_buf_gps[i].queued = false;
+		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				   transmit_data.buf, transmit_data.len,
+				   transmit_data.topic);
 
-				err = process_mqtt_and_sleep(&client,
-							     APP_SLEEP_MS);
-				if (err != 0) {
-					goto end;
-				}
-			}
+		if (err != 0) {
+			goto end;
 		}
 
-		head_cir_buf = 0;
-		/*End experimental */
+		printk("Entry: %d in gps_buffer published\n", head_cir_buf);
+		cir_buf_gps[head_cir_buf].queued = false;
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
+		}
+
+		err = encode_modem_data(&transmit_data, false);
+		if (err != 0) {
+			goto end;
+		}
+		transmit_data.topic = update_topic;
+
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			     transmit_data.buf, transmit_data.len,
+			     transmit_data.topic);
+		if (err != 0) {
+			goto end;
+		}
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
+		}
+
+		break;
+
+	default:
+		break;
 	}
+
+	if (check_config_change()) {
+		err = encode_message(&transmit_data, &sync_data,
+				     &cir_buf_gps[head_cir_buf]);
+		if (err != 0) {
+			goto end;
+		}
+		transmit_data.topic = update_topic;
+
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			     transmit_data.buf, transmit_data.len,
+			     transmit_data.topic);
+		if (err != 0) {
+			goto end;
+		}
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
+		}
+	}
+
+	/*Experimental */
+
+	for (int i = 0; i < MAX_CIR_BUF; i++) {
+		if (cir_buf_gps[i].queued) {
+			err = encode_gps_buffer(&transmit_data,
+						&cir_buf_gps[i]);
+			if (err != 0) {
+				goto end;
+			}
+			transmit_data.topic = update_topic;
+
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				     transmit_data.buf, transmit_data.len,
+				     transmit_data.topic);
+			if (err != 0) {
+				goto end;
+			}
+
+			printk("Entry: %d in gps_buffer published\n", i);
+			cir_buf_gps[i].queued = false;
+
+			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			if (err != 0) {
+				goto end;
+			}
+		}
+	}
+
+	head_cir_buf = 0;
+	/*End experimental */
 
 	err = mqtt_disconnect(&client);
 	if (err) {
@@ -699,3 +742,10 @@ end:
 
 	return err;
 }
+
+static const struct cloud_api cat_cloud_api = {
+	.report_and_update = report_and_update,
+	.init_config = init_config,
+};
+
+CLOUD_BACKEND_DEFINE(CAT_CLOUD, cat_cloud_api);
