@@ -112,7 +112,6 @@ static void cloud_report(bool gps_fix)
 		err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
 		if (err) {
 			printk("cloud_report_and_update failed: %d\n", err);
-			cloud_error_handler(err);
 		}
 
 		set_led_state(PUBLISH_DATA_STOP_E);
@@ -135,7 +134,6 @@ static void cloud_pair(bool gps_fix)
 		err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
 		if (err) {
 			printk("cloud_report_and_update failed: %d\n", err);
-			cloud_error_handler(err);
 		}
 
 		set_led_state(PUBLISH_DATA_STOP_E);
