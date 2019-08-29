@@ -80,6 +80,8 @@ int modem_time_get(void)
 	__ASSERT_NO_MSG(bytes_read == TIME_LEN);
 	modem_ts_buf[TIME_LEN] = 0;
 
+	printk("Time obtained from modem: %s\n", modem_ts_buf);
+
 	for (int i = 8; i < 28; i++) {
 		modem_ts[i - 8] = modem_ts_buf[i];
 	}
