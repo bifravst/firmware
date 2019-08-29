@@ -162,7 +162,7 @@ static const char status4[] = "+CEREG:5";
 
 void connection_handler(char *response)
 {
-	printk("recv: %s", response);
+	printk("Incoming network registration status: %s", response);
 
 	if (!memcmp(status1, response, AT_CMD_SIZE(status1)) ||
 	    !memcmp(status2, response, AT_CMD_SIZE(status2)) ||
@@ -176,8 +176,6 @@ void connection_handler(char *response)
 		}
 
 	} else {
-		printk("LTE disconnected\n");
-
 		lte_connected = false;
 	}
 }
@@ -288,6 +286,8 @@ static void lte_connect()
 		printk("Error setting lte_connect manager: %d\n", err);
 	}
 
+	printk("Searching for LTE connection... timeout in %d minutes\n", LTE_CONN_TIMEOUT);
+
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
 		set_led_state(LTE_CONNECTED_E);
 
@@ -301,6 +301,7 @@ static void lte_connect()
 		cloud_pair(NO_GPS_FIX);
 		lte_lc_psm_req(true);
 	} else {
+		printk("LTE not connected within %d minutes, starting gps search\n", LTE_CONN_TIMEOUT);
 		set_led_state(LTE_NOT_CONNECTED_E);
 		lte_lc_gps_mode();
 	}
