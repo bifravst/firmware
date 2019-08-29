@@ -54,10 +54,16 @@ enum error_type {
 
 void error_handler(enum error_type err_type, int err_code)
 {
+	set_led_state(ERROR_E);
+	k_sleep(K_SECONDS(30));
+
 #if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
 	LOG_PANIC();
 	sys_reboot(0);
 #else
+
+	
+
 	switch (err_type) {
 	case ERROR_BSD_RECOVERABLE:
 		printk("Error of type ERROR_BSD_RECOVERABLE: %d\n", err_code);
@@ -334,10 +340,14 @@ void main(void)
 check_mode:
 	start_restart_mov_timer();
 	if (check_mode()) {
+		set_led_state(ACTIVE_MODE_E);
 		active = true;
+		k_sleep(15000);
 		goto active;
 	} else {
+		set_led_state(PASSIVE_MODE_E);
 		active = false;
+		k_sleep(15000);
 		goto passive;
 	}
 

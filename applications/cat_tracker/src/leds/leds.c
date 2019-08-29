@@ -11,7 +11,9 @@
 #define LED2 1
 #define LED3 2
 
-#define GPS_SEARCH_STOP_FIX 0x1336
+#define PASSIVE_MODE 0x1334
+#define ACTIVE_MODE 0x1335
+#define ERROR 0x1336
 #define GPS_SEARCH 0x1337
 #define GPS_SEARCH_STOP 0x1338
 #define LTE_CONNECTING 0x1339
@@ -23,6 +25,7 @@
 #define LED_PULSE_CYCLE 1000
 #define PROLONGED_DELAY 3500
 #define MID_DELAY 2000
+#define SHORT_DELAY 500
 
 struct k_poll_signal signal_led;
 static int state;
@@ -48,7 +51,7 @@ static struct device *led_devs[ARRAY_SIZE(led_pins)];
 
 void led_FSM(void)
 {
-	int err, cnt = 0;
+	int err, iterations, cnt = 0;
 
 	k_poll_signal_init(&signal_led);
 
@@ -85,6 +88,8 @@ void led_FSM(void)
 			while (1) {
 				gpio_pin_write(led_devs[LED1],
 					       led_pins[LED1].number, cnt % 2);
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, cnt % 2);
 				cnt++;
 
 				k_poll(events, 1, MID_DELAY);
@@ -100,24 +105,23 @@ void led_FSM(void)
 
 			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
 				       false);
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
 
 			k_poll(events, 1, K_FOREVER);
 			break;
 
-		case GPS_SEARCH_STOP_FIX:
+		case ERROR:
 			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
-				       false);
-			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
 				       true);
-			k_sleep(2000);
-			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
-				       false);
 			k_poll(events, 1, K_FOREVER);
 			break;
 
 		case LTE_CONNECTING:
 
 			while (1) {
+				gpio_pin_write(led_devs[LED1],
+					       led_pins[LED2].number, cnt % 2);
 				gpio_pin_write(led_devs[LED2],
 					       led_pins[LED2].number, cnt % 2);
 				cnt++;
@@ -131,24 +135,21 @@ void led_FSM(void)
 
 			break;
 		case LTE_CONNECTED:
-
-			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
-				       true);
-			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
-				       true);
 			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       true);
+			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
 				       true);
 			k_sleep(PROLONGED_DELAY);
-			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
-				       false);
-			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
-				       false);
 			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
+			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
 				       false);
 			k_poll(events, 1, K_FOREVER);
 			break;
 
 		case LTE_NOT_CONNECTED:
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
 			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
 				       false);
 
@@ -158,23 +159,23 @@ void led_FSM(void)
 		case PUBLISH_DATA:
 
 			while (1) {
-				gpio_pin_write(led_devs[LED3],
-					       led_pins[LED3].number, true);
+				gpio_pin_write(led_devs[LED2],
+					       led_pins[LED2].number, true);
 
 				k_sleep(250);
 
-				gpio_pin_write(led_devs[LED3],
-					       led_pins[LED3].number, false);
+				gpio_pin_write(led_devs[LED2],
+					       led_pins[LED2].number, false);
 
 				k_sleep(250);
 
-				gpio_pin_write(led_devs[LED3],
-					       led_pins[LED3].number, true);
+				gpio_pin_write(led_devs[LED2],
+					       led_pins[LED2].number, true);
 
 				k_sleep(300);
 
-				gpio_pin_write(led_devs[LED3],
-					       led_pins[LED3].number, false);
+				gpio_pin_write(led_devs[LED2],
+					       led_pins[LED2].number, false);
 
 				k_poll(events, 1, PROLONGED_DELAY);
 
@@ -185,6 +186,60 @@ void led_FSM(void)
 			break;
 
 		case PUBLISH_DATA_STOP:
+
+			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
+				       false);
+
+			k_poll(events, 1, K_FOREVER);
+
+			break;
+
+		case ACTIVE_MODE:
+
+			iterations = 0;
+			while (iterations < 4) {
+				gpio_pin_write(led_devs[LED1],
+					       led_pins[LED1].number, cnt % 2);
+				gpio_pin_write(led_devs[LED2],
+					       led_pins[LED2].number, cnt % 2);
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, cnt % 2);
+				cnt++;
+				iterations++;
+
+				k_poll(events, 1, SHORT_DELAY);
+
+				if (state == PASSIVE_MODE) {
+					break;
+				}
+			}
+
+			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+				       false);
+			gpio_pin_write(led_devs[LED2], led_pins[LED2].number,
+				       false);
+			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
+				       false);
+
+			k_poll(events, 1, K_FOREVER);
+
+			break;
+
+		case PASSIVE_MODE:
+
+		iterations = 0;
+			while (iterations < 4) {
+				gpio_pin_write(led_devs[LED3],
+					       led_pins[LED3].number, cnt % 2);
+				cnt++;
+				iterations++;
+
+				k_poll(events, 1, PROLONGED_DELAY);
+
+				if (state == PASSIVE_MODE) {
+					break;
+				}
+			}
 
 			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
 				       false);
@@ -219,8 +274,8 @@ void set_led_state(enum led_events led_event)
 		k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP);
 		break;
 
-	case GPS_SEARCH_STOP_FIX_E:
-		k_poll_signal_raise(&signal_led, GPS_SEARCH_STOP_FIX);
+	case ERROR_E:
+		k_poll_signal_raise(&signal_led, ERROR);
 		break;
 
 	case LTE_CONNECTING_E:
@@ -241,6 +296,14 @@ void set_led_state(enum led_events led_event)
 
 	case PUBLISH_DATA_STOP_E:
 		k_poll_signal_raise(&signal_led, PUBLISH_DATA_STOP);
+		break;
+
+	case ACTIVE_MODE_E:
+		k_poll_signal_raise(&signal_led, ACTIVE_MODE);
+		break;
+
+	case PASSIVE_MODE_E:
+		k_poll_signal_raise(&signal_led, PASSIVE_MODE);
 		break;
 
 	default:
