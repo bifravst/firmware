@@ -150,8 +150,6 @@ static const char status4[] = "+CEREG:5";
 
 void connection_handler(char *response)
 {
-	int err;
-
 	printk("recv: %s", response);
 
 	if (!memcmp(status1, response, AT_CMD_SIZE(status1)) ||
@@ -159,21 +157,14 @@ void connection_handler(char *response)
 	    !memcmp(status3, response, AT_CMD_SIZE(status3)) ||
 	    !memcmp(status4, response, AT_CMD_SIZE(status4))) {
 		if (!lte_connected) {
-			printk("CONNECTED\n");
-
-			k_sleep(5000);
-
-			err = modem_time_get();
-			if (err != 0) {
-				printk("Error fetching modem time\n");
-			}
+			printk("LTE connected\n");
 
 			lte_connected = true;
 			k_sem_give(&connect_sem);
 		}
 
 	} else {
-		printk("Disconnected\n");
+		printk("LTE disconnected\n");
 
 		lte_connected = false;
 	}
@@ -288,7 +279,12 @@ static void lte_connect()
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
 		set_led_state(LTE_CONNECTED_E);
 
-		k_sleep(5000);
+		k_sleep(10000);
+
+		err = modem_time_get();
+		if (err != 0) {
+			printk("Error fetching modem time\n");
+		}
 
 		cloud_pair(NO_GPS_FIX);
 		lte_lc_psm_req(true);
