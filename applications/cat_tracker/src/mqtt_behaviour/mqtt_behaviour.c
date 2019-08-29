@@ -297,25 +297,42 @@ static int subscribe(void)
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-static int publish_get_payload(struct mqtt_client *c, u8_t *write_buf,
-			       size_t length)
+static int publish_get_payload(struct mqtt_client *c, size_t length)
 {
-	u8_t *buf = write_buf;
+	u8_t *buf = payload_buf;
 	u8_t *end = buf + length;
 
 	if (length > sizeof(payload_buf)) {
 		return -EMSGSIZE;
 	}
+
 	while (buf < end) {
-		int ret = mqtt_read_publish_payload_blocking(c, buf, end - buf);
+		int ret = mqtt_read_publish_payload(c, buf, end - buf);
 
 		if (ret < 0) {
-			return ret;
-		} else if (ret == 0) {
+			int err;
+
+			if (ret != -EAGAIN) {
+				return ret;
+			}
+
+			printk("mqtt_read_publish_payload: EAGAIN\n");
+
+			err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+			if (err > 0 && (fds.revents & POLLIN) == POLLIN) {
+				continue;
+			} else {
+				return -EIO;
+			}
+		}
+
+		if (ret == 0) {
 			return -EIO;
 		}
+
 		buf += ret;
 	}
+
 	return 0;
 }
 
@@ -355,8 +372,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 
 		printk("[%s:%d] MQTT PUBLISH result=%d len=%d\n", __func__,
 		       __LINE__, evt->result, p->message.payload.len);
-		err = publish_get_payload(c, payload_buf,
-					  p->message.payload.len);
+		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
 			printk("mqtt_read_publish_payload: Failed! %d\n", err);
 			printk("Disconnecting MQTT client...\n");
