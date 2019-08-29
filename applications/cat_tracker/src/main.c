@@ -43,6 +43,8 @@ struct k_poll_event events[2] = {
 					&accel_trig_sem, 0)
 };
 
+static struct k_work cloud_report_work;
+
 enum error_type {
 	ERROR_BSD_RECOVERABLE,
 	ERROR_BSD_IRRECOVERABLE,
@@ -119,6 +121,16 @@ static void cloud_report(bool gps_fix)
 	} else {
 		printk("Publish of data denied, LTE not connected\n");
 	}
+}
+
+static void cloud_report_work_fn(struct k_work *work)
+{
+	cloud_report(NO_GPS_FIX);
+}
+
+static void work_init(void)
+{
+	k_work_init(&cloud_report_work, cloud_report_work_fn);
 }
 
 static void cloud_pair(bool gps_fix)
@@ -246,7 +258,7 @@ static void adxl362_init(void)
 
 void movement_timeout_handler(struct k_work *work)
 {
-	cloud_report(NO_GPS_FIX);
+	k_work_submit(&cloud_report_work);
 }
 
 K_WORK_DEFINE(my_work, movement_timeout_handler);
@@ -297,6 +309,8 @@ static void lte_connect()
 void main(void)
 {
 	int err;
+
+	work_init();
 
 	printk("The cat tracker has started\n");
 

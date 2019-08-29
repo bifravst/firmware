@@ -631,8 +631,11 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		printk("Entry: %d in gps_buffer published\n", head_cir_buf);
-		cir_buf_gps[head_cir_buf].queued = false;
+		if (sync_data.gps_found) {
+			printk("Entry: %d in gps_buffer published\n",
+			       head_cir_buf);
+			cir_buf_gps[head_cir_buf].queued = false;
+		}
 
 		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
 		if (err != 0) {
