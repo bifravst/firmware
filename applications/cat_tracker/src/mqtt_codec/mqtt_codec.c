@@ -368,6 +368,7 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
+	strcpy(modem_info->network.network_mode, "");
 
 	return 0;
 }
@@ -449,14 +450,12 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 	}
 
 	if (!change_config) {
-		if (sync_data->active == true &&
-		    sync_data->gps_found == false) {
+		if (sync_data->active && !sync_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 		}
 
-		if (sync_data->active == true && sync_data->gps_found == true) {
+		if (sync_data->active && sync_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
-
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(
 				gps_obj, "ts",
@@ -465,19 +464,14 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
-		if (sync_data->active == false &&
-		    sync_data->gps_found == false) {
+		if (!sync_data->active && !sync_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
-
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
 
-		if (sync_data->active == false &&
-		    sync_data->gps_found == true) {
+		if (!sync_data->active && sync_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
-
 			err += json_add_obj(reported_obj, "acc", acc_obj);
-
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(
 				gps_obj, "ts",
