@@ -27,12 +27,10 @@
 static struct cloud_backend *cloud_backend;
 
 static bool active;
-static bool lte_connected = false;
-
-static struct k_sem connect_sem;
 
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
+K_SEM_DEFINE(connect_sem, 0, 1);
 
 struct k_poll_event events[2] = {
 	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
@@ -61,8 +59,6 @@ void error_handler(enum error_type err_type, int err_code)
 	LOG_PANIC();
 	sys_reboot(0);
 #else
-
-	
 
 	switch (err_type) {
 	case ERROR_BSD_RECOVERABLE:
@@ -111,7 +107,8 @@ static void cloud_report(bool gps_fix)
 {
 	int err;
 
-	if (lte_connected) {
+	if (k_sem_count_get(&connect_sem) == 1) {
+		k_sem_give(&connect_sem);
 		set_led_state(PUBLISH_DATA_E);
 		attach_battery_data(request_battery_status());
 
@@ -143,7 +140,7 @@ static void cloud_pair(bool gps_fix)
 {
 	int err;
 
-	if (lte_connected) {
+	if (k_sem_count_get(&connect_sem) == 1) {
 		set_led_state(PUBLISH_DATA_E);
 		attach_battery_data(request_battery_status());
 
@@ -174,15 +171,13 @@ void connection_handler(char *response)
 	    !memcmp(status2, response, AT_CMD_SIZE(status2)) ||
 	    !memcmp(status3, response, AT_CMD_SIZE(status3)) ||
 	    !memcmp(status4, response, AT_CMD_SIZE(status4))) {
-		if (!lte_connected) {
-			printk("LTE connected\n");
-
-			lte_connected = true;
+		if (k_sem_count_get(&connect_sem) == 0) {
 			k_sem_give(&connect_sem);
 		}
-
 	} else {
-		lte_connected = false;
+		if (k_sem_count_get(&connect_sem) == 1) {
+			k_sem_take(&connect_sem, 0);
+		}
 	}
 }
 
@@ -286,7 +281,6 @@ static void lte_connect()
 
 	set_led_state(LTE_CONNECTING_E);
 
-	k_sem_init(&connect_sem, 0, 1);
 	err = lte_lc_init_connect_manager(connection_handler);
 	if (err != 0) {
 		printk("Error setting lte_connect manager: %d\n", err);
@@ -296,7 +290,10 @@ static void lte_connect()
 	       LTE_CONN_TIMEOUT);
 
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
+		k_sem_give(&connect_sem);
 		set_led_state(LTE_CONNECTED_E);
+
+		printk("LTE connected! \nFetching modem time...\n");
 
 		k_sleep(10000);
 
@@ -334,8 +331,14 @@ void main(void)
 	}
 
 	adxl362_init();
-	lte_connect();
 	gps_control_init(gps_control_handler);
+
+check_connection:
+	if (k_sem_count_get(&connect_sem) == 0) {
+		lte_connect();
+	}
+
+	goto check_mode;
 
 check_mode:
 	start_restart_mov_timer();
@@ -378,9 +381,5 @@ gps_search:
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
 
-	if (!lte_connected) {
-		lte_connect();
-	}
-
-	goto check_mode;
+	goto check_connection;
 }

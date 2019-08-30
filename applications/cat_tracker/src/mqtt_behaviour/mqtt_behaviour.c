@@ -588,6 +588,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 	err = mqtt_enable(&client);
 	if (err) {
 		printk("Could not connect to client: %d\n", err);
+		goto end;
 	}
 
 	switch (action) {

@@ -105,7 +105,7 @@ void led_FSM(void)
 
 			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
 				       false);
-			gpio_pin_write(led_devs[LED1], led_pins[LED1].number,
+			gpio_pin_write(led_devs[LED3], led_pins[LED3].number,
 				       false);
 
 			k_poll(events, 1, K_FOREVER);
@@ -121,7 +121,7 @@ void led_FSM(void)
 
 			while (1) {
 				gpio_pin_write(led_devs[LED1],
-					       led_pins[LED2].number, cnt % 2);
+					       led_pins[LED1].number, cnt % 2);
 				gpio_pin_write(led_devs[LED2],
 					       led_pins[LED2].number, cnt % 2);
 				cnt++;
@@ -227,7 +227,7 @@ void led_FSM(void)
 
 		case PASSIVE_MODE:
 
-		iterations = 0;
+			iterations = 0;
 			while (iterations < 4) {
 				gpio_pin_write(led_devs[LED3],
 					       led_pins[LED3].number, cnt % 2);
