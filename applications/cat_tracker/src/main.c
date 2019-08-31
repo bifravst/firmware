@@ -42,6 +42,8 @@ struct k_poll_event events[2] = {
 };
 
 static struct k_work cloud_report_work;
+static struct k_work cloud_report_fix_work;
+static struct k_work cloud_pair_work;
 
 enum error_type {
 	ERROR_BSD_RECOVERABLE,
@@ -109,6 +111,12 @@ static void cloud_report(bool gps_fix)
 
 	if (k_sem_count_get(&connect_sem) == 1) {
 		k_sem_give(&connect_sem);
+
+		err = modem_time_get();
+		if (err != 0) {
+			printk("Error fetching modem time\n");
+		}
+
 		set_led_state(PUBLISH_DATA_E);
 		attach_battery_data(request_battery_status());
 
@@ -126,25 +134,21 @@ static void cloud_report(bool gps_fix)
 	}
 }
 
-static void cloud_report_work_fn(struct k_work *work)
-{
-	cloud_report(NO_GPS_FIX);
-}
-
-static void work_init(void)
-{
-	k_work_init(&cloud_report_work, cloud_report_work_fn);
-}
-
-static void cloud_pair(bool gps_fix)
+static void cloud_pair()
 {
 	int err;
 
 	if (k_sem_count_get(&connect_sem) == 1) {
+
+		err = modem_time_get();
+		if (err != 0) {
+			printk("Error fetching modem time\n");
+		}
+
 		set_led_state(PUBLISH_DATA_E);
 		attach_battery_data(request_battery_status());
 
-		set_gps_found(gps_fix);
+		set_gps_found(false);
 
 		err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
 		if (err) {
@@ -156,6 +160,27 @@ static void cloud_pair(bool gps_fix)
 	} else {
 		printk("Publish of data denied, LTE not connected\n");
 	}
+}
+
+static void cloud_pair_work_fn(struct k_work *work) {
+	cloud_pair();
+}
+
+static void cloud_report_work_fn(struct k_work *work)
+{
+	cloud_report(NO_GPS_FIX);
+}
+
+static void cloud_report_fix_work_fn(struct k_work *work)
+{
+	cloud_report(GPS_FIX);
+}
+
+static void work_init(void)
+{
+	k_work_init(&cloud_report_work, cloud_report_work_fn);
+	k_work_init(&cloud_report_fix_work, cloud_report_fix_work_fn);
+	k_work_init(&cloud_pair_work, cloud_pair_work_fn);
 }
 
 static const char status1[] = "+CEREG: 1";
@@ -295,14 +320,9 @@ static void lte_connect()
 
 		printk("LTE connected! \nFetching modem time...\n");
 
-		k_sleep(10000);
+		k_sleep(5000);
 
-		err = modem_time_get();
-		if (err != 0) {
-			printk("Error fetching modem time\n");
-		}
-
-		cloud_pair(NO_GPS_FIX);
+		k_work_submit(&cloud_pair_work);
 		lte_lc_psm_req(true);
 	} else {
 		printk("LTE not connected within %d minutes, starting gps search\n",
@@ -372,10 +392,10 @@ gps_search:
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
-		cloud_report(GPS_FIX);
+		k_work_submit(&cloud_report_fix_work);
 	} else {
 		gps_control_stop();
-		cloud_report(NO_GPS_FIX);
+		k_work_submit(&cloud_report_fix_work);
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
