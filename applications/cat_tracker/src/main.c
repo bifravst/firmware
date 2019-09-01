@@ -390,10 +390,10 @@ gps_search:
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
 		k_sem_take(events[0].sem, 0);
-		k_work_submit(&cloud_report_work);
+		k_work_submit(&cloud_report_fix_work);
 	} else {
 		gps_control_stop();
-		k_work_submit(&cloud_report_fix_work);
+		k_work_submit(&cloud_report_work);
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
