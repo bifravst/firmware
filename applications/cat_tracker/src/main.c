@@ -363,12 +363,12 @@ check_mode:
 	if (check_mode()) {
 		set_led_state(ACTIVE_MODE_E);
 		active = true;
-		k_sleep(15000);
+		k_sleep(10000);
 		goto active;
 	} else {
 		set_led_state(PASSIVE_MODE_E);
 		active = false;
-		k_sleep(15000);
+		k_sleep(10000);
 		goto passive;
 	}
 

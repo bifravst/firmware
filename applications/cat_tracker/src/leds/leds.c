@@ -252,6 +252,11 @@ void led_FSM(void)
 			printk("Unknown state\n");
 			break;
 		}
+
+		gpio_pin_write(led_devs[LED1], led_pins[LED1].number, false);
+		gpio_pin_write(led_devs[LED2], led_pins[LED2].number, false);
+		gpio_pin_write(led_devs[LED3], led_pins[LED3].number, false);
+		gpio_pin_write(led_devs[LED4], led_pins[LED4].number, false);
 	}
 }
 
