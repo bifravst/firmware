@@ -105,11 +105,12 @@ int modem_time_get(void)
 			printk("Error fetching modem time: %d\n", err);
 		}
 		printk("Fetched modem time not current, trying again in %d\n", MODEM_TRY_AGAIN);
-		k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
 		modem_fetch_tries++
+		k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
+		
 	}
 
-	modem_fetch_tries = 0
+	modem_fetch_tries = 0;
 
 	epoch = mktime(&info);
 
