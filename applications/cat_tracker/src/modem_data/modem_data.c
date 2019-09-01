@@ -13,11 +13,14 @@
 #define TIME_LEN 50
 #define BAT_LEN 50
 #define RSRP_LEN 50
+#define MODEM_TRY_AGAIN 1
 
 time_t update_time;
 time_t epoch;
 
 struct modem_param_info modem_param;
+
+int modem_fetch_tries = 0;
 
 int get_time_info(char *datetime_string, int min, int max)
 {
@@ -95,6 +98,18 @@ int modem_time_get(void)
 	info.tm_hour = get_time_info(modem_ts, 9, 10);
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
+
+	if ((info.tm_year == 15) && (modem_fetch_tries < 120)) {
+		err = modem_time_get();
+		if(err != 0) {
+			printk("Error fetching modem time: %d\n", err);
+		}
+		printk("Fetched modem time not current, trying again in %d\n", MODEM_TRY_AGAIN);
+		k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
+		modem_fetch_tries++
+	}
+
+	modem_fetch_tries = 0
 
 	epoch = mktime(&info);
 
