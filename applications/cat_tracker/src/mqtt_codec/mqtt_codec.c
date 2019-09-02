@@ -202,7 +202,7 @@ end:
 	return 0;
 }
 
-static void bsortDesc(struct Sync_data_GPS *cir_buf_gps, int s)
+static void sort_gps_buf_descending(struct Sync_data_GPS *cir_buf_gps, int s)
 {
 	int i, j;
 	struct Sync_data_GPS temp;
@@ -257,7 +257,7 @@ int encode_gps_buffer(struct Transmit_data *output,
 		return -ENOMEM;
 	}
 
-	bsortDesc(cir_buf_gps, MAX_CIR_BUF);
+	sort_gps_buf_descending(cir_buf_gps, MAX_CIR_BUF);
 
 	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
