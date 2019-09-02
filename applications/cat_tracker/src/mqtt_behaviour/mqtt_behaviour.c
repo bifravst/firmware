@@ -93,6 +93,8 @@ static int nfds;
 
 static bool queued_entries = false;
 
+static bool include_static_modem_data;
+
 void set_gps_found(bool gps_found)
 {
 	sync_data.gps_found = gps_found;
@@ -623,23 +625,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		err = encode_modem_data(&transmit_data, true);
-		if (err != 0) {
-			goto end;
-		}
-		transmit_data.topic = update_topic;
-
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			goto end;
-		}
-
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			goto end;
-		}
+		include_static_modem_data = true;
 
 		break;
 
@@ -671,23 +657,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 			cir_buf_gps[head_cir_buf].queued = false;
 		}
 
-		err = encode_modem_data(&transmit_data, false);
-		if (err != 0) {
-			goto end;
-		}
-		transmit_data.topic = update_topic;
-
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			goto end;
-		}
-
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			goto end;
-		}
+		include_static_modem_data = false;
 
 		break;
 
@@ -747,6 +717,23 @@ static int report_and_update(const struct cloud_backend *const backend,
 	queued_entries = false;
 	head_cir_buf = 0;
 	/*End experimental */
+
+	err = encode_modem_data(&transmit_data, include_static_modem_data);
+	if (err != 0) {
+		goto end;
+	}
+	transmit_data.topic = update_topic;
+
+	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
+		     transmit_data.len, transmit_data.topic);
+	if (err != 0) {
+		goto end;
+	}
+
+	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	if (err != 0) {
+		goto end;
+	}
 
 	err = mqtt_disconnect(&client);
 	if (err) {
