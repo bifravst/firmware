@@ -13,7 +13,6 @@
 #define TIME_LEN 50
 #define BAT_LEN 50
 #define RSRP_LEN 50
-#define MODEM_TRY_AGAIN 1
 
 time_t update_time;
 time_t epoch;
@@ -83,11 +82,11 @@ int modem_time_get(void)
 	__ASSERT_NO_MSG(bytes_read == TIME_LEN);
 	modem_ts_buf[TIME_LEN] = 0;
 
-	printk("Time obtained from modem: %s\n", modem_ts_buf);
-
-	for (int i = 8; i < 28; i++) {
+	for (int i = 8; i < 25; i++) {
 		modem_ts[i - 8] = modem_ts_buf[i];
 	}
+
+	printk("Time from modem: %s\n", modem_ts);
 
 	err = nrf_close(at_socket_fd);
 	__ASSERT_NO_MSG(err == 0);
@@ -99,22 +98,22 @@ int modem_time_get(void)
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
 
-	if ((info.tm_year == 15) && (modem_fetch_tries < 120)) {
-		err = modem_time_get();
-		if(err != 0) {
-			printk("Error fetching modem time: %d\n", err);
-		}
-		printk("Fetched modem time not current, trying again in %d\n", MODEM_TRY_AGAIN);
+	if ((info.tm_year == 115) && (modem_fetch_tries < 20)) {
 		modem_fetch_tries++;
-		k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
-		
+		return -ENODATA;
 	}
 
-	modem_fetch_tries = 0;
+	if (info.tm_year == 115) {
+		printk("Could not fetch correct time from modem\n");
+	}
 
 	epoch = mktime(&info);
 
 	update_time = k_uptime_get();
+
+	printk("Modem time successfully obtained\n");
+
+	modem_fetch_tries = 0;
 
 	return 0;
 }
