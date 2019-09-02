@@ -41,6 +41,9 @@
 #define SHADOW_GET AWS "%s/shadow/get"
 #define SHADOW_GET_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 11)
 
+#define BATCH_TOPIC AWS "%s/batch"
+#define BATCH_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 6)
+
 #define CC_SUBSCRIBE_ID 1234
 
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
@@ -50,6 +53,7 @@ static char rejected_topic[REJECTED_TOPIC_LEN + 1];
 static char update_delta_topic[UPDATE_DELTA_TOPIC_LEN + 1];
 static char update_topic[UPDATE_TOPIC_LEN + 1];
 static char get_topic[SHADOW_GET_LEN + 1];
+static char batch_topic[BATCH_TOPIC_LEN + 1];
 
 static const struct mqtt_topic cc_rx_list[] = {
 	{ .topic = { .utf8 = accepted_topic, .size = ACCEPTED_TOPIC_LEN },
@@ -86,6 +90,8 @@ static struct pollfd fds;
 static bool connected;
 
 static int nfds;
+
+static bool queued_entries = false;
 
 void set_gps_found(bool gps_found)
 {
@@ -233,6 +239,12 @@ static int topics_populate(void)
 
 	err = snprintf(get_topic, sizeof(get_topic), SHADOW_GET, client_id_buf);
 	if (err != SHADOW_GET_LEN) {
+		return -ENOMEM;
+	}
+
+	err = snprintf(batch_topic, sizeof(batch_topic), BATCH_TOPIC,
+		       client_id_buf);
+	if (err != BATCH_TOPIC_LEN) {
 		return -ENOMEM;
 	}
 
@@ -648,15 +660,15 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
+		}
+
 		if (sync_data.gps_found) {
 			printk("Entry: %d in gps_buffer published\n",
 			       head_cir_buf);
 			cir_buf_gps[head_cir_buf].queued = false;
-		}
-
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			goto end;
 		}
 
 		err = encode_modem_data(&transmit_data, false);
@@ -708,30 +720,31 @@ static int report_and_update(const struct cloud_backend *const backend,
 
 	for (int i = 0; i < MAX_CIR_BUF; i++) {
 		if (cir_buf_gps[i].queued) {
-			err = encode_gps_buffer(&transmit_data,
-						&cir_buf_gps[i]);
-			if (err != 0) {
-				goto end;
-			}
-			transmit_data.topic = update_topic;
-
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				     transmit_data.buf, transmit_data.len,
-				     transmit_data.topic);
-			if (err != 0) {
-				goto end;
-			}
-
-			printk("Entry: %d in gps_buffer published\n", i);
-			cir_buf_gps[i].queued = false;
-
-			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-			if (err != 0) {
-				goto end;
-			}
+			queued_entries = true;
 		}
 	}
 
+	if (queued_entries) {
+		err = encode_gps_buffer(&transmit_data, cir_buf_gps);
+		if (err != 0) {
+			goto end;
+		}
+		transmit_data.topic = batch_topic;
+
+		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			     transmit_data.buf, transmit_data.len,
+			     transmit_data.topic);
+		if (err != 0) {
+			goto end;
+		}
+
+		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		if (err != 0) {
+			goto end;
+		}
+	}
+
+	queued_entries = false;
 	head_cir_buf = 0;
 	/*End experimental */
 

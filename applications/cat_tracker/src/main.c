@@ -112,46 +112,34 @@ static void cloud_report(bool gps_fix)
 {
 	int err;
 
-	if (k_sem_count_get(&connect_sem) == 1) {
-		k_sem_give(&connect_sem);
+	set_led_state(PUBLISH_DATA_E);
+	attach_battery_data(request_battery_status());
 
-		set_led_state(PUBLISH_DATA_E);
-		attach_battery_data(request_battery_status());
+	set_gps_found(gps_fix);
 
-		set_gps_found(gps_fix);
-
-		err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
-		if (err) {
-			printk("cloud_report_and_update failed: %d\n", err);
-		}
-
-		set_led_state(PUBLISH_DATA_STOP_E);
-
-	} else {
-		printk("Publish of data denied, LTE not connected\n");
+	err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
+	if (err) {
+		printk("cloud_report_and_update failed: %d\n", err);
 	}
+
+	set_led_state(PUBLISH_DATA_STOP_E);
 }
 
 static void cloud_pair()
 {
 	int err;
 
-	if (k_sem_count_get(&connect_sem) == 1) {
-		set_led_state(PUBLISH_DATA_E);
-		attach_battery_data(request_battery_status());
+	set_led_state(PUBLISH_DATA_E);
+	attach_battery_data(request_battery_status());
 
-		set_gps_found(false);
+	set_gps_found(false);
 
-		err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
-		if (err) {
-			printk("cloud_report_and_update failed: %d\n", err);
-		}
-
-		set_led_state(PUBLISH_DATA_STOP_E);
-
-	} else {
-		printk("Publish of data denied, LTE not connected\n");
+	err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
+	if (err) {
+		printk("cloud_report_and_update failed: %d\n", err);
 	}
+
+	set_led_state(PUBLISH_DATA_STOP_E);
 }
 
 static void cloud_pair_work_fn(struct k_work *work)

@@ -28,6 +28,13 @@ static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 	return 0;
 }
 
+static int json_add_obj_array(cJSON *parent, cJSON *item)
+{
+	cJSON_AddItemToArray(parent, item);
+
+	return 0;
+}
+
 static int json_add_number(cJSON *parent, const char *str, double item)
 {
 	cJSON *json_num;
@@ -195,6 +202,28 @@ end:
 	return 0;
 }
 
+static void bsortDesc(struct Sync_data_GPS *cir_buf_gps, int s)
+{
+	int i, j;
+	struct Sync_data_GPS temp;
+
+	for (i = 0; i < s - 1; i++) {
+		for (j = 0; j < (s - 1 - i); j++) {
+			if (cir_buf_gps[j].gps_timestamp <
+			    cir_buf_gps[j + 1].gps_timestamp) {
+				temp = cir_buf_gps[j];
+				cir_buf_gps[j] = cir_buf_gps[j + 1];
+				cir_buf_gps[j + 1] = temp;
+			}
+		}
+	}
+}
+
+struct twins_gps_buf {
+	cJSON *gps_buf_objects;
+	cJSON *gps_buf_val_objects;
+};
+
 int encode_gps_buffer(struct Transmit_data *output,
 		      struct Sync_data_GPS *cir_buf_gps)
 {
@@ -204,42 +233,79 @@ int encode_gps_buffer(struct Transmit_data *output,
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
-	cJSON *gps_obj = cJSON_CreateObject();
-	cJSON *gps_val_obj = cJSON_CreateObject();
+	cJSON *gps_obj = cJSON_CreateArray();
+
+	struct twins_gps_buf twins_gps_buf[MAX_CIR_BUF];
+
+	for (int i = 0; i < MAX_CIR_BUF; i++) {
+		twins_gps_buf[i].gps_buf_objects = NULL;
+		twins_gps_buf[i].gps_buf_objects = cJSON_CreateObject();
+		twins_gps_buf[i].gps_buf_val_objects = NULL;
+		twins_gps_buf[i].gps_buf_val_objects = cJSON_CreateObject();
+	}
 
 	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
-	    gps_obj == NULL || gps_val_obj == NULL) {
+	    gps_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(gps_val_obj);
+		for (int i = 0; i < MAX_CIR_BUF; i++) {
+			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
+			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
+		}
 		return -ENOMEM;
 	}
 
-	err = json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
-	err += json_add_number(gps_val_obj, "lat", cir_buf_gps->latitude);
-	err += json_add_number(gps_val_obj, "acc", cir_buf_gps->accuracy);
-	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
-	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
-	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
+	bsortDesc(cir_buf_gps, MAX_CIR_BUF);
 
-	err += json_add_obj(gps_obj, "v", gps_val_obj);
-	err += json_add_number(
-		gps_obj, "ts",
-		convert_to_timestamp(cir_buf_gps->gps_timestamp));
-
-	err += json_add_obj(reported_obj, "gps", gps_obj);
-
+	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
+
+	for (int i = 0; i < MAX_CIR_BUF; i++) {
+		if (cir_buf_gps[i].queued) {
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "lng",
+				cir_buf_gps[i].longitude);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "lat",
+				cir_buf_gps[i].latitude);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "acc",
+				cir_buf_gps[i].accuracy);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "alt",
+				cir_buf_gps[i].altitude);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "spd",
+				cir_buf_gps[i].speed);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_val_objects, "hdg",
+				cir_buf_gps[i].heading);
+
+			err += json_add_obj(
+				twins_gps_buf[i].gps_buf_objects, "v",
+				twins_gps_buf[i].gps_buf_val_objects);
+			err += json_add_number(
+				twins_gps_buf[i].gps_buf_objects, "ts",
+				convert_to_timestamp(
+					cir_buf_gps[i].gps_timestamp));
+			err += json_add_obj_array(
+				gps_obj, twins_gps_buf[i].gps_buf_objects);
+			cir_buf_gps[i].queued = false;
+		}
+	}
 
 	if (err != 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(gps_val_obj);
+		for (int i = 0; i < MAX_CIR_BUF; i++) {
+			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
+			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
+		}
 		return -EAGAIN;
 	}
 
