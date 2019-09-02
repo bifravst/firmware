@@ -287,7 +287,9 @@ static void adxl362_init(void)
 
 void movement_timeout_handler(struct k_work *work)
 {
-	k_work_submit(&cloud_report_work);
+	if (check_mode() == false) {
+		k_work_submit(&cloud_report_work);
+	}
 }
 
 K_WORK_DEFINE(my_work, movement_timeout_handler);
