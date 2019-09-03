@@ -56,7 +56,7 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 		   struct Sync_data_GPS *cir_buf_gps);
 
 int encode_gps_buffer(struct Transmit_data *output,
-		      struct Sync_data_GPS *cir_buf_gps);
+		      struct Sync_data_GPS *cir_buf_gps, int max_per_publish);
 
 int encode_modem_data(struct Transmit_data *output, bool syncronization);
 

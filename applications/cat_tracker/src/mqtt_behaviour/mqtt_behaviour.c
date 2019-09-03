@@ -13,6 +13,7 @@
 
 #define APP_SLEEP_MS 5000
 #define APP_CONNECT_TRIES 5
+#define MAX_PER_PUBLISH 7
 
 #define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
 #define CLOUD_PORT CONFIG_CLOUD_PORT
@@ -67,8 +68,6 @@ static const struct mqtt_topic cc_rx_list[] = {
 
 struct Sync_data_GPS cir_buf_gps[MAX_CIR_BUF];
 
-int head_cir_buf = 0;
-
 struct Sync_data sync_data = { .gps_timeout = 1000,
 			       .active = true,
 			       .active_wait = 60,
@@ -92,6 +91,9 @@ static bool connected;
 static int nfds;
 
 static bool queued_entries = false;
+
+int head_cir_buf = 0;
+int num_queued_entries = 0;
 
 static bool include_static_modem_data;
 
@@ -686,37 +688,37 @@ static int report_and_update(const struct cloud_backend *const backend,
 		}
 	}
 
-	/*Experimental */
-
 	for (int i = 0; i < MAX_CIR_BUF; i++) {
 		if (cir_buf_gps[i].queued) {
 			queued_entries = true;
+			num_queued_entries++;
 		}
 	}
 
 	if (queued_entries) {
-		err = encode_gps_buffer(&transmit_data, cir_buf_gps);
-		if (err != 0) {
-			goto end;
-		}
-		transmit_data.topic = batch_topic;
+		while (num_queued_entries > 0) {
+			err = encode_gps_buffer(&transmit_data, cir_buf_gps,
+						MAX_PER_PUBLISH);
+			if (err != 0) {
+				goto end;
+			}
+			transmit_data.topic = batch_topic;
 
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			goto end;
-		}
+			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+				     transmit_data.buf, transmit_data.len,
+				     transmit_data.topic);
+			if (err != 0) {
+				goto end;
+			}
 
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
-		if (err != 0) {
-			goto end;
+			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			if (err != 0) {
+				goto end;
+			}
+
+			num_queued_entries -= MAX_PER_PUBLISH;
 		}
 	}
-
-	queued_entries = false;
-	head_cir_buf = 0;
-	/*End experimental */
 
 	err = encode_modem_data(&transmit_data, include_static_modem_data);
 	if (err != 0) {
@@ -746,6 +748,10 @@ static int report_and_update(const struct cloud_backend *const backend,
 		printk("Could not input data\n");
 	}
 
+	head_cir_buf = 0;
+	num_queued_entries = 0;
+	queued_entries = false;
+
 	return 0;
 
 end:
@@ -759,6 +765,10 @@ end:
 	if (err) {
 		printk("Could not input data\n");
 	}
+
+	head_cir_buf = 0;
+	num_queued_entries = 0;
+	queued_entries = false;
 
 	return err;
 }

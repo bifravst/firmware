@@ -225,10 +225,11 @@ struct twins_gps_buf {
 };
 
 int encode_gps_buffer(struct Transmit_data *output,
-		      struct Sync_data_GPS *cir_buf_gps)
+		      struct Sync_data_GPS *cir_buf_gps, int max_per_publish)
 {
 	int err;
 	char *buffer;
+	int encoded_counter = 0;
 
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
@@ -264,7 +265,8 @@ int encode_gps_buffer(struct Transmit_data *output,
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	for (int i = 0; i < MAX_CIR_BUF; i++) {
-		if (cir_buf_gps[i].queued) {
+		if (cir_buf_gps[i].queued &&
+		    (encoded_counter < max_per_publish)) {
 			err += json_add_number(
 				twins_gps_buf[i].gps_buf_val_objects, "lng",
 				cir_buf_gps[i].longitude);
@@ -294,8 +296,11 @@ int encode_gps_buffer(struct Transmit_data *output,
 			err += json_add_obj_array(
 				gps_obj, twins_gps_buf[i].gps_buf_objects);
 			cir_buf_gps[i].queued = false;
+			encoded_counter++;
 		}
 	}
+
+	encoded_counter = 0;
 
 	if (err != 0) {
 		cJSON_Delete(root_obj);
