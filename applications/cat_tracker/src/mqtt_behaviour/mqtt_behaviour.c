@@ -760,7 +760,6 @@ static int report_and_update(const struct cloud_backend *const backend,
 		printk("Could not input data\n");
 	}
 
-	head_cir_buf = 0;
 	num_queued_entries = 0;
 	queued_entries = false;
 
@@ -778,7 +777,6 @@ end:
 		printk("Could not input data\n");
 	}
 
-	head_cir_buf = 0;
 	num_queued_entries = 0;
 	queued_entries = false;
 
