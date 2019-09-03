@@ -176,29 +176,50 @@ static void work_init(void)
 	k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
 }
 
-static const char status1[] = "+CEREG: 1";
-static const char status2[] = "+CEREG:1";
-static const char status3[] = "+CEREG: 5";
-static const char status4[] = "+CEREG:5";
-static const char sub_status[] = "FFFE";
+static const char home[] = "+CEREG: 1";
+static const char home_2[] = "+CEREG:1";
+static const char roam[] = "+CEREG: 5";
+static const char roam_2[] = "+CEREG:5";
+static const char home_unreg[] = "+CEREG: 1,\"FFFE\"";
+static const char home_unreg2[] = "+CEREG:1,\"FFFE\"";
+static const char roam_unreg[] = "+CEREG: 5,\"FFFE\"";
+static const char roam_unreg2[] = "+CEREG:5,\"FFFE\"";
 
 void connection_handler(char *response)
 {
 	printk("Incoming network registration status: %s", response);
 
-	if ((memcmp(sub_status, response, AT_CMD_SIZE(sub_status))) &&
-	    (!memcmp(status1, response, AT_CMD_SIZE(status1)) ||
-	     !memcmp(status2, response, AT_CMD_SIZE(status2)) ||
-	     !memcmp(status3, response, AT_CMD_SIZE(status3)) ||
-	     !memcmp(status4, response, AT_CMD_SIZE(status4)))) {
-		if (k_sem_count_get(&connect_sem) == 0) {
-			k_sem_give(&connect_sem);
-		}
-	} else {
-		if (k_sem_count_get(&connect_sem) == 1) {
-			k_sem_take(&connect_sem, 0);
-		}
+	if (!memcmp(home_unreg, response, AT_CMD_SIZE(home_unreg)) ||
+	    !memcmp(roam_unreg, response, AT_CMD_SIZE(roam_unreg)) ||
+	    !memcmp(home_unreg2, response, AT_CMD_SIZE(home_unreg2)) ||
+	    !memcmp(roam_unreg2, response, AT_CMD_SIZE(roam_unreg2))) {
+		goto no_connection;
 	}
+
+	if (!memcmp(home, response, AT_CMD_SIZE(home)) ||
+	    !memcmp(roam, response, AT_CMD_SIZE(roam)) ||
+	    !memcmp(home_2, response, AT_CMD_SIZE(home_2)) ||
+	    !memcmp(roam_2, response, AT_CMD_SIZE(roam_2))) {
+		goto connection;
+	}
+
+	goto no_connection;
+
+connection:
+	if (k_sem_count_get(&connect_sem) == 0) {
+		k_sem_give(&connect_sem);
+		printk("SEM GIVEN\n");
+	}
+
+	return;
+
+no_connection:
+	if (k_sem_count_get(&connect_sem) == 1) {
+		k_sem_take(&connect_sem, 0);
+		printk("SEM TAKEN\n");
+	}
+
+	return;
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -358,30 +379,25 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-check_connection:
-	if (k_sem_count_get(&connect_sem) == 0) {
-		lte_connect();
-	}
-
-	goto check_mode;
+	lte_connect();
 
 check_mode:
 	start_restart_mov_timer();
 	if (check_mode()) {
 		set_led_state(ACTIVE_MODE_E);
 		active = true;
-		k_sleep(10000);
+		k_sleep(5000);
 		goto active;
 	} else {
 		set_led_state(PASSIVE_MODE_E);
 		active = false;
-		k_sleep(10000);
+		k_sleep(5000);
 		goto passive;
 	}
 
 active:
 	printk("ACTIVE MODE\n");
-	goto gps_search;
+	goto gps_search_and_connect;
 
 passive:
 	printk("PASSIVE MODE\n");
@@ -390,9 +406,14 @@ passive:
 		k_sem_take(events[1].sem, 0);
 	}
 
-	goto gps_search;
+	goto gps_search_and_connect;
 
-gps_search:
+gps_search_and_connect:
+
+	if (k_sem_count_get(&connect_sem) == 0) {
+		lte_connect();
+	}
+
 	gps_control_start();
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -406,5 +427,5 @@ gps_search:
 	events[0].state = K_POLL_STATE_NOT_READY;
 	k_sleep(K_SECONDS(check_active_wait(active)));
 
-	goto check_connection;
+	goto check_mode;
 }
