@@ -379,8 +379,6 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	lte_connect();
-
 check_mode:
 	start_restart_mov_timer();
 	if (check_mode()) {
