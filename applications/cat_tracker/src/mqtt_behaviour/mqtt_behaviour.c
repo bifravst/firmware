@@ -436,7 +436,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	}
 }
 
-static void broker_init(void)
+static int broker_init(void)
 {
 	int err;
 	struct addrinfo *result;
@@ -448,7 +448,7 @@ static void broker_init(void)
 	if (err) {
 		printk("ERROR: getaddrinfo failed %d\n", err);
 
-		return;
+		return err;
 	}
 
 	addr = result;
@@ -484,13 +484,20 @@ static void broker_init(void)
 	}
 
 	freeaddrinfo(result);
+
+	return 0;
 }
 
-static void client_init(struct mqtt_client *client)
+static int client_init(struct mqtt_client *client)
 {
+	int err;
+
 	mqtt_client_init(client);
 
-	broker_init();
+	err = broker_init();
+	if (err) {
+		return err;
+	}
 
 	client->broker = &broker;
 	client->evt_cb = mqtt_evt_handler;
@@ -519,6 +526,8 @@ static void client_init(struct mqtt_client *client)
 #else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 #endif
+
+	return 0;
 }
 
 static void wait(int timeout)
@@ -562,7 +571,10 @@ static int mqtt_enable(struct mqtt_client *client)
 	int err, i = 0;
 
 	while (i++ < APP_CONNECT_TRIES && !connected) {
-		client_init(client);
+		err = client_init(client);
+		if (err != 0) {
+			continue;
+		}
 
 		err = mqtt_connect(client);
 		if (err != 0) {

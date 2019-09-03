@@ -180,15 +180,17 @@ static const char status1[] = "+CEREG: 1";
 static const char status2[] = "+CEREG:1";
 static const char status3[] = "+CEREG: 5";
 static const char status4[] = "+CEREG:5";
+static const char sub_status[] = "FFFE";
 
 void connection_handler(char *response)
 {
 	printk("Incoming network registration status: %s", response);
 
-	if (!memcmp(status1, response, AT_CMD_SIZE(status1)) ||
-	    !memcmp(status2, response, AT_CMD_SIZE(status2)) ||
-	    !memcmp(status3, response, AT_CMD_SIZE(status3)) ||
-	    !memcmp(status4, response, AT_CMD_SIZE(status4))) {
+	if ((memcmp(sub_status, response, AT_CMD_SIZE(sub_status))) &&
+	    (!memcmp(status1, response, AT_CMD_SIZE(status1)) ||
+	     !memcmp(status2, response, AT_CMD_SIZE(status2)) ||
+	     !memcmp(status3, response, AT_CMD_SIZE(status3)) ||
+	     !memcmp(status4, response, AT_CMD_SIZE(status4)))) {
 		if (k_sem_count_get(&connect_sem) == 0) {
 			k_sem_give(&connect_sem);
 		}
