@@ -6,9 +6,7 @@
 
 menu "Cat Tracker sample"
 
-config ENABLE_LED_THREAD
-	bool "Enable LED thread"
-	default y
+rsource "src/ui/Kconfig"
 
 menu "GPS"
 
@@ -76,10 +74,6 @@ config MQTT_MESSAGE_BUFFER_SIZE
 config MQTT_PAYLOAD_BUFFER_SIZE
 	int ""
 	default 2048
-
-config LED_USAGE
-	bool ""
-	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
 
 endmenu
 

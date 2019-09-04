@@ -1,0 +1,47 @@
+#
+# Copyright (c) 2019 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+config USE_UI_MODULE
+	bool "Enable UI module"
+	default y
+	help
+		Enable the User Interface module for user interaction on
+		development kit / Thingy91 hardware.
+
+menu "User Interface"
+	visible if USE_UI_MODULE
+
+config UI_LED_USE_PWM
+	bool "Use PWM to control LEDs"
+	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+	select PWM if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+	select PWM_0 if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+
+if UI_LED_USE_PWM
+
+config UI_LED_PWM_DEV_NAME
+	string "PWM device name for RGB LED"
+	default "$(dt_str_val,DT_NORDIC_NRF_PWM_PWM_0_LABEL)" if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+
+config UI_LED_RED_PIN
+	int "Red LED pin number"
+	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH0_PIN)
+
+config UI_LED_GREEN_PIN
+	int "Green LED pin number"
+	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH1_PIN)
+
+config UI_LED_BLUE_PIN
+	int "Blue LED pin number"
+	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH2_PIN)
+
+endif # UI_LED_USE_PWM
+
+endmenu
+
+module = UI
+module-str = User Interface
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"

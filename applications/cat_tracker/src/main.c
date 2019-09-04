@@ -358,7 +358,7 @@ void main(void)
 
 	work_init();
 
-#if defined(CONFIG_LED_USAGE)
+#if defined(CONFIG_USE_UI_MODULE)
 	ui_init();
 #endif
 

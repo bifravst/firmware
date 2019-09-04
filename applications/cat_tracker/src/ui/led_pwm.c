@@ -82,9 +82,9 @@ static struct led_effect custom_effect =
 
 static struct led leds;
 static const size_t led_pins[3] = {
-	DT_NORDIC_NRF_PWM_PWM_0_CH0_PIN,
-	DT_NORDIC_NRF_PWM_PWM_0_CH1_PIN,
-	DT_NORDIC_NRF_PWM_PWM_0_CH2_PIN,
+	CONFIG_UI_LED_RED_PIN,
+	CONFIG_UI_LED_GREEN_PIN,
+	CONFIG_UI_LED_BLUE_PIN,
 };
 
 static void pwm_out(struct led *led, struct led_color *color)
@@ -164,7 +164,7 @@ static void led_update(struct led *led)
 
 int ui_leds_init(void)
 {
-	const char *dev_name = DT_NORDIC_NRF_PWM_PWM_0_LABEL;
+	const char *dev_name = CONFIG_UI_LED_PWM_DEV_NAME;
 	int err = 0;
 
 	leds.pwm_dev = device_get_binding(dev_name);

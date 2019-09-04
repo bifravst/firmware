@@ -4,17 +4,21 @@
  * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
  */
 
+#include <logging/log.h>
+
 #include "ui.h"
 #include "led_pwm.h"
+
+LOG_MODULE_REGISTER(ui, CONFIG_UI_LOG_LEVEL);
 
 static enum ui_led_pattern current_led_state;
 
 void ui_led_set_pattern(enum ui_led_pattern state)
 {
-#if defined (CONFIG_LED_USAGE)
 	current_led_state = state;
+#ifdef CONFIG_UI_LED_USE_PWM
 	ui_led_set_effect(state);
-#endif
+#endif /* CONFIG_UI_LED_USE_PWM */
 }
 
 enum ui_led_pattern ui_led_get_pattern(void)
@@ -22,28 +26,25 @@ enum ui_led_pattern ui_led_get_pattern(void)
 	return current_led_state;
 }
 
-int ui_led_set_color(u8_t red, u8_t green, u8_t blue)
-{
-	return ui_led_set_rgb(red, green, blue);
-}
-
 int ui_init()
 {
-
 	int err = 0;
 
+#ifdef CONFIG_UI_LED_USE_PWM
 	err = ui_leds_init();
 	if (err) {
-		printk("Error when initializing PWM controlled LEDs\n");
+		LOG_ERR("Error when initializing PWM controlled LEDs");
 		return err;
 	}
-
+#endif /* CONFIG_UI_LED_USE_PWM */
 	return err;
 }
 
 void ui_stop_leds()
 {
-#if defined(CONFIG_LED_USAGE)
+#ifdef CONFIG_UI_LED_USE_PWM
 	ui_leds_stop();
 #endif
 }
+
+
