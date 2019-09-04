@@ -67,6 +67,7 @@ extern "C" {
 #define UI_LED_GPS_SEARCHING_COLOR	UI_LED_COLOR_PURPLE
 #define UI_LED_ACTIVE_MODE_COLOR	UI_LED_COLOR_CYAN
 #define UI_LED_PASSIVE_MODE_COLOR	UI_LED_COLOR_BLUE
+#define UI_LED_ERROR_SYSTEM_FAULT_COLOR UI_LED_COLOR_RED
 
 /**@brief UI LED state pattern definitions. */
 enum ui_led_pattern {
@@ -86,6 +87,7 @@ enum ui_led_pattern {
 	UI_LED_GPS_SEARCHING,
 	UI_LED_ACTIVE_MODE,
 	UI_LED_PASSIVE_MODE,
+	UI_LED_ERROR_SYSTEM_FAULT,
 };
 
 /**

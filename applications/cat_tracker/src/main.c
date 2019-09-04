@@ -75,7 +75,7 @@ void error_handler(enum error_type err_type, int err_code)
 
 	case ERROR_SYSTEM_FAULT:
 		printk("Error of type ERROR_SYSTEM_FAULT: %d\n", err_code);
-		ui_led_set_pattern(UI_LED_ERROR_UNKNOWN);
+		ui_led_set_pattern(UI_LED_ERROR_SYSTEM_FAULT);
 		break;
 
 	case ERROR_CLOUD:
@@ -86,6 +86,7 @@ void error_handler(enum error_type err_type, int err_code)
 	default:
 		printk("Unknown error type: %d, code: %d\n", err_type,
 		       err_code);
+		ui_led_set_pattern(UI_LED_ERROR_UNKNOWN);
 		break;
 	}
 
