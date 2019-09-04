@@ -3,7 +3,6 @@
 #include <misc/reboot.h>
 #include <gps.h>
 #include <lte_lc.h>
-#include <leds.h>
 
 #include "gps_controller.h"
 
@@ -56,8 +55,6 @@ static void gps_work_handler(struct k_work *work)
 
 void gps_control_stop(void)
 {
-	set_led_state(GPS_SEARCH_STOP_E);
-
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
 	k_poll(gps_events, 1, K_SECONDS(GPS_THREAD_DEADLINE));
@@ -73,8 +70,6 @@ void gps_control_stop(void)
 
 void gps_control_start(void)
 {
-	set_led_state(GPS_SEARCH_E);
-
 	gps_work.type = GPS_WORK_START;
 	k_work_submit(&gps_work.work);
 }

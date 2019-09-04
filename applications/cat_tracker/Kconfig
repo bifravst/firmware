@@ -77,6 +77,10 @@ config MQTT_PAYLOAD_BUFFER_SIZE
 	int ""
 	default 2048
 
+config LED_USAGE
+	bool ""
+	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+
 endmenu
 
 menu "Zephyr Kernel"

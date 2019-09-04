@@ -11,7 +11,7 @@
 #include <sensor.h>
 #include <gps_controller.h>
 #include <mqtt_codec.h>
-#include <leds.h>
+#include <ui.h>
 #include <net/cloud.h>
 
 #define NORMAL_OPERATION false
@@ -57,8 +57,6 @@ enum error_type {
 
 void error_handler(enum error_type err_type, int err_code)
 {
-	set_led_state(ERROR_E);
-	k_sleep(K_SECONDS(30));
 
 #if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
 	LOG_PANIC();
@@ -68,17 +66,21 @@ void error_handler(enum error_type err_type, int err_code)
 	switch (err_type) {
 	case ERROR_BSD_RECOVERABLE:
 		printk("Error of type ERROR_BSD_RECOVERABLE: %d\n", err_code);
+		ui_led_set_pattern(UI_LED_ERROR_BSD_REC);
 		break;
 	case ERROR_BSD_IRRECOVERABLE:
 		printk("Error of type ERROR_BSD_IRRECOVERABLE: %d\n", err_code);
+		ui_led_set_pattern(UI_LED_ERROR_BSD_IRREC);
 		break;
 
 	case ERROR_SYSTEM_FAULT:
 		printk("Error of type ERROR_SYSTEM_FAULT: %d\n", err_code);
+		ui_led_set_pattern(UI_LED_ERROR_UNKNOWN);
 		break;
 
 	case ERROR_CLOUD:
 		printk("Error of type ERROR_CLOUD: %d\n", err_code);
+		ui_led_set_pattern(UI_LED_ERROR_CLOUD);
 		break;
 
 	default:
@@ -112,7 +114,7 @@ static void cloud_report(bool gps_fix)
 {
 	int err;
 
-	set_led_state(PUBLISH_DATA_E);
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	attach_battery_data(request_battery_status());
 
 	set_gps_found(gps_fix);
@@ -121,15 +123,13 @@ static void cloud_report(bool gps_fix)
 	if (err) {
 		printk("cloud_report_and_update failed: %d\n", err);
 	}
-
-	set_led_state(PUBLISH_DATA_STOP_E);
 }
 
 static void cloud_pair()
 {
 	int err;
 
-	set_led_state(PUBLISH_DATA_E);
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	attach_battery_data(request_battery_status());
 
 	set_gps_found(false);
@@ -138,8 +138,6 @@ static void cloud_pair()
 	if (err) {
 		printk("cloud_report_and_update failed: %d\n", err);
 	}
-
-	set_led_state(PUBLISH_DATA_STOP_E);
 }
 
 static void cloud_pair_work_fn(struct k_work *work)
@@ -320,7 +318,7 @@ static void lte_connect()
 {
 	int err;
 
-	set_led_state(LTE_CONNECTING_E);
+	ui_led_set_pattern(UI_LTE_CONNECTING);
 
 	err = lte_lc_init_connect_manager(connection_handler);
 	if (err != 0) {
@@ -332,7 +330,6 @@ static void lte_connect()
 
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
 		k_sem_give(&connect_sem);
-		set_led_state(LTE_CONNECTED_E);
 
 		printk("LTE connected! \nFetching modem time...\n");
 
@@ -340,7 +337,7 @@ static void lte_connect()
 
 		err = modem_time_get();
 		if (err != 0) {
-			printk("Error fetching modem time, trying again in %d seconds\n",
+			printk("Modem giving old network time, trying again in %d seconds\n",
 			       MODEM_TRY_AGAIN);
 			k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
 			goto modem_time_fetch;
@@ -351,7 +348,6 @@ static void lte_connect()
 	} else {
 		printk("LTE not connected within %d minutes, starting gps search\n",
 		       LTE_CONN_TIMEOUT);
-		set_led_state(LTE_NOT_CONNECTED_E);
 		lte_lc_gps_mode();
 	}
 }
@@ -361,6 +357,10 @@ void main(void)
 	int err;
 
 	work_init();
+
+#if defined(CONFIG_LED_USAGE)
+	ui_init();
+#endif
 
 	printk("The cat tracker has started\n");
 
@@ -380,14 +380,14 @@ void main(void)
 check_mode:
 	start_restart_mov_timer();
 	if (check_mode()) {
-		set_led_state(ACTIVE_MODE_E);
+		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
 		active = true;
-		k_sleep(5000);
+		k_sleep(30000);
 		goto active;
 	} else {
-		set_led_state(PASSIVE_MODE_E);
+		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
 		active = false;
-		k_sleep(5000);
+		k_sleep(30000);
 		goto passive;
 	}
 
@@ -410,6 +410,7 @@ gps_search_and_connect:
 		lte_connect();
 	}
 
+	ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 	gps_control_start();
 	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
 	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
@@ -421,6 +422,7 @@ gps_search_and_connect:
 	}
 	events[1].state = K_POLL_STATE_NOT_READY;
 	events[0].state = K_POLL_STATE_NOT_READY;
+	ui_stop_leds();
 	k_sleep(K_SECONDS(check_active_wait(active)));
 
 	goto check_mode;

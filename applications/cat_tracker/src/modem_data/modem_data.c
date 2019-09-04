@@ -19,7 +19,8 @@ time_t epoch;
 
 struct modem_param_info modem_param;
 
-int modem_fetch_tries = 0;
+static int modem_fetch_tries = 0;
+static bool old_modem_time;
 
 int get_time_info(char *datetime_string, int min, int max)
 {
@@ -104,14 +105,21 @@ int modem_time_get(void)
 	}
 
 	if (info.tm_year == 115) {
+		old_modem_time = true;
 		printk("Could not fetch correct time from modem\n");
+	} else {
+		old_modem_time = false;
 	}
 
 	epoch = mktime(&info);
 
 	update_time = k_uptime_get();
 
-	printk("Modem time successfully obtained\n");
+	if (!old_modem_time) {
+		printk("Correct modem time successfully obtained\n");
+	} else {
+		printk("Could not fetch correct modem time\n");
+	}
 
 	modem_fetch_tries = 0;
 

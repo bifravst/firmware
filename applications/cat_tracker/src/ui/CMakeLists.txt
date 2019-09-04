@@ -5,4 +5,5 @@
 #
 
 zephyr_include_directories(.)
-target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/leds.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ui.c)
+target_sources(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/led_pwm.c)
