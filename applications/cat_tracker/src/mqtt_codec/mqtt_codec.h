@@ -9,9 +9,7 @@
 extern "C" {
 #endif
 
-#define MAX_CIR_BUF 10
-
-struct Sync_data_GPS {
+struct cloud_data_gps_t {
 	double longitude;
 	double latitude;
 	float altitude;
@@ -22,7 +20,7 @@ struct Sync_data_GPS {
 	bool queued;
 };
 
-struct Sync_data {
+struct cloud_data_t {
 	int bat_voltage;
 	s64_t bat_timestamp;
 
@@ -39,26 +37,28 @@ struct Sync_data {
 	bool gps_found;
 };
 
-struct Transmit_data {
+struct transmit_data_t {
 	char *buf;
 	size_t len;
 	u8_t *topic;
 };
 
-struct Modem_data {
+struct modem_data_t {
 	s64_t static_timestamp;
 	s64_t dynamic_timestamp;
 };
 
-int decode_response(char *input, struct Sync_data *sync_data);
+int decode_response(char *input, struct cloud_data_t *cloud_data);
 
-int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
-		   struct Sync_data_GPS *cir_buf_gps);
+int encode_message(struct transmit_data_t *output,
+		   struct cloud_data_t *cloud_data,
+		   struct cloud_data_gps_t *cir_buf_gps);
 
-int encode_gps_buffer(struct Transmit_data *output,
-		      struct Sync_data_GPS *cir_buf_gps, int max_per_publish);
+int encode_gps_buffer(struct transmit_data_t *output,
+		      struct cloud_data_gps_t *cir_buf_gps,
+		      int max_per_publish);
 
-int encode_modem_data(struct Transmit_data *output, bool syncronization);
+int encode_modem_data(struct transmit_data_t *output, bool syncronization);
 
 bool check_config_change(void);
 

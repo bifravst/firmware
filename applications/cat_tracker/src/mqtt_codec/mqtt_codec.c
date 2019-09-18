@@ -11,15 +11,15 @@
 #include "cJSON_os.h"
 #include "../version.h"
 
-bool change_gpst = true;
-bool change_active = true;
-bool change_active_wait = true;
-bool change_passive_wait = true;
-bool change_movement_timeout = true;
-bool change_accel_threshold = true;
-bool change_config = true;
+static bool change_gpst = true;
+static bool change_active = true;
+static bool change_active_wait = true;
+static bool change_passive_wait = true;
+static bool change_movement_timeout = true;
+static bool change_accel_threshold = true;
+static bool change_config = true;
 
-struct Modem_data modem_data;
+struct modem_data_t modem_data;
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
@@ -93,7 +93,7 @@ s64_t convert_to_timestamp(time_t timestamp_type)
 	return get_current_time() + timestamp_type;
 }
 
-int decode_response(char *input, struct Sync_data *sync_data)
+int decode_response(char *input, struct cloud_data_t *cloud_data)
 {
 	char *string = NULL;
 	cJSON *root_obj = NULL;
@@ -155,35 +155,35 @@ int decode_response(char *input, struct Sync_data *sync_data)
 get_data:
 
 	if (gpst != NULL) {
-		sync_data->gps_timeout = gpst->valueint;
+		cloud_data->gps_timeout = gpst->valueint;
 		printk("SETTING GPST TO: %d\n", gpst->valueint);
 		change_gpst = true;
 		change_config = true;
 	}
 
 	if (active != NULL) {
-		sync_data->active = active->valueint;
+		cloud_data->active = active->valueint;
 		printk("SETTING ACTIVE TO: %d\n", active->valueint);
 		change_active = true;
 		change_config = true;
 	}
 
 	if (active_wait != NULL) {
-		sync_data->active_wait = active_wait->valueint;
+		cloud_data->active_wait = active_wait->valueint;
 		printk("SETTING ACTIVE WAIT TO: %d\n", active_wait->valueint);
 		change_active_wait = true;
 		change_config = true;
 	}
 
 	if (passive_wait != NULL) {
-		sync_data->passive_wait = passive_wait->valueint;
+		cloud_data->passive_wait = passive_wait->valueint;
 		printk("SETTING PASSIVE_WAIT TO: %d\n", passive_wait->valueint);
 		change_passive_wait = true;
 		change_config = true;
 	}
 
 	if (movement_timeout != NULL) {
-		sync_data->movement_timeout = movement_timeout->valueint;
+		cloud_data->movement_timeout = movement_timeout->valueint;
 		printk("SETTING MOVEMENT TIMEOUT TO: %d\n",
 		       movement_timeout->valueint);
 		change_movement_timeout = true;
@@ -191,7 +191,7 @@ get_data:
 	}
 
 	if (accel_threshold != NULL) {
-		sync_data->accel_threshold = accel_threshold->valueint;
+		cloud_data->accel_threshold = accel_threshold->valueint;
 		printk("SETTING ACCEL THRESHOLD TIMEOUT TO: %d\n",
 		       accel_threshold->valueint);
 		change_accel_threshold = true;
@@ -202,10 +202,10 @@ end:
 	return 0;
 }
 
-static void sort_gps_buf_descending(struct Sync_data_GPS *cir_buf_gps, int s)
+static void sort_gps_buf_descending(struct cloud_data_gps_t *cir_buf_gps, int s)
 {
 	int i, j;
-	struct Sync_data_GPS temp;
+	struct cloud_data_gps_t temp;
 
 	for (i = 0; i < s - 1; i++) {
 		for (j = 0; j < (s - 1 - i); j++) {
@@ -224,8 +224,8 @@ struct twins_gps_buf {
 	cJSON *gps_buf_val_objects;
 };
 
-int encode_gps_buffer(struct Transmit_data *output,
-		      struct Sync_data_GPS *cir_buf_gps, int max_per_publish)
+int encode_gps_buffer(struct transmit_data_t *output,
+		      struct cloud_data_gps_t *cir_buf_gps, int max_per_publish)
 {
 	int err;
 	char *buffer;
@@ -236,9 +236,9 @@ int encode_gps_buffer(struct Transmit_data *output,
 	cJSON *reported_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateArray();
 
-	struct twins_gps_buf twins_gps_buf[MAX_CIR_BUF];
+	struct twins_gps_buf twins_gps_buf[CONFIG_GPS_MAX_CIR_BUF];
 
-	for (int i = 0; i < MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
 		twins_gps_buf[i].gps_buf_objects = NULL;
 		twins_gps_buf[i].gps_buf_objects = cJSON_CreateObject();
 		twins_gps_buf[i].gps_buf_val_objects = NULL;
@@ -251,20 +251,20 @@ int encode_gps_buffer(struct Transmit_data *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < MAX_CIR_BUF; i++) {
+		for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}
 		return -ENOMEM;
 	}
 
-	sort_gps_buf_descending(cir_buf_gps, MAX_CIR_BUF);
+	sort_gps_buf_descending(cir_buf_gps, CONFIG_GPS_MAX_CIR_BUF);
 
 	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	for (int i = 0; i < MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
 		if (cir_buf_gps[i].queued &&
 		    (encoded_counter < max_per_publish)) {
 			err += json_add_number(
@@ -307,7 +307,7 @@ int encode_gps_buffer(struct Transmit_data *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < MAX_CIR_BUF; i++) {
+		for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}
@@ -323,7 +323,7 @@ int encode_gps_buffer(struct Transmit_data *output,
 	return 0;
 }
 
-int encode_modem_data(struct Transmit_data *output, bool syncronization)
+int encode_modem_data(struct transmit_data_t *output, bool syncronization)
 {
 	int err;
 	char *buffer;
@@ -444,8 +444,9 @@ int encode_modem_data(struct Transmit_data *output, bool syncronization)
 	return 0;
 }
 
-int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
-		   struct Sync_data_GPS *cir_buf_gps)
+int encode_message(struct transmit_data_t *output,
+		   struct cloud_data_t *cloud_data,
+		   struct cloud_data_gps_t *cir_buf_gps)
 {
 	int err;
 	char *buffer;
@@ -474,13 +475,13 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 	}
 
 	/*BAT*/
-	err = json_add_number(bat_obj, "v", sync_data->bat_voltage);
+	err = json_add_number(bat_obj, "v", cloud_data->bat_voltage);
 	err += json_add_number(bat_obj, "ts",
-			       convert_to_timestamp(sync_data->bat_timestamp));
+			       convert_to_timestamp(cloud_data->bat_timestamp));
 	/*ACC*/
-	err += json_add_DoubleArray(acc_obj, "v", sync_data->acc);
+	err += json_add_DoubleArray(acc_obj, "v", cloud_data->acc);
 	err += json_add_number(acc_obj, "ts",
-			       convert_to_timestamp(sync_data->acc_timestamp));
+			       convert_to_timestamp(cloud_data->acc_timestamp));
 
 	/*GPS*/
 	err += json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
@@ -493,39 +494,40 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 	/*CFG*/
 
 	if (change_gpst) {
-		err += json_add_number(cfg_obj, "gpst", sync_data->gps_timeout);
+		err += json_add_number(cfg_obj, "gpst",
+				       cloud_data->gps_timeout);
 	}
 
 	if (change_active) {
-		err += json_add_bool(cfg_obj, "act", sync_data->active);
+		err += json_add_bool(cfg_obj, "act", cloud_data->active);
 	}
 
 	if (change_active_wait) {
 		err += json_add_number(cfg_obj, "actwt",
-				       sync_data->active_wait);
+				       cloud_data->active_wait);
 	}
 
 	if (change_passive_wait) {
 		err += json_add_number(cfg_obj, "mvres",
-				       sync_data->passive_wait);
+				       cloud_data->passive_wait);
 	}
 
 	if (change_movement_timeout) {
 		err += json_add_number(cfg_obj, "mvt",
-				       sync_data->movement_timeout);
+				       cloud_data->movement_timeout);
 	}
 
 	if (change_accel_threshold) {
 		err += json_add_number(cfg_obj, "acct",
-				       sync_data->accel_threshold);
+				       cloud_data->accel_threshold);
 	}
 
 	if (!change_config) {
-		if (sync_data->active && !sync_data->gps_found) {
+		if (cloud_data->active && !cloud_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 		}
 
-		if (sync_data->active && sync_data->gps_found) {
+		if (cloud_data->active && cloud_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
 			err += json_add_number(
@@ -535,12 +537,12 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
-		if (!sync_data->active && !sync_data->gps_found) {
+		if (!cloud_data->active && !cloud_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
 
-		if (!sync_data->active && sync_data->gps_found) {
+		if (!cloud_data->active && cloud_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 			err += json_add_obj(gps_obj, "v", gps_val_obj);

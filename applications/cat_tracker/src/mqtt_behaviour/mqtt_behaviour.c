@@ -11,9 +11,9 @@
 #include <gps.h>
 #include <mqtt_codec.h>
 
-#define APP_SLEEP_MS 5000
-#define APP_CONNECT_TRIES 5
-#define MAX_PER_PUBLISH 7
+#define APP_SLEEP_MS CONFIG_MQTT_APP_SLEEP_MS
+#define APP_CONNECT_TRIES CONFIG_MQTT_APP_CONNECT_TRIES
+#define MAX_PER_PUBLISH CONFIG_GPS_CIR_BUF_PUB_LIMIT
 
 #define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
 #define CLOUD_PORT CONFIG_CLOUD_PORT
@@ -66,15 +66,15 @@ static const struct mqtt_topic cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-struct Sync_data_GPS cir_buf_gps[MAX_CIR_BUF];
+struct cloud_data_gps_t cir_buf_gps[CONFIG_GPS_MAX_CIR_BUF];
 
-struct Sync_data sync_data = { .gps_timeout = 1000,
-			       .active = true,
-			       .active_wait = 60,
-			       .passive_wait = 300,
-			       .movement_timeout = 3600,
-			       .accel_threshold = 100,
-			       .gps_found = false };
+struct cloud_data_t cloud_data = { .gps_timeout = 1000,
+				   .active = true,
+				   .active_wait = 60,
+				   .passive_wait = 300,
+				   .movement_timeout = 3600,
+				   .accel_threshold = 100,
+				   .gps_found = false };
 
 static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
@@ -99,12 +99,12 @@ static bool include_static_modem_data;
 
 void set_gps_found(bool gps_found)
 {
-	sync_data.gps_found = gps_found;
+	cloud_data.gps_found = gps_found;
 }
 
 int check_mode(void)
 {
-	if (sync_data.active) {
+	if (cloud_data.active) {
 		return true;
 	} else {
 		return false;
@@ -114,30 +114,30 @@ int check_mode(void)
 int check_active_wait(bool mode)
 {
 	if (mode) {
-		return sync_data.active_wait;
+		return cloud_data.active_wait;
 	} else {
-		return sync_data.passive_wait;
+		return cloud_data.passive_wait;
 	}
 }
 
 int check_gps_timeout(void)
 {
-	return sync_data.gps_timeout;
+	return cloud_data.gps_timeout;
 }
 
 int check_mov_timeout(void)
 {
-	return sync_data.movement_timeout;
+	return cloud_data.movement_timeout;
 }
 
 double check_accel_thres(void)
 {
 	double accel_threshold_double;
 
-	if (sync_data.accel_threshold == 0) {
+	if (cloud_data.accel_threshold == 0) {
 		accel_threshold_double = 0;
 	} else {
-		accel_threshold_double = sync_data.accel_threshold / 10;
+		accel_threshold_double = cloud_data.accel_threshold / 10;
 	}
 
 	return accel_threshold_double;
@@ -146,7 +146,7 @@ double check_accel_thres(void)
 void attach_gps_data(struct gps_data gps_data)
 {
 	head_cir_buf += 1;
-	if (head_cir_buf == MAX_CIR_BUF - 1) {
+	if (head_cir_buf == CONFIG_GPS_MAX_CIR_BUF - 1) {
 		head_cir_buf = 0;
 	}
 
@@ -164,16 +164,16 @@ void attach_gps_data(struct gps_data gps_data)
 
 void attach_battery_data(int battery_voltage)
 {
-	sync_data.bat_voltage = battery_voltage;
-	sync_data.bat_timestamp = k_uptime_get();
+	cloud_data.bat_voltage = battery_voltage;
+	cloud_data.bat_timestamp = k_uptime_get();
 }
 
 void attach_accel_data(double x, double y, double z)
 {
-	sync_data.acc[0] = x;
-	sync_data.acc[1] = y;
-	sync_data.acc[2] = z;
-	sync_data.acc_timestamp = k_uptime_get();
+	cloud_data.acc[0] = x;
+	cloud_data.acc[1] = y;
+	cloud_data.acc[2] = z;
+	cloud_data.acc_timestamp = k_uptime_get();
 }
 
 static int client_id_get(char *id)
@@ -402,7 +402,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		}
 
 		if (p->message.payload.len > 2) {
-			err = decode_response(payload_buf, &sync_data);
+			err = decode_response(payload_buf, &cloud_data);
 			if (err != 0) {
 				printk("Could not decode response\n%d", err);
 			}
@@ -611,7 +611,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 			     const enum cloud_action_type action)
 {
 	int err;
-	struct Transmit_data transmit_data;
+	struct transmit_data_t transmit_data;
 
 	err = mqtt_enable(&client);
 	if (err) {
@@ -645,7 +645,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 
 	case CLOUD_REPORT:
 
-		err = encode_message(&transmit_data, &sync_data,
+		err = encode_message(&transmit_data, &cloud_data,
 				     &cir_buf_gps[head_cir_buf]);
 		if (err != 0) {
 			goto end;
@@ -665,7 +665,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		if (sync_data.gps_found) {
+		if (cloud_data.gps_found) {
 			printk("Entry: %d in gps_buffer published\n",
 			       head_cir_buf);
 			cir_buf_gps[head_cir_buf].queued = false;
@@ -680,7 +680,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 	}
 
 	if (check_config_change()) {
-		err = encode_message(&transmit_data, &sync_data,
+		err = encode_message(&transmit_data, &cloud_data,
 				     &cir_buf_gps[head_cir_buf]);
 		if (err != 0) {
 			goto end;
@@ -700,7 +700,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 		}
 	}
 
-	for (int i = 0; i < MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
 		if (cir_buf_gps[i].queued) {
 			queued_entries = true;
 			num_queued_entries++;

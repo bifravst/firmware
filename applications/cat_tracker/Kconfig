@@ -75,6 +75,22 @@ config MQTT_PAYLOAD_BUFFER_SIZE
 	int ""
 	default 2048
 
+config MQTT_APP_SLEEP_MS
+	int ""
+	default 5000
+
+config MQTT_APP_CONNECT_TRIES
+	int "Number of times the device will try to connect to the broker"
+	default 5
+
+config GPS_CIR_BUF_PUB_LIMIT
+	int "Maximum amount of entries in the gps buffer published in bulk"
+	default 7
+
+config GPS_MAX_CIR_BUF
+	int "Maximum amount of entries in the gps circualr buffer"
+	default 10
+
 endmenu
 
 menu "Zephyr Kernel"
