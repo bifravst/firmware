@@ -91,6 +91,18 @@ config GPS_MAX_CIR_BUF
 	int "Maximum amount of entries in the gps circualr buffer"
 	default 10
 
+config LTE_CONN_TIMEOUT
+	int "Number of minutes of trying to connect to lte"
+	default 10
+
+config MODEM_TIME_RETRIES
+	int "Number of seconds between each modem time fetch"
+	default 10
+
+config MODE_INDICATION_TIME
+	int "Number of ms to indicate the current device mode, active or passive"
+	default 10000
+
 endmenu
 
 menu "Zephyr Kernel"

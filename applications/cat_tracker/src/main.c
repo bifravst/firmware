@@ -16,14 +16,24 @@
 
 #define NORMAL_OPERATION false
 #define SYNCRONIZATION true
-#define NO_GPS_FIX false
 #define GPS_FIX true
-#define INCLUDE_MOD_D true
+#define NO_GPS_FIX false
+
+#define MODE_INDICATION_TIME CONFIG_MODE_INDICATION_TIME
+#define LTE_CONN_TIMEOUT CONFIG_LTE_CONN_TIMEOUT
+#define MODEM_TIME_RETRIES CONFIG_MODEM_TIME_RETRIES
 
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
-#define LTE_CONN_TIMEOUT 10
-#define MODEM_TRY_AGAIN 10
+enum governing_states {
+	LTE_CHECK_CONNECTION,
+	CHECK_MODE,
+	ACTIVE_MODE,
+	PASSIVE_MODE,
+	GPS_SEARCH,
+};
+
+enum governing_states state = CHECK_MODE;
 
 static struct cloud_backend *cloud_backend;
 
@@ -337,8 +347,8 @@ modem_time_fetch:
 		err = modem_time_get();
 		if (err != 0) {
 			printk("Modem giving old network time, trying again in %d seconds\n",
-			       MODEM_TRY_AGAIN);
-			k_sleep(K_SECONDS(MODEM_TRY_AGAIN));
+			       MODEM_TIME_RETRIES);
+			k_sleep(K_SECONDS(MODEM_TIME_RETRIES));
 			goto modem_time_fetch;
 		}
 
@@ -375,54 +385,69 @@ void main(void)
 
 	adxl362_init();
 	gps_control_init(gps_control_handler);
+	lte_connect();
 
-check_mode:
-	start_restart_mov_timer();
-	if (check_mode()) {
-		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
-		active = true;
-		k_sleep(30000);
-		goto active;
-	} else {
-		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
-		active = false;
-		k_sleep(30000);
-		goto passive;
+	while (true) {
+		switch (state) {
+		case CHECK_MODE:
+			start_restart_mov_timer();
+			if (check_mode()) {
+				ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+				active = true;
+				k_sleep(MODE_INDICATION_TIME);
+				state = ACTIVE_MODE;
+			} else {
+				ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+				active = false;
+				k_sleep(MODE_INDICATION_TIME);
+				state = PASSIVE_MODE;
+			}
+			break;
+
+		case ACTIVE_MODE:
+			printk("ACTIVE MODE\n");
+			state = LTE_CHECK_CONNECTION;
+			break;
+
+		case PASSIVE_MODE:
+			printk("PASSIVE MODE\n");
+			ui_stop_leds();
+			k_poll(events, 2, K_FOREVER);
+			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[1].sem, 0);
+			}
+			state = LTE_CHECK_CONNECTION;
+			break;
+
+		case LTE_CHECK_CONNECTION:
+			if (k_sem_count_get(&connect_sem) == 0) {
+				lte_connect();
+			}
+			state = GPS_SEARCH;
+			break;
+
+		case GPS_SEARCH:
+			ui_led_set_pattern(UI_LED_GPS_SEARCHING);
+			gps_control_start();
+			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
+			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
+				k_sem_take(events[0].sem, 0);
+				cloud_report(GPS_FIX);
+			} else {
+				gps_control_stop();
+				cloud_report(NO_GPS_FIX);
+			}
+			events[1].state = K_POLL_STATE_NOT_READY;
+			events[0].state = K_POLL_STATE_NOT_READY;
+			ui_stop_leds();
+			k_sleep(K_SECONDS(check_active_wait(active)));
+
+			state = CHECK_MODE;
+			break;
+
+		default:
+			printk("Unknown governing state\n");
+			break;
+		}
 	}
-
-active:
-	printk("ACTIVE MODE\n");
-	goto gps_search_and_connect;
-
-passive:
-	printk("PASSIVE MODE\n");
-	k_poll(events, 2, K_FOREVER);
-	if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(events[1].sem, 0);
-	}
-
-	goto gps_search_and_connect;
-
-gps_search_and_connect:
-
-	if (k_sem_count_get(&connect_sem) == 0) {
-		lte_connect();
-	}
-
-	ui_led_set_pattern(UI_LED_GPS_SEARCHING);
-	gps_control_start();
-	k_poll(events, 1, K_SECONDS(check_gps_timeout()));
-	if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(events[0].sem, 0);
-		cloud_report(GPS_FIX);
-	} else {
-		gps_control_stop();
-		cloud_report(NO_GPS_FIX);
-	}
-	events[1].state = K_POLL_STATE_NOT_READY;
-	events[0].state = K_POLL_STATE_NOT_READY;
-	ui_stop_leds();
-	k_sleep(K_SECONDS(check_active_wait(active)));
-
-	goto check_mode;
 }
