@@ -95,7 +95,7 @@ struct cloud_event {
  * @param backend   Pointer to cloud backend.
  * @param evt       Pointer to cloud event.
  * @param user_data Pointer to user defined data that will be passed on as
- * 		       argument to cloud event handler.
+ *                     argument to cloud event handler.
  */
 typedef void (*cloud_evt_handler_t)(const struct cloud_backend *const backend,
 				    const struct cloud_event *const evt,
@@ -325,11 +325,11 @@ static inline int cloud_ep_subscriptions_remove(
 }
 
 /**@brief Set the user-defined data that is passed as an argument to cloud event
- * 	  handler.
+ *        handler.
  *
  * @param backend   Pointer to cloud backend structure.
  * @param user_data Pointer to user defined data that will be passed on as
- * 		       argument to cloud event handler.
+ *                     argument to cloud event handler.
  */
 static inline int cloud_user_data_set(struct cloud_backend *const backend,
 				      void *user_data)
@@ -356,15 +356,19 @@ static inline int cloud_user_data_set(struct cloud_backend *const backend,
  **/
 struct cloud_backend *cloud_get_binding(const char *name);
 
-#define CLOUD_BACKEND_DEFINE(_name, _api)                                      \
-                                                                               \
-	static struct cloud_backend_config UTIL_CAT(                           \
-		_name, _config) = { .name = STRINGIFY(_name) };                \
-                                                                               \
-	static const struct cloud_backend _name                                \
-		__attribute__((section(".cloud_backends"))) __attribute__(     \
-			(used)) = { .api = &_api,                              \
-				    .config = &UTIL_CAT(_name, _config) };
+#define CLOUD_BACKEND_DEFINE(_name, _api)				     \
+									     \
+	static struct cloud_backend_config UTIL_CAT(_name, _config) =	     \
+	{								     \
+		.name = STRINGIFY(_name)				     \
+	};								     \
+									     \
+	static const struct cloud_backend _name				     \
+	__attribute__ ((section(".cloud_backends"))) __attribute__((used)) = \
+	{								     \
+		.api = &_api,						     \
+		.config = &UTIL_CAT(_name, _config)			     \
+	};
 
 /**
  * @}

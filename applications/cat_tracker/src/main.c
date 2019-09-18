@@ -126,7 +126,7 @@ static void cloud_report(bool gps_fix)
 	}
 }
 
-static void cloud_pair()
+static void cloud_pair(void)
 {
 	int err;
 
@@ -215,8 +215,6 @@ no_connection:
 	if (k_sem_count_get(&connect_sem) == 1) {
 		k_sem_take(&connect_sem, 0);
 	}
-
-	return;
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -315,7 +313,7 @@ static void start_restart_mov_timer(void)
 		      K_SECONDS(check_mov_timeout()));
 }
 
-static void lte_connect()
+static void lte_connect(void)
 {
 	int err;
 
@@ -323,7 +321,7 @@ static void lte_connect()
 
 	err = lte_lc_init_connect_manager(connection_handler);
 	if (err != 0) {
-		printk("Error setting lte_connect manager: %d\n", err);
+		printk("Error setting lte connection manager: %d\n", err);
 	}
 
 	printk("Searching for LTE connection... timeout in %d minutes\n",
@@ -332,9 +330,9 @@ static void lte_connect()
 	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
 		k_sem_give(&connect_sem);
 
-		printk("LTE connected! \nFetching modem time...\n");
+		printk("LTE connected!\nFetching modem time...\n");
 
-	modem_time_fetch:
+modem_time_fetch:
 
 		err = modem_time_get();
 		if (err != 0) {

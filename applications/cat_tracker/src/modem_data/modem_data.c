@@ -19,7 +19,7 @@ time_t epoch;
 
 struct modem_param_info modem_param;
 
-static int modem_fetch_tries = 0;
+static int modem_fetch_tries;
 static bool old_modem_time;
 
 int get_time_info(char *datetime_string, int min, int max)

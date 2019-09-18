@@ -22,8 +22,12 @@ static struct {
 
 K_SEM_DEFINE(gps_stop_sem, 0, 1);
 
-struct k_poll_event gps_events[1] = { K_POLL_EVENT_STATIC_INITIALIZER(
-	K_POLL_TYPE_SEM_AVAILABLE, K_POLL_MODE_NOTIFY_ONLY, &gps_stop_sem, 0) };
+struct k_poll_event gps_events[1] = {
+	K_POLL_EVENT_STATIC_INITIALIZER(
+		K_POLL_TYPE_SEM_AVAILABLE,
+		K_POLL_MODE_NOTIFY_ONLY,
+		&gps_stop_sem, 0)
+};
 
 static void gps_work_handler(struct k_work *work)
 {
@@ -32,18 +36,18 @@ static void gps_work_handler(struct k_work *work)
 	if (gps_work.type == GPS_WORK_START) {
 		err = gps_start(gps_work.dev);
 		if (err) {
-			LOG_DBG("GPS could not be started, error: %d\n", err);
+			LOG_DBG("GPS could not start, error: %d\n", err);
 			return;
 		}
 
-		LOG_DBG("GPS started successfully.\nSearching for satellites ");
-		LOG_DBG("to get position fix. This may take several minutes.\n");
+		LOG_DBG("GPS started successfully.");
+		LOG_DBG("Searching for satellites");
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {
 		err = gps_stop(gps_work.dev);
 		if (err) {
-			LOG_DBG("GPS could not be stopped, error: %d\n", err);
+			LOG_DBG("GPS could not stop error, %d\n", err);
 			return;
 		}
 

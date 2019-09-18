@@ -90,10 +90,10 @@ static bool connected;
 
 static int nfds;
 
-static bool queued_entries = false;
+static bool queued_entries;
+static int num_queued_entries;
 
-int head_cir_buf = 0;
-int num_queued_entries = 0;
+static int head_cir_buf;
 
 static bool include_static_modem_data;
 
@@ -464,7 +464,7 @@ static int broker_init(void)
 
 			broker4->sin_addr.s_addr =
 				((struct sockaddr_in *)addr->ai_addr)
-					->sin_addr.s_addr;
+				->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
 			broker4->sin_port = htons(CLOUD_PORT);
 

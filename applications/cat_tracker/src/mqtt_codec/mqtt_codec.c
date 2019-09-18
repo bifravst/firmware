@@ -556,9 +556,12 @@ int encode_message(struct Transmit_data *output, struct Sync_data *sync_data,
 	    change_passive_wait || change_movement_timeout ||
 	    change_accel_threshold || change_config) {
 		err += json_add_obj(reported_obj, "cfg", cfg_obj);
-		change_gpst = change_active = change_active_wait =
-			change_passive_wait = change_movement_timeout =
-				change_accel_threshold = false;
+		change_gpst = false;
+		change_active = false;
+		change_active_wait = false;
+		change_passive_wait = false;
+		change_movement_timeout = false;
+		change_accel_threshold = false;
 		change_config = false;
 	}
 

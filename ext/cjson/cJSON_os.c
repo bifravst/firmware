@@ -12,10 +12,16 @@
 static cJSON_Hooks _cjson_hooks;
 
 /**@brief malloc() function definition. */
-static void *malloc_fn_hook(size_t sz) { return k_malloc(sz); }
+static void *malloc_fn_hook(size_t sz)
+{
+	return k_malloc(sz);
+}
 
 /**@brief free() function definition. */
-static void free_fn_hook(void *p_ptr) { k_free(p_ptr); }
+static void free_fn_hook(void *p_ptr)
+{
+	k_free(p_ptr);
+}
 
 /**@brief Initialize cJSON by assigning function hooks. */
 void cJSON_Init(void)

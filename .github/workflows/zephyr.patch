@@ -5,7 +5,7 @@ index fbd0f0ef57..71a46262b3 100644
 @@ -276,6 +276,11 @@ else() # NOT FIRST_BOILERPLATE_EXECUTION
      message("Changed board to secure nrf9160_pca20035 (NOT NS)")
    endif()
- 
+
 +  if(${BOARD} STREQUAL nrf9160_pca10015ns)
 +    set(BOARD nrf9160_pca10015)
 +    message("Changed board to secure nrf9160_pca10015 (NOT NS)")
