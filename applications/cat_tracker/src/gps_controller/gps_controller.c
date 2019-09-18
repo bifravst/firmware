@@ -22,13 +22,6 @@ static struct {
 
 K_SEM_DEFINE(gps_stop_sem, 0, 1);
 
-struct k_poll_event gps_events[1] = {
-	K_POLL_EVENT_STATIC_INITIALIZER(
-		K_POLL_TYPE_SEM_AVAILABLE,
-		K_POLL_MODE_NOTIFY_ONLY,
-		&gps_stop_sem, 0)
-};
-
 static void gps_work_handler(struct k_work *work)
 {
 	int err;
@@ -51,7 +44,7 @@ static void gps_work_handler(struct k_work *work)
 			return;
 		}
 
-		k_sem_give(gps_events[0].sem);
+		k_sem_give(&gps_stop_sem);
 
 		return;
 	}
@@ -61,15 +54,12 @@ void gps_control_stop(void)
 {
 	gps_work.type = GPS_WORK_STOP;
 	k_work_submit(&gps_work.work);
-	k_poll(gps_events, 1, K_SECONDS(GPS_THREAD_DEADLINE));
 
-	if (gps_events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-		k_sem_take(gps_events[0].sem, 0);
+	if (!k_sem_take(&gps_stop_sem, K_SECONDS(GPS_THREAD_DEADLINE))) {
 	} else {
 		sys_reboot(0);
 		/*Should be forwarded to an error handler */
 	}
-	gps_events[0].state = K_POLL_STATE_NOT_READY;
 }
 
 void gps_control_start(void)

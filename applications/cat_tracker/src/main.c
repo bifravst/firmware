@@ -43,15 +43,6 @@ K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(connect_sem, 0, 1);
 
-struct k_poll_event events[2] = {
-	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY,
-					&gps_timeout_sem, 0),
-	K_POLL_EVENT_STATIC_INITIALIZER(K_POLL_TYPE_SEM_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY,
-					&accel_trig_sem, 0)
-};
-
 static struct k_work cloud_report_work;
 static struct k_work cloud_report_fix_work;
 static struct k_work cloud_pair_work;
@@ -215,14 +206,14 @@ void connection_handler(char *response)
 	goto no_connection;
 
 connection:
-	if (k_sem_count_get(&connect_sem) == 0) {
+	if (!k_sem_count_get(&connect_sem)) {
 		k_sem_give(&connect_sem);
 	}
 
 	return;
 
 no_connection:
-	if (k_sem_count_get(&connect_sem) == 1) {
+	if (k_sem_count_get(&connect_sem)) {
 		k_sem_take(&connect_sem, 0);
 	}
 }
@@ -253,7 +244,7 @@ static void adxl362_trigger_handler(struct device *dev,
 			attach_accel_data(sensor_value_to_double(&accel[0]),
 					  sensor_value_to_double(&accel[1]),
 					  sensor_value_to_double(&accel[2]));
-			k_sem_give(events[1].sem);
+			k_sem_give(&accel_trig_sem);
 		}
 
 		break;
@@ -273,7 +264,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		set_current_time(gps_data);
 		attach_gps_data(gps_data);
-		k_sem_give(events[0].sem);
+		k_sem_give(&gps_timeout_sem);
 		break;
 
 	default:
@@ -337,7 +328,7 @@ static void lte_connect(void)
 	printk("Searching for LTE connection... timeout in %d minutes\n",
 	       LTE_CONN_TIMEOUT);
 
-	if (k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT)) == 0) {
+	if (!k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT))) {
 		k_sem_give(&connect_sem);
 
 		printk("LTE connected!\nFetching modem time...\n");
@@ -412,15 +403,13 @@ void main(void)
 		case PASSIVE_MODE:
 			printk("PASSIVE MODE\n");
 			ui_stop_leds();
-			k_poll(events, 2, K_FOREVER);
-			if (events[1].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[1].sem, 0);
+			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 			}
 			state = LTE_CHECK_CONNECTION;
 			break;
 
 		case LTE_CHECK_CONNECTION:
-			if (k_sem_count_get(&connect_sem) == 0) {
+			if (!k_sem_count_get(&connect_sem)) {
 				lte_connect();
 			}
 			state = GPS_SEARCH;
@@ -429,19 +418,14 @@ void main(void)
 		case GPS_SEARCH:
 			ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 			gps_control_start();
-			k_poll(events, 1, K_SECONDS(check_gps_timeout()));
-			if (events[0].state == K_POLL_STATE_SEM_AVAILABLE) {
-				k_sem_take(events[0].sem, 0);
+			if (!k_sem_take(&gps_timeout_sem, K_SECONDS(check_gps_timeout()))) {
 				cloud_report(GPS_FIX);
 			} else {
 				gps_control_stop();
 				cloud_report(NO_GPS_FIX);
 			}
-			events[1].state = K_POLL_STATE_NOT_READY;
-			events[0].state = K_POLL_STATE_NOT_READY;
 			ui_stop_leds();
 			k_sleep(K_SECONDS(check_active_wait(active)));
-
 			state = CHECK_MODE;
 			break;
 
