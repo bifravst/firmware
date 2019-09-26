@@ -5,12 +5,10 @@
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
 #include <misc/reboot.h>
-#include <mqtt_behaviour.h>
 #include <modem_data.h>
 #include <device.h>
 #include <sensor.h>
 #include <gps_controller.h>
-#include <mqtt_codec.h>
 #include <ui.h>
 #include <net/cloud.h>
 
@@ -58,7 +56,6 @@ enum error_type {
 
 void error_handler(enum error_type err_type, int err_code)
 {
-
 #if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
 	LOG_PANIC();
 	sys_reboot(0);
@@ -119,7 +116,7 @@ static void cloud_report(bool gps_fix)
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	attach_battery_data(request_battery_status());
 
-	set_gps_found(gps_fix);
+	set_gps_found(true);
 
 	err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
 	if (err) {
@@ -149,12 +146,12 @@ static void cloud_pair_work_fn(struct k_work *work)
 
 static void cloud_report_work_fn(struct k_work *work)
 {
-	cloud_report(NO_GPS_FIX);
+	cloud_report(false);
 }
 
 static void cloud_report_fix_work_fn(struct k_work *work)
 {
-	cloud_report(GPS_FIX);
+	cloud_report(true);
 }
 
 static void gps_control_start_work_fn(struct k_work *work)
@@ -326,20 +323,20 @@ static void lte_connect(void)
 	}
 
 	printk("Searching for LTE connection... timeout in %d minutes\n",
-	       LTE_CONN_TIMEOUT);
+	       CONFIG_LTE_CONN_TIMEOUT);
 
-	if (!k_sem_take(&connect_sem, K_MINUTES(LTE_CONN_TIMEOUT))) {
+	if (!k_sem_take(&connect_sem, K_MINUTES(CONFIG_LTE_CONN_TIMEOUT))) {
 		k_sem_give(&connect_sem);
 
 		printk("LTE connected!\nFetching modem time...\n");
 
-modem_time_fetch:
+	modem_time_fetch:
 
 		err = modem_time_get();
 		if (err != 0) {
 			printk("Modem giving old network time, trying again in %d seconds\n",
-			       MODEM_TIME_RETRIES);
-			k_sleep(K_SECONDS(MODEM_TIME_RETRIES));
+			       CONFIG_MODEM_TIME_RETRIES);
+			k_sleep(K_SECONDS(CONFIG_MODEM_TIME_RETRIES));
 			goto modem_time_fetch;
 		}
 
@@ -347,7 +344,7 @@ modem_time_fetch:
 		lte_lc_psm_req(true);
 	} else {
 		printk("LTE not connected within %d minutes, starting gps search\n",
-		       LTE_CONN_TIMEOUT);
+		       CONFIG_LTE_CONN_TIMEOUT);
 		lte_lc_gps_mode();
 	}
 }
@@ -364,7 +361,7 @@ void main(void)
 
 	printk("The cat tracker has started\n");
 
-	cloud_backend = cloud_get_binding("CAT_CLOUD");
+	cloud_backend = cloud_get_binding("BIFRAVST_CLOUD");
 	__ASSERT(cloud_backend != NULL, "Cat Cloud backend not found");
 
 	err = cloud_init_config(cloud_backend);
@@ -385,12 +382,12 @@ void main(void)
 			if (check_mode()) {
 				ui_led_set_pattern(UI_LED_ACTIVE_MODE);
 				active = true;
-				k_sleep(MODE_INDICATION_TIME);
+				k_sleep(CONFIG_MODE_INDICATION_TIME);
 				state = ACTIVE_MODE;
 			} else {
 				ui_led_set_pattern(UI_LED_PASSIVE_MODE);
 				active = false;
-				k_sleep(MODE_INDICATION_TIME);
+				k_sleep(CONFIG_MODE_INDICATION_TIME);
 				state = PASSIVE_MODE;
 			}
 			break;
@@ -418,11 +415,12 @@ void main(void)
 		case GPS_SEARCH:
 			ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 			gps_control_start();
-			if (!k_sem_take(&gps_timeout_sem, K_SECONDS(check_gps_timeout()))) {
-				cloud_report(GPS_FIX);
+			if (!k_sem_take(&gps_timeout_sem,
+					K_SECONDS(check_gps_timeout()))) {
+				cloud_report(true);
 			} else {
 				gps_control_stop();
-				cloud_report(NO_GPS_FIX);
+				cloud_report(false);
 			}
 			ui_stop_leds();
 			k_sleep(K_SECONDS(check_active_wait(active)));

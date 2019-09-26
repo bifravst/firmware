@@ -103,7 +103,7 @@ int gps_control_init(gps_trigger_handler_t handler)
 	gps_work.dev = gps_dev;
 	gps_work.type = GPS_WORK_STOP;
 
-	LOG_DBG("GPS initialized\n");
+	LOG_DBG("GPS initialized");
 
 	return 0;
 }

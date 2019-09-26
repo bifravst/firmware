@@ -1,0 +1,43 @@
+# Copyright (c) 2018 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menuconfig BIFRAVST_CLOUD
+	bool "BIFRAVST Cloud library"
+	select CJSON_LIB
+	select MQTT_LIB
+
+if BIFRAVST_CLOUD
+
+config BIFRAVST_CLOUD_SEC_TAG
+	int "Security tag to use for BIFRAVST Cloud connection"
+	default 42
+
+config BIFRAVST_CLOUD_HOST_NAME
+	string "BIFRAVST Cloud server hostname"
+	default "a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com"
+
+config BIFRAVST_CLOUD_PORT
+	int "BIFRAVST Cloud server port"
+	default 8883
+
+config BIFRAVST_CLOUD_CONNECTION_TRIES
+    int "Number of times the mqtt client will try to connect to host"
+    default 5
+
+config BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX
+    int "The maximum amount of buffered gps fixes"
+    default 10
+
+config BIFRAVST_MQTT_TRANSMISSION_SLEEP
+	int "Number of millisecond the mqtt transmission sleeps between data poll"
+	default 500
+
+module=BIFRAVST_CLOUD
+module-dep=LOG
+module-str=Log level for BIFRAVST Cloud
+module-help=Enables BIFRAVST Cloud log messages.
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # BIFRAVST_CLOUD

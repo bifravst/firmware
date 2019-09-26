@@ -49,26 +49,6 @@ endmenu	# GPS
 
 menu "Cloud"
 
-config CLOUD_CERT_SEC_TAG
-	int "Secure tag fo TLS credentials"
-	default 42
-
-config MQTT_PUB_TOPIC
-	string "MQTT publish topic"
-	default "my/publish/topic"
-
-config MQTT_SUB_TOPIC
-	string "MQTT subscribe topic"
-	default "my/subscribe/topic"
-
-config CLOUD_HOST_NAME
-	string "Cloud broker hostname"
-	default "a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com"
-
-config CLOUD_PORT
-	int "Cloud AWS broker port"
-	default 8883
-
 config MQTT_MESSAGE_BUFFER_SIZE
 	int ""
 	default 2048
@@ -76,22 +56,6 @@ config MQTT_MESSAGE_BUFFER_SIZE
 config MQTT_PAYLOAD_BUFFER_SIZE
 	int ""
 	default 2048
-
-config MQTT_APP_SLEEP_MS
-	int ""
-	default 5000
-
-config MQTT_APP_CONNECT_TRIES
-	int "Number of times the device will try to connect to the broker"
-	default 5
-
-config GPS_CIR_BUF_PUB_LIMIT
-	int "Maximum amount of entries in the gps buffer published in bulk"
-	default 7
-
-config GPS_MAX_CIR_BUF
-	int "Maximum amount of entries in the gps circualr buffer"
-	default 10
 
 endmenu # Cloud
 

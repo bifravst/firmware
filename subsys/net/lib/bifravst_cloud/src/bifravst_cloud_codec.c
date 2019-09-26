@@ -1,4 +1,4 @@
-#include <mqtt_codec.h>
+#include <bifravst_cloud_codec.h>
 #include <stdbool.h>
 #include <string.h>
 #include <zephyr.h>
@@ -236,9 +236,10 @@ int encode_gps_buffer(struct transmit_data_t *output,
 	cJSON *reported_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateArray();
 
-	struct twins_gps_buf twins_gps_buf[CONFIG_GPS_MAX_CIR_BUF];
+	struct twins_gps_buf
+		twins_gps_buf[CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX];
 
-	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
 		twins_gps_buf[i].gps_buf_objects = NULL;
 		twins_gps_buf[i].gps_buf_objects = cJSON_CreateObject();
 		twins_gps_buf[i].gps_buf_val_objects = NULL;
@@ -251,20 +252,22 @@ int encode_gps_buffer(struct transmit_data_t *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
+		for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
+		     i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}
 		return -ENOMEM;
 	}
 
-	sort_gps_buf_descending(cir_buf_gps, CONFIG_GPS_MAX_CIR_BUF);
+	sort_gps_buf_descending(cir_buf_gps,
+				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
 
 	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued &&
 		    (encoded_counter < max_per_publish)) {
 			err += json_add_number(
@@ -307,7 +310,8 @@ int encode_gps_buffer(struct transmit_data_t *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
+		for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
+		     i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}

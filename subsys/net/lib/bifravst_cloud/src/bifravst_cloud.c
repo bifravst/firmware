@@ -1,4 +1,4 @@
-#include <mqtt_behaviour.h>
+#include <bifravst_cloud.h>
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <net/cloud.h>
@@ -9,14 +9,10 @@
 #include <stdlib.h>
 #include <time.h>
 #include <gps.h>
-#include <mqtt_codec.h>
+#include <bifravst_cloud_codec.h>
+#include <logging/log.h>
 
-#define APP_SLEEP_MS CONFIG_MQTT_APP_SLEEP_MS
-#define APP_CONNECT_TRIES CONFIG_MQTT_APP_CONNECT_TRIES
-#define MAX_PER_PUBLISH CONFIG_GPS_CIR_BUF_PUB_LIMIT
-
-#define CLOUD_HOSTNAME CONFIG_CLOUD_HOST_NAME
-#define CLOUD_PORT CONFIG_CLOUD_PORT
+LOG_MODULE_REGISTER(bifravst_cloud_transport, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 
 #define IMEI_LEN 15
 #define AWS_CLOUD_CLIENT_ID_LEN (IMEI_LEN)
@@ -66,7 +62,7 @@ static const struct mqtt_topic cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-struct cloud_data_gps_t cir_buf_gps[CONFIG_GPS_MAX_CIR_BUF];
+struct cloud_data_gps_t cir_buf_gps[CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX];
 
 struct cloud_data_t cloud_data = { .gps_timeout = 1000,
 				   .active = true,
@@ -86,15 +82,13 @@ static struct sockaddr_storage broker;
 
 static struct pollfd fds;
 
-static bool connected;
-
 static int nfds;
 
-static bool queued_entries;
+static int head_cir_buf;
 static int num_queued_entries;
 
-static int head_cir_buf;
-
+static bool connected;
+static bool queued_entries;
 static bool include_static_modem_data;
 
 void set_gps_found(bool gps_found)
@@ -146,7 +140,7 @@ double check_accel_thres(void)
 void attach_gps_data(struct gps_data gps_data)
 {
 	head_cir_buf += 1;
-	if (head_cir_buf == CONFIG_GPS_MAX_CIR_BUF - 1) {
+	if (head_cir_buf == CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX - 1) {
 		head_cir_buf = 0;
 	}
 
@@ -159,7 +153,7 @@ void attach_gps_data(struct gps_data gps_data)
 	cir_buf_gps[head_cir_buf].gps_timestamp = k_uptime_get();
 	cir_buf_gps[head_cir_buf].queued = true;
 
-	printk("Entry: %d in gps_buffer filled\n", head_cir_buf);
+	LOG_DBG("Entry: %d in gps_buffer filled", head_cir_buf);
 }
 
 void attach_battery_data(int battery_voltage)
@@ -261,7 +255,7 @@ static int init_config(const struct cloud_backend *const backend)
 
 	err = topics_populate();
 	if (err) {
-		printk("Could not populate topics: %d\n", err);
+		LOG_ERR("Could not populate topics: %d", err);
 		return err;
 	}
 
@@ -274,7 +268,7 @@ static void data_print(u8_t *prefix, u8_t *data, size_t len)
 
 	memcpy(buf, data, len);
 	buf[len] = 0;
-	printk("%s%s\n", prefix, buf);
+	LOG_DBG("%s%s", prefix, buf);
 }
 
 static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
@@ -292,7 +286,7 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	param.retain_flag = 0;
 
 	data_print("Publishing: ", data, len);
-	printk("to topic: %s len: %u\n", topic, (unsigned int)strlen(topic));
+	LOG_DBG("to topic: %s len: %u", topic, (unsigned int)strlen(topic));
 
 	return mqtt_publish(c, &param);
 }
@@ -306,8 +300,8 @@ static int subscribe(void)
 	};
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
-		printk("Subscribing to: %s\n",
-		       subscription_list.list[i].topic.utf8);
+		LOG_DBG("Subscribing to: %s",
+			subscription_list.list[i].topic.utf8);
 	}
 
 	return mqtt_subscribe(&client, &subscription_list);
@@ -332,7 +326,7 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 				return ret;
 			}
 
-			printk("mqtt_read_publish_payload: EAGAIN\n");
+			LOG_DBG("mqtt_read_publish_payload: EAGAIN");
 
 			err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
 			if (err > 0 && (fds.revents & POLLIN) == POLLIN) {
@@ -365,19 +359,19 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	switch (evt->type) {
 	case MQTT_EVT_CONNACK:
 		if (evt->result != 0) {
-			printk("MQTT connect failed %d\n", evt->result);
+			LOG_ERR("MQTT connect failed %d", evt->result);
 			break;
 		}
 		connected = true;
-		printk("[%s:%d] MQTT client connected!\n", __func__, __LINE__);
+		LOG_DBG("[%s:%d] MQTT client connected!", __func__, __LINE__);
 
 		subscribe();
 
 		break;
 
 	case MQTT_EVT_DISCONNECT:
-		printk("[%s:%d] MQTT client disconnected %d\n", __func__,
-		       __LINE__, evt->result);
+		LOG_DBG("[%s:%d] MQTT client disconnected %d", __func__,
+			__LINE__, evt->result);
 
 		connected = false;
 		clear_fds();
@@ -386,16 +380,16 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	case MQTT_EVT_PUBLISH: {
 		const struct mqtt_publish_param *p = &evt->param.publish;
 
-		printk("[%s:%d] MQTT PUBLISH result=%d len=%d\n", __func__,
-		       __LINE__, evt->result, p->message.payload.len);
+		LOG_DBG("[%s:%d] MQTT PUBLISH result=%d len=%d", __func__,
+			__LINE__, evt->result, p->message.payload.len);
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
-			printk("mqtt_read_publish_payload: Failed! %d\n", err);
-			printk("Disconnecting MQTT client...\n");
+			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
+			LOG_ERR("Disconnecting MQTT client...");
 
 			err = mqtt_disconnect(c);
 			if (err) {
-				printk("Could not disconnect: %d\n", err);
+				LOG_ERR("Could not disconnect: %d", err);
 			}
 
 			break;
@@ -404,7 +398,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		if (p->message.payload.len > 2) {
 			err = decode_response(payload_buf, &cloud_data);
 			if (err != 0) {
-				printk("Could not decode response\n%d", err);
+				LOG_ERR("Could not decode response%d", err);
 			}
 		}
 
@@ -412,26 +406,26 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 
 	case MQTT_EVT_PUBACK:
 		if (evt->result != 0) {
-			printk("MQTT PUBACK error %d\n", evt->result);
+			LOG_ERR("MQTT PUBACK error %d", evt->result);
 			break;
 		}
 
-		printk("[%s:%d] PUBACK packet id: %u\n", __func__, __LINE__,
-		       evt->param.puback.message_id);
+		LOG_ERR("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
+			evt->param.puback.message_id);
 		break;
 
 	case MQTT_EVT_SUBACK:
 		if (evt->result != 0) {
-			printk("MQTT SUBACK error %d\n", evt->result);
+			LOG_ERR("MQTT SUBACK error %d", evt->result);
 			break;
 		}
 
-		printk("[%s:%d] SUBACK packet id: %u\n", __func__, __LINE__,
-		       evt->param.suback.message_id);
+		LOG_ERR("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
+			evt->param.suback.message_id);
 		break;
 
 	default:
-		printk("[%s:%d] default: %d\n", __func__, __LINE__, evt->type);
+		LOG_ERR("[%s:%d] default: %d", __func__, __LINE__, evt->type);
 		break;
 	}
 }
@@ -444,9 +438,10 @@ static int broker_init(void)
 	struct addrinfo hints = { .ai_family = AF_INET,
 				  .ai_socktype = SOCK_STREAM };
 
-	err = getaddrinfo(CLOUD_HOSTNAME, NULL, &hints, &result);
+	err = getaddrinfo(CONFIG_BIFRAVST_CLOUD_HOST_NAME, NULL, &hints,
+			  &result);
 	if (err) {
-		printk("ERROR: getaddrinfo failed %d\n", err);
+		LOG_ERR("ERROR: getaddrinfo failed %d", err);
 
 		return err;
 	}
@@ -464,20 +459,20 @@ static int broker_init(void)
 
 			broker4->sin_addr.s_addr =
 				((struct sockaddr_in *)addr->ai_addr)
-				->sin_addr.s_addr;
+					->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
-			broker4->sin_port = htons(CLOUD_PORT);
+			broker4->sin_port = htons(CONFIG_BIFRAVST_CLOUD_PORT);
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
-			printk("IPv4 Address found %s\n", ipv4_addr);
+			LOG_DBG("IPv4 Address found %s", ipv4_addr);
 
 			break;
 		}
-		printk("ai_addrlen = %u should be %u or %u\n",
-		       (unsigned int)addr->ai_addrlen,
-		       (unsigned int)sizeof(struct sockaddr_in),
-		       (unsigned int)sizeof(struct sockaddr_in6));
+		LOG_DBG("ai_addrlen = %u should be %u or %un",
+			(unsigned int)addr->ai_addrlen,
+			(unsigned int)sizeof(struct sockaddr_in),
+			(unsigned int)sizeof(struct sockaddr_in6));
 
 		addr = addr->ai_next;
 		break;
@@ -514,7 +509,7 @@ static int client_init(struct mqtt_client *client)
 #if defined(CONFIG_MQTT_LIB_TLS)
 	client->transport.type = MQTT_TRANSPORT_SECURE;
 
-	static sec_tag_t sec_tag_list[] = { CONFIG_CLOUD_CERT_SEC_TAG };
+	static sec_tag_t sec_tag_list[] = { CONFIG_BIFRAVST_CLOUD_SEC_TAG };
 	struct mqtt_sec_config *tls_config = &(client->transport).tls.config;
 
 	tls_config->peer_verify = 2;
@@ -522,7 +517,7 @@ static int client_init(struct mqtt_client *client)
 	tls_config->cipher_list = NULL;
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
-	tls_config->hostname = CLOUD_HOSTNAME;
+	tls_config->hostname = CONFIG_BIFRAVST_CLOUD_HOST_NAME;
 #else
 	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
 #endif
@@ -534,7 +529,7 @@ static void wait(int timeout)
 {
 	if (nfds > 0) {
 		if (poll(&fds, nfds, timeout) < 0) {
-			printk("poll error: %d\n", errno);
+			LOG_ERR("poll error: %d", errno);
 		}
 	}
 }
@@ -550,13 +545,13 @@ static int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
 
 		err = mqtt_live(client);
 		if (err != 0) {
-			printk("mqtt_live error\n");
+			LOG_ERR("mqtt_live error");
 			return err;
 		}
 
 		err = mqtt_input(client);
 		if (err != 0) {
-			printk("mqtt_input error\n");
+			LOG_ERR("mqtt_input error");
 			return err;
 		}
 
@@ -570,7 +565,7 @@ static int mqtt_enable(struct mqtt_client *client)
 {
 	int err, i = 0;
 
-	while (i++ < APP_CONNECT_TRIES && !connected) {
+	while (i++ < CONFIG_BIFRAVST_CLOUD_CONNECTION_TRIES && !connected) {
 		err = client_init(client);
 		if (err != 0) {
 			continue;
@@ -578,8 +573,8 @@ static int mqtt_enable(struct mqtt_client *client)
 
 		err = mqtt_connect(client);
 		if (err != 0) {
-			printk("ERROR: mqtt_connect %d\n", err);
-			k_sleep(APP_SLEEP_MS);
+			LOG_ERR("ERROR: mqtt_connect %d", err);
+			k_sleep(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 			continue;
 		}
 
@@ -592,7 +587,7 @@ static int mqtt_enable(struct mqtt_client *client)
 		fds.events = POLLIN;
 		nfds = 1;
 
-		wait(APP_SLEEP_MS);
+		wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 		mqtt_input(client);
 
 		if (!connected) {
@@ -615,7 +610,7 @@ static int report_and_update(const struct cloud_backend *const backend,
 
 	err = mqtt_enable(&client);
 	if (err) {
-		printk("Could not connect to client: %d\n", err);
+		LOG_ERR("Could not connect to client: %d", err);
 		goto end;
 	}
 
@@ -634,7 +629,8 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		err = process_mqtt_and_sleep(
+			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 		if (err != 0) {
 			goto end;
 		}
@@ -660,14 +656,15 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		err = process_mqtt_and_sleep(
+			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 		if (err != 0) {
 			goto end;
 		}
 
 		if (cloud_data.gps_found) {
-			printk("Entry: %d in gps_buffer published\n",
-			       head_cir_buf);
+			LOG_DBG("Entry: %d in gps_buffer published",
+				head_cir_buf);
 			cir_buf_gps[head_cir_buf].queued = false;
 		}
 
@@ -694,13 +691,14 @@ static int report_and_update(const struct cloud_backend *const backend,
 			goto end;
 		}
 
-		err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+		err = process_mqtt_and_sleep(
+			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 		if (err != 0) {
 			goto end;
 		}
 	}
 
-	for (int i = 0; i < CONFIG_GPS_MAX_CIR_BUF; i++) {
+	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued) {
 			queued_entries = true;
 			num_queued_entries++;
@@ -709,8 +707,9 @@ static int report_and_update(const struct cloud_backend *const backend,
 
 	if (queued_entries) {
 		while (num_queued_entries > 0) {
-			err = encode_gps_buffer(&transmit_data, cir_buf_gps,
-						MAX_PER_PUBLISH);
+			err = encode_gps_buffer(
+				&transmit_data, cir_buf_gps,
+				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
 			if (err != 0) {
 				goto end;
 			}
@@ -723,12 +722,15 @@ static int report_and_update(const struct cloud_backend *const backend,
 				goto end;
 			}
 
-			err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+			err = process_mqtt_and_sleep(
+				&client,
+				CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 			if (err != 0) {
 				goto end;
 			}
 
-			num_queued_entries -= MAX_PER_PUBLISH;
+			num_queued_entries -=
+				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
 		}
 	}
 
@@ -744,37 +746,22 @@ static int report_and_update(const struct cloud_backend *const backend,
 		goto end;
 	}
 
-	err = process_mqtt_and_sleep(&client, APP_SLEEP_MS);
+	err = process_mqtt_and_sleep(&client,
+				     CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 	if (err != 0) {
 		goto end;
 	}
 
-	err = mqtt_disconnect(&client);
-	if (err) {
-		printk("Could not disconnect\n");
-	}
-
-	wait(APP_SLEEP_MS);
-	err = mqtt_input(&client);
-	if (err) {
-		printk("Could not input data\n");
-	}
-
-	num_queued_entries = 0;
-	queued_entries = false;
-
-	return 0;
-
 end:
 	err = mqtt_disconnect(&client);
 	if (err) {
-		printk("Could not disconnect\n");
+		LOG_ERR("Could not disconnect\n");
 	}
 
-	wait(APP_SLEEP_MS);
+	wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 	err = mqtt_input(&client);
 	if (err) {
-		printk("Could not input data\n");
+		LOG_ERR("Could not input data");
 	}
 
 	num_queued_entries = 0;
@@ -783,9 +770,9 @@ end:
 	return err;
 }
 
-static const struct cloud_api cat_cloud_api = {
+static const struct cloud_api bifravst_cloud_api = {
 	.report_and_update = report_and_update,
 	.init_config = init_config,
 };
 
-CLOUD_BACKEND_DEFINE(CAT_CLOUD, cat_cloud_api);
+CLOUD_BACKEND_DEFINE(BIFRAVST_CLOUD, bifravst_cloud_api);

@@ -20,7 +20,5 @@ zephyr_include_directories(src)
 
 # Application directories
 add_subdirectory(src/modem_data)
-add_subdirectory(src/mqtt_behaviour)
 add_subdirectory(src/gps_controller)
-add_subdirectory(src/mqtt_codec)
 add_subdirectory(src/ui)
