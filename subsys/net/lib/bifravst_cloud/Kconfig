@@ -32,7 +32,7 @@ config BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX
 
 config BIFRAVST_MQTT_TRANSMISSION_SLEEP
 	int "Number of millisecond the mqtt transmission sleeps between data poll"
-	default 500
+	default 5000
 
 module=BIFRAVST_CLOUD
 module-dep=LOG
