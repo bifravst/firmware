@@ -13,15 +13,6 @@
 #include <net/cloud.h>
 #include <bifravst_cloud.h>
 
-#define NORMAL_OPERATION false
-#define SYNCRONIZATION true
-#define GPS_FIX true
-#define NO_GPS_FIX false
-
-#define MODE_INDICATION_TIME CONFIG_MODE_INDICATION_TIME
-#define LTE_CONN_TIMEOUT CONFIG_LTE_CONN_TIMEOUT
-#define MODEM_TIME_RETRIES CONFIG_MODEM_TIME_RETRIES
-
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
 enum governing_states {

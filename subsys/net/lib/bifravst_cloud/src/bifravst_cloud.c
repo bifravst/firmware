@@ -734,23 +734,23 @@ static int report_and_update(const struct cloud_backend *const backend,
 		}
 	}
 
-	err = encode_modem_data(&transmit_data, include_static_modem_data);
-	if (err != 0) {
-		goto end;
-	}
-	transmit_data.topic = update_topic;
+	// err = encode_modem_data(&transmit_data, include_static_modem_data);
+	// if (err != 0) {
+	// 	goto end;
+	// }
+	// transmit_data.topic = update_topic;
 
-	data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-		     transmit_data.len, transmit_data.topic);
-	if (err != 0) {
-		goto end;
-	}
+	// data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
+	// 	     transmit_data.len, transmit_data.topic);
+	// if (err != 0) {
+	// 	goto end;
+	// }
 
-	err = process_mqtt_and_sleep(&client,
-				     CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-	if (err != 0) {
-		goto end;
-	}
+	// err = process_mqtt_and_sleep(&client,
+	// 			     CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	// if (err != 0) {
+	// 	goto end;
+	// }
 
 end:
 	err = mqtt_disconnect(&client);
