@@ -47,18 +47,6 @@ config GPS_TRIGGER
 
 endmenu	# GPS
 
-menu "Cloud"
-
-config MQTT_MESSAGE_BUFFER_SIZE
-	int ""
-	default 2048
-
-config MQTT_PAYLOAD_BUFFER_SIZE
-	int ""
-	default 2048
-
-endmenu # Cloud
-
 menu "Modem Data"
 
 rsource "src/modem_data/Kconfig"

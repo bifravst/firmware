@@ -72,9 +72,9 @@ struct cloud_data_t cloud_data = { .gps_timeout = 1000,
 				   .accel_threshold = 100,
 				   .gps_found = false };
 
-static u8_t rx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static u8_t tx_buffer[CONFIG_MQTT_MESSAGE_BUFFER_SIZE];
-static u8_t payload_buf[CONFIG_MQTT_PAYLOAD_BUFFER_SIZE];
+static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
+static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
+static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_PAYLOAD_SIZE];
 
 static struct mqtt_client client;
 
@@ -301,7 +301,7 @@ static int subscribe(void)
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
 		printk("Subscribing to: %s\n",
-			subscription_list.list[i].topic.utf8);
+		       subscription_list.list[i].topic.utf8);
 	}
 
 	return mqtt_subscribe(&client, &subscription_list);
@@ -459,7 +459,7 @@ static int broker_init(void)
 
 			broker4->sin_addr.s_addr =
 				((struct sockaddr_in *)addr->ai_addr)
-					->sin_addr.s_addr;
+				->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
 			broker4->sin_port = htons(CONFIG_BIFRAVST_CLOUD_PORT);
 
@@ -736,20 +736,20 @@ static int report_and_update(const struct cloud_backend *const backend,
 
 	// err = encode_modem_data(&transmit_data, include_static_modem_data);
 	// if (err != 0) {
-	// 	goto end;
+	//      goto end;
 	// }
 	// transmit_data.topic = update_topic;
 
 	// data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-	// 	     transmit_data.len, transmit_data.topic);
+	//           transmit_data.len, transmit_data.topic);
 	// if (err != 0) {
-	// 	goto end;
+	//      goto end;
 	// }
 
 	// err = process_mqtt_and_sleep(&client,
-	// 			     CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	//                           CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 	// if (err != 0) {
-	// 	goto end;
+	//      goto end;
 	// }
 
 end:

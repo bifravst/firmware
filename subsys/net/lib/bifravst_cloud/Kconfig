@@ -34,6 +34,14 @@ config BIFRAVST_MQTT_TRANSMISSION_SLEEP
 	int "Number of millisecond the mqtt transmission sleeps between data poll"
 	default 5000
 
+config BIFRAVST_CLOUD_BUFFER_SIZE
+	int ""
+	default 2048
+
+config BIFRAVST_CLOUD_PAYLOAD_SIZE
+	int ""
+	default 2048
+
 module=BIFRAVST_CLOUD
 module-dep=LOG
 module-str=Log level for BIFRAVST Cloud
