@@ -11,6 +11,7 @@
 #include <gps_controller.h>
 #include <ui.h>
 #include <net/cloud.h>
+#include <bifravst_cloud.h>
 
 #define NORMAL_OPERATION false
 #define SYNCRONIZATION true
@@ -116,7 +117,7 @@ static void cloud_report(bool gps_fix)
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	attach_battery_data(request_battery_status());
 
-	set_gps_found(true);
+	set_gps_found(gps_fix);
 
 	err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
 	if (err) {
