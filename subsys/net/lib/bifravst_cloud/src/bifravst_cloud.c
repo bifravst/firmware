@@ -268,7 +268,7 @@ static void data_print(u8_t *prefix, u8_t *data, size_t len)
 
 	memcpy(buf, data, len);
 	buf[len] = 0;
-	LOG_DBG("%s%s", prefix, buf);
+	printk("%s%s\n", prefix, buf);
 }
 
 static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
@@ -285,8 +285,8 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	param.dup_flag = 0;
 	param.retain_flag = 0;
 
-	data_print("Publishing: ", data, len);
-	LOG_DBG("to topic: %s len: %u", topic, (unsigned int)strlen(topic));
+	data_print("Publishing: \n", data, len);
+	printk("to topic: %s len: %u\n", topic, (unsigned int)strlen(topic));
 
 	return mqtt_publish(c, &param);
 }
@@ -300,7 +300,7 @@ static int subscribe(void)
 	};
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
-		LOG_DBG("Subscribing to: %s",
+		printk("Subscribing to: %s\n",
 			subscription_list.list[i].topic.utf8);
 	}
 
@@ -410,7 +410,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
-		LOG_ERR("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
+		LOG_DBG("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
 			evt->param.puback.message_id);
 		break;
 
@@ -420,7 +420,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
-		LOG_ERR("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
+		LOG_DBG("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
 			evt->param.suback.message_id);
 		break;
 
@@ -465,7 +465,7 @@ static int broker_init(void)
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
-			LOG_DBG("IPv4 Address found %s", ipv4_addr);
+			printk("IPv4 Address found %s\n", ipv4_addr);
 
 			break;
 		}

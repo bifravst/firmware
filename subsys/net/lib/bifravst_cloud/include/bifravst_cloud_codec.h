@@ -1,5 +1,5 @@
-#ifndef MQTT_CODEC_H__
-#define MQTT_CODEC_H__
+#ifndef BIFRAVST_CLOUD_CODEC_H__
+#define BIFRAVST_CLOUD_CODEC_H__
 
 #include <zephyr.h>
 #include <stdbool.h>

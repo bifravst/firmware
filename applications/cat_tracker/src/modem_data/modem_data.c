@@ -10,6 +10,9 @@
 #include "cJSON.h"
 #include "cJSON_os.h"
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(modem_data, CONFIG_MODEM_DATA_LOG_LEVEL);
+
 #define TIME_LEN 50
 #define BAT_LEN 50
 #define RSRP_LEN 50
@@ -87,7 +90,7 @@ int modem_time_get(void)
 		modem_ts[i - 8] = modem_ts_buf[i];
 	}
 
-	printk("Time from modem: %s\n", modem_ts);
+	LOG_DBG("Time from modem: %s\n", modem_ts);
 
 	err = nrf_close(at_socket_fd);
 	__ASSERT_NO_MSG(err == 0);
@@ -106,7 +109,7 @@ int modem_time_get(void)
 
 	if (info.tm_year == 115) {
 		old_modem_time = true;
-		printk("Could not fetch correct time from modem\n");
+		LOG_ERR("Could not fetch correct time from modem\n");
 	} else {
 		old_modem_time = false;
 	}
@@ -116,9 +119,9 @@ int modem_time_get(void)
 	update_time = k_uptime_get();
 
 	if (!old_modem_time) {
-		printk("Correct modem time successfully obtained\n");
+		LOG_DBG("Correct modem time successfully obtained\n");
 	} else {
-		printk("Could not fetch correct modem time\n");
+		LOG_ERR("Could not fetch correct modem time\n");
 	}
 
 	modem_fetch_tries = 0;
@@ -153,22 +156,22 @@ struct modem_param_info *get_modem_info(void)
 
 	err = modem_info_init();
 	if (err != 0) {
-		printk("Error initializing modem_info module: %d\n", err);
+		LOG_ERR("Error initializing modem_info module: %d\n", err);
 	}
 
 	err = modem_info_params_init(&modem_param);
 	if (err != 0) {
-		printk("Error initializing modem_info structure: %d\n", err);
+		LOG_ERR("Error initializing modem_info structure: %d\n", err);
 	}
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
-		printk("Error getting modem_info: %d\n", err);
+		LOG_ERR("Error getting modem_info: %d\n", err);
 	}
 
 	err = modem_info_uninit();
 	if (err != 0) {
-		printk("Error uninitializing modem_info: %d\n", err);
+		LOG_ERR("Error uninitializing modem_info: %d\n", err);
 	}
 
 	return &modem_param;

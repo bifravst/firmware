@@ -1,5 +1,5 @@
-#ifndef MQTT_FUNC_H__
-#define MQTT_FUNC_H__
+#ifndef BIFRAVST_CLOUD_H__
+#define BIFRAVST_CLOUD_H__
 
 #include <net/mqtt.h>
 #include <net/socket.h>
