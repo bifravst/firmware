@@ -22,9 +22,6 @@ time_t epoch;
 
 struct modem_param_info modem_param;
 
-static int modem_fetch_tries;
-static bool old_modem_time;
-
 int get_time_info(char *datetime_string, int min, int max)
 {
 	char buf[50];
@@ -102,34 +99,13 @@ int modem_time_get(void)
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
 
-	if ((info.tm_year == 115) && (modem_fetch_tries < 20)) {
-		modem_fetch_tries++;
-		return -ENODATA;
-	}
-
-	if (info.tm_year == 115) {
-		old_modem_time = true;
-		LOG_ERR("Could not fetch correct time from modem");
-	} else {
-		old_modem_time = false;
-	}
-
 	epoch = mktime(&info);
-
 	update_time = k_uptime_get();
-
-	if (!old_modem_time) {
-		LOG_DBG("Correct modem time successfully obtained");
-	} else {
-		LOG_ERR("Could not fetch correct modem time");
-	}
-
-	modem_fetch_tries = 0;
 
 	return 0;
 }
 
-void set_current_time(struct gps_data gps_data)
+int set_current_time(struct gps_data gps_data)
 {
 	struct tm info;
 
@@ -141,8 +117,9 @@ void set_current_time(struct gps_data gps_data)
 	info.tm_sec = gps_data.pvt.datetime.seconds;
 
 	epoch = mktime(&info);
-
 	update_time = k_uptime_get();
+
+	return 0;
 }
 
 time_t get_current_time(void)

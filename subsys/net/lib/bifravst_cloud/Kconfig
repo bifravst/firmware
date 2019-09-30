@@ -26,10 +26,6 @@ config BIFRAVST_CLOUD_CONNECTION_TRIES
     int "Number of times the mqtt client will try to connect to host"
     default 5
 
-config BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX
-    int "The maximum amount of buffered gps fixes"
-    default 10
-
 config BIFRAVST_MQTT_TRANSMISSION_SLEEP
 	int "Number of millisecond the mqtt transmission sleeps between data poll"
 	default 5000

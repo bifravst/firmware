@@ -67,6 +67,10 @@ config MODE_INDICATION_TIME
 	int "Number of ms to indicate the current device mode, active or passive"
 	default 10000
 
+config CIRCULAR_SENSOR_BUFFER_MAX
+	int "Maximum amount of buffered sensor entries"
+	default 10
+
 endmenu # Governing FSM
 
 endmenu

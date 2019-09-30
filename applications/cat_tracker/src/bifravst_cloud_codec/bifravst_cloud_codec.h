@@ -4,6 +4,7 @@
 #include <zephyr.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <net/cloud.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,15 +51,15 @@ struct modem_data_t {
 
 int decode_response(char *input, struct cloud_data_t *cloud_data);
 
-int encode_message(struct transmit_data_t *output,
+int encode_message(struct cloud_msg *output,
 		   struct cloud_data_t *cloud_data,
 		   struct cloud_data_gps_t *cir_buf_gps);
 
-int encode_gps_buffer(struct transmit_data_t *output,
+int encode_gps_buffer(struct cloud_msg *output,
 		      struct cloud_data_gps_t *cir_buf_gps,
 		      int max_per_publish);
 
-int encode_modem_data(struct transmit_data_t *output, bool syncronization);
+int encode_modem_data(struct cloud_msg *output, bool syncronization);
 
 bool check_config_change(void);
 

@@ -10,6 +10,7 @@
 #include "cJSON.h"
 #include "cJSON_os.h"
 #include "../version.h"
+#include <net/cloud.h>
 
 static bool change_gpst = true;
 static bool change_active = true;
@@ -202,29 +203,12 @@ end:
 	return 0;
 }
 
-static void sort_gps_buf_descending(struct cloud_data_gps_t *cir_buf_gps, int s)
-{
-	int i, j;
-	struct cloud_data_gps_t temp;
-
-	for (i = 0; i < s - 1; i++) {
-		for (j = 0; j < (s - 1 - i); j++) {
-			if (cir_buf_gps[j].gps_timestamp <
-			    cir_buf_gps[j + 1].gps_timestamp) {
-				temp = cir_buf_gps[j];
-				cir_buf_gps[j] = cir_buf_gps[j + 1];
-				cir_buf_gps[j + 1] = temp;
-			}
-		}
-	}
-}
-
 struct twins_gps_buf {
 	cJSON *gps_buf_objects;
 	cJSON *gps_buf_val_objects;
 };
 
-int encode_gps_buffer(struct transmit_data_t *output,
+int encode_gps_buffer(struct cloud_msg *output,
 		      struct cloud_data_gps_t *cir_buf_gps, int max_per_publish)
 {
 	int err;
@@ -237,9 +221,9 @@ int encode_gps_buffer(struct transmit_data_t *output,
 	cJSON *gps_obj = cJSON_CreateArray();
 
 	struct twins_gps_buf
-		twins_gps_buf[CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX];
+		twins_gps_buf[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
-	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
+	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		twins_gps_buf[i].gps_buf_objects = NULL;
 		twins_gps_buf[i].gps_buf_objects = cJSON_CreateObject();
 		twins_gps_buf[i].gps_buf_val_objects = NULL;
@@ -252,7 +236,7 @@ int encode_gps_buffer(struct transmit_data_t *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
+		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 		     i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
@@ -260,14 +244,11 @@ int encode_gps_buffer(struct transmit_data_t *output,
 		return -ENOMEM;
 	}
 
-	sort_gps_buf_descending(cir_buf_gps,
-				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
-
 	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
+	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued &&
 		    (encoded_counter < max_per_publish)) {
 			err += json_add_number(
@@ -310,7 +291,7 @@ int encode_gps_buffer(struct transmit_data_t *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
+		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 		     i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
@@ -327,7 +308,7 @@ int encode_gps_buffer(struct transmit_data_t *output,
 	return 0;
 }
 
-int encode_modem_data(struct transmit_data_t *output, bool syncronization)
+int encode_modem_data(struct cloud_msg *output, bool syncronization)
 {
 	int err;
 	char *buffer;
@@ -448,7 +429,7 @@ int encode_modem_data(struct transmit_data_t *output, bool syncronization)
 	return 0;
 }
 
-int encode_message(struct transmit_data_t *output,
+int encode_message(struct cloud_msg *output,
 		   struct cloud_data_t *cloud_data,
 		   struct cloud_data_gps_t *cir_buf_gps)
 {

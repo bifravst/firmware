@@ -15,7 +15,7 @@ int modem_time_get(void);
 
 time_t get_current_time(void);
 
-void set_current_time(struct gps_data gps_data);
+int set_current_time(struct gps_data gps_data);
 
 struct modem_param_info *get_modem_info(void);
 

@@ -11,7 +11,9 @@
 #include <gps_controller.h>
 #include <ui.h>
 #include <net/cloud.h>
-#include <bifravst_cloud.h>
+#include <bifravst_cloud_codec.h>
+#include <lte_lc.h>
+#include <stdlib.h>
 
 #define AT_CMD_SIZE(x) (sizeof(x) - 1)
 
@@ -23,6 +25,16 @@ enum governing_states {
 	GPS_SEARCH,
 };
 
+struct cloud_data_gps_t cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
+
+struct cloud_data_t cloud_data = { .gps_timeout = 1000,
+				   .active = true,
+				   .active_wait = 60,
+				   .passive_wait = 300,
+				   .movement_timeout = 3600,
+				   .accel_threshold = 100,
+				   .gps_found = false };
+
 enum governing_states state = CHECK_MODE;
 
 static struct cloud_backend *cloud_backend;
@@ -33,11 +45,17 @@ K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(connect_sem, 0, 1);
 
-static struct k_work cloud_report_work;
-static struct k_work cloud_report_fix_work;
-static struct k_work cloud_pair_work;
-static struct k_work gps_control_start_work;
-static struct k_work gps_control_stop_work;
+// static struct k_work cloud_report_work;
+// static struct k_work cloud_report_fix_work;
+// static struct k_work cloud_pair_work;
+// static struct k_work gps_control_start_work;
+// static struct k_work gps_control_stop_work;
+
+static int head_cir_buf;
+// static int num_queued_entries;
+
+// static bool queued_entries;
+// static bool include_static_modem_data;
 
 enum error_type {
 	ERROR_BSD_RECOVERABLE,
@@ -101,69 +119,251 @@ void cloud_error_handler(int err)
 	error_handler(ERROR_CLOUD, err);
 }
 
-static void cloud_report(bool gps_fix)
+// change names and shorten syntax here
+int check_mode(void)
 {
-	int err;
-
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	attach_battery_data(request_battery_status());
-
-	set_gps_found(gps_fix);
-
-	err = cloud_report_and_update(cloud_backend, CLOUD_REPORT);
-	if (err) {
-		printk("cloud_report_and_update failed: %d\n", err);
+	if (cloud_data.active) {
+		return true;
+	} else {
+		return false;
 	}
+}
+
+int check_active_wait(bool mode)
+{
+	if (mode) {
+		return cloud_data.active_wait;
+	} else {
+		return cloud_data.passive_wait;
+	}
+}
+
+double check_accel_thres(void)
+{
+	double accel_threshold_double;
+
+	if (cloud_data.accel_threshold == 0) {
+		accel_threshold_double = 0;
+	} else {
+		accel_threshold_double = cloud_data.accel_threshold / 10;
+	}
+
+	return accel_threshold_double;
+}
+
+static void attach_gps_data(struct gps_data gps_data)
+{
+	head_cir_buf += 1;
+	if (head_cir_buf == CONFIG_CIRCULAR_SENSOR_BUFFER_MAX - 1) {
+		head_cir_buf = 0;
+	}
+
+	cir_buf_gps[head_cir_buf].longitude = gps_data.pvt.longitude;
+	cir_buf_gps[head_cir_buf].latitude = gps_data.pvt.latitude;
+	cir_buf_gps[head_cir_buf].altitude = gps_data.pvt.altitude;
+	cir_buf_gps[head_cir_buf].accuracy = gps_data.pvt.accuracy;
+	cir_buf_gps[head_cir_buf].speed = gps_data.pvt.speed;
+	cir_buf_gps[head_cir_buf].heading = gps_data.pvt.heading;
+	cir_buf_gps[head_cir_buf].gps_timestamp = k_uptime_get();
+	cir_buf_gps[head_cir_buf].queued = true;
+
+	printk("Entry: %d in gps_buffer filled", head_cir_buf);
+}
+
+static int request_voltage_level(void)
+{
+	cloud_data.bat_voltage = request_battery_status();
+	cloud_data.bat_timestamp = k_uptime_get();
+
+	return 0;
 }
 
 static void cloud_pair(void)
 {
 	int err;
 
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_PAIR,
+		.buf = "",
+		.len = 0
+	};
+
+	cloud_connect(cloud_backend);
+
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	attach_battery_data(request_battery_status());
 
-	set_gps_found(false);
+	err = cloud_send(cloud_backend, &msg);
+	if (err != 0) {
+		printk("Cloud send failed, err: %d\n", err);
+	}
 
-	err = cloud_report_and_update(cloud_backend, CLOUD_PAIR);
-	if (err) {
-		printk("cloud_report_and_update failed: %d\n", err);
+	cloud_disconnect(cloud_backend);
+}
+
+static void cloud_send_sensor_data(void)
+{
+	int err;
+
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_MSG
+	};
+
+	err = request_voltage_level();
+	if (err != 0) {
+		printk("Error requesting voltage level %d\n", err);
+	}
+
+	err = encode_message(&msg, &cloud_data,
+			     &cir_buf_gps[head_cir_buf]);
+	if (err != 0) {
+		printk("Error enconding message %d\n", err);
+	}
+
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
+	err = cloud_send(cloud_backend, &msg);
+	if (err != 0) {
+		printk("Cloud send failed, err: %d\n", err);
 	}
 }
 
-static void cloud_pair_work_fn(struct k_work *work)
+static void cloud_ack_config_change(void)
 {
-	cloud_pair();
+
+	int err;
+
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_MSG
+	};
+
+	if (check_config_change()) {
+		err = encode_message(&msg, &cloud_data,
+				     &cir_buf_gps[head_cir_buf]);
+		if (err != 0) {
+			printk("error encoding modem configurations\n");
+		}
+
+		ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
+		err = cloud_send(cloud_backend, &msg);
+		if (err != 0) {
+			printk("Cloud send failed, err: %d\n", err);
+		}
+	}
 }
 
-static void cloud_report_work_fn(struct k_work *work)
+// static void cloud_send_modem_data(void)
+// {
+//      int err;
+
+//      struct cloud_msg msg = {
+//              .qos = CLOUD_QOS_AT_LEAST_ONCE,
+//              .endpoint.type = CLOUD_EP_TOPIC_MSG
+//      };
+
+//      err = encode_modem_data(&msg, true);
+//      if (err != 0) {
+//              printk("Error encoding modem data");
+//      }
+
+//      ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
+//      err = cloud_send(cloud_backend, &msg);
+//      if (err) {
+//              printk("Cloud send failed, err: %d\n", err);
+//      }
+// }
+
+// static void cloud_send_buffered_data(void)
+// {
+//      // for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
+//      //      if (cir_buf_gps[i].queued) {
+//      //              queued_entries = true;
+//      //              num_queued_entries++;
+//      //      }
+//      // }
+
+//      // if (queued_entries) {
+//      //      while (num_queued_entries > 0) {
+//      //              err = encode_gps_buffer(
+//      //                      &transmit_data, cir_buf_gps,
+//      //                      CONFIG_CIRCULAR_SENSOR_BUFFER_MAX);
+//      //              if (err != 0) {
+//      //                      goto end;
+//      //              }
+//      //              transmit_data.topic = batch_topic;
+
+//      //              data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+//      //                           transmit_data.buf, transmit_data.len,
+//      //                           transmit_data.topic);
+//      //              if (err != 0) {
+//      //                      goto end;
+//      //              }
+
+//      //              err = process_mqtt_and_sleep(
+//      //                      &client,
+//      //                      CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//      //              if (err != 0) {
+//      //                      goto end;
+//      //              }
+
+//      //              num_queued_entries -=
+//      //                      CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
+//      //      }
+//      // }
+
+
+//      // num_queued_entries = 0;
+//      // queued_entries = false;
+// }
+
+static void cloud_process_cycle(void)
 {
-	cloud_report(false);
+	cloud_connect(cloud_backend);
+	cloud_send_sensor_data();
+	cloud_ack_config_change();
+	// cloud_send_modem_data();
+	// cloud_send_buffered_data();
+	cloud_disconnect(cloud_backend);
+
 }
 
-static void cloud_report_fix_work_fn(struct k_work *work)
-{
-	cloud_report(true);
-}
+// static void cloud_pair_work_fn(struct k_work *work)
+// {
+//      cloud_pair();
+// }
 
-static void gps_control_start_work_fn(struct k_work *work)
-{
-	gps_control_start();
-}
+// static void cloud_report_work_fn(struct k_work *work)
+// {
+//      cloud_report(false);
+// }
 
-static void gps_control_stop_work_fn(struct k_work *work)
-{
-	gps_control_stop();
-}
+// static void cloud_report_fix_work_fn(struct k_work *work)
+// {
+//      cloud_report(true);
+// }
 
-static void work_init(void)
-{
-	k_work_init(&cloud_report_work, cloud_report_work_fn);
-	k_work_init(&cloud_report_fix_work, cloud_report_fix_work_fn);
-	k_work_init(&cloud_pair_work, cloud_pair_work_fn);
-	k_work_init(&gps_control_start_work, gps_control_start_work_fn);
-	k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
-}
+// static void gps_control_start_work_fn(struct k_work *work)
+// {
+//      gps_control_start();
+// }
+
+// static void gps_control_stop_work_fn(struct k_work *work)
+// {
+//      gps_control_stop();
+// }
+
+// static void work_init(void)
+// {
+//      // k_work_init(&cloud_report_work, cloud_report_work_fn);
+//      // k_work_init(&cloud_report_fix_work, cloud_report_fix_work_fn);
+//      k_work_init(&cloud_pair_work, cloud_pair_work_fn);
+//      // k_work_init(&gps_control_start_work, gps_control_start_work_fn);
+//      // k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
+// }
 
 static const char home[] = "+CEREG: 1";
 static const char home_2[] = "+CEREG:1";
@@ -224,15 +424,17 @@ static void adxl362_trigger_handler(struct device *dev,
 		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &accel[1]);
 		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &accel[2]);
 
-		if ((abs(sensor_value_to_double(&accel[0])) >
-		     check_accel_thres()) ||
-		    (abs(sensor_value_to_double(&accel[1])) >
-		     check_accel_thres()) ||
-		    (abs(sensor_value_to_double(&accel[2])) >
-		     check_accel_thres())) {
-			attach_accel_data(sensor_value_to_double(&accel[0]),
-					  sensor_value_to_double(&accel[1]),
-					  sensor_value_to_double(&accel[2]));
+		double x = sensor_value_to_double(&accel[0]);
+		double y = sensor_value_to_double(&accel[1]);
+		double z = sensor_value_to_double(&accel[2]);
+
+		if ((abs(x) > check_accel_thres()) ||
+		    (abs(y) > check_accel_thres()) ||
+		    (abs(z) > check_accel_thres())) {
+			cloud_data.acc[0] = x;
+			cloud_data.acc[1] = y;
+			cloud_data.acc[2] = z;
+			cloud_data.acc_timestamp = k_uptime_get();
 			k_sem_give(&accel_trig_sem);
 		}
 
@@ -245,13 +447,17 @@ static void adxl362_trigger_handler(struct device *dev,
 static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 {
 	static struct gps_data gps_data;
+	int err;
 
 	switch (trigger->type) {
 	case GPS_TRIG_FIX:
 		printk("gps control handler triggered!\n");
 		gps_control_on_trigger();
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		set_current_time(gps_data);
+		err = set_current_time(gps_data);
+		if (err != 0) {
+			printk("Error setting current time %d\n", err);
+		}
 		attach_gps_data(gps_data);
 		k_sem_give(&gps_timeout_sem);
 		break;
@@ -281,27 +487,72 @@ static void adxl362_init(void)
 	}
 }
 
-void movement_timeout_handler(struct k_work *work)
+void cloud_event_handler(const struct cloud_backend *const backend,
+			 const struct cloud_event *const evt,
+			 void *user_data)
 {
-	if (check_mode() == false) {
-		k_work_submit(&cloud_report_work);
+	ARG_UNUSED(user_data);
+
+	int err;
+
+	switch (evt->type) {
+	case CLOUD_EVT_CONNECTED:
+		printk("CLOUD_EVT_CONNECTED\n");
+		break;
+	case CLOUD_EVT_READY:
+		printk("CLOUD_EVT_READY\n");
+		break;
+	case CLOUD_EVT_DISCONNECTED:
+		printk("CLOUD_EVT_DISCONNECTED\n");
+		break;
+	case CLOUD_EVT_ERROR:
+		printk("CLOUD_EVT_ERROR\n");
+		break;
+	case CLOUD_EVT_DATA_SENT:
+		printk("CLOUD_EVT_DATA_SENT\n");
+		break;
+	case CLOUD_EVT_DATA_RECEIVED:
+		printk("CLOUD_EVT_DATA_RECEIVED\n");
+		if (evt->data.msg.len > 2) {
+			err = decode_response(evt->data.msg.buf, &cloud_data);
+			if (err != 0) {
+				printk("Could not decode response %d", err);
+			}
+		}
+		break;
+	case CLOUD_EVT_PAIR_REQUEST:
+		printk("CLOUD_EVT_PAIR_REQUEST\n");
+		break;
+	case CLOUD_EVT_PAIR_DONE:
+		printk("CLOUD_EVT_PAIR_DONE\n");
+		break;
+	default:
+		printk("Unknown cloud event type: %d\n", evt->type);
+		break;
 	}
 }
 
-K_WORK_DEFINE(my_work, movement_timeout_handler);
+// void movement_timeout_handler(struct k_work *work)
+// {
+//      if (check_mode() == false) {
+//              k_work_submit(&cloud_report_work);
+//      }
+// }
 
-void movement_timer_handler(struct k_timer *dummy)
-{
-	k_work_submit(&my_work);
-}
+// K_WORK_DEFINE(my_work, movement_timeout_handler);
 
-K_TIMER_DEFINE(mov_timer, movement_timer_handler, NULL);
+// void movement_timer_handler(struct k_timer *dummy)
+// {
+//      k_work_submit(&my_work);
+// }
 
-static void start_restart_mov_timer(void)
-{
-	k_timer_start(&mov_timer, K_SECONDS(check_mov_timeout()),
-		      K_SECONDS(check_mov_timeout()));
-}
+// K_TIMER_DEFINE(mov_timer, movement_timer_handler, NULL);
+
+// static void start_restart_mov_timer(void)
+// {
+//      k_timer_start(&mov_timer, K_SECONDS(cloud_data.movement_timeout),
+//                    K_SECONDS(cloud_data.movement_timeout));
+// }
 
 static void lte_connect(void)
 {
@@ -322,20 +573,21 @@ static void lte_connect(void)
 
 		printk("LTE connected!\nFetching modem time...\n");
 
-	modem_time_fetch:
+		k_sleep(5000);
+
+		// need to add some sort of fallback here, incease time is not obtained
+		// preferably in modem_data module
 
 		err = modem_time_get();
 		if (err != 0) {
-			printk("Modem giving old network time, trying again in %d seconds\n",
-			       CONFIG_MODEM_TIME_RETRIES);
-			k_sleep(K_SECONDS(CONFIG_MODEM_TIME_RETRIES));
-			goto modem_time_fetch;
+			printk("Error fetching modem time: %d\n", err);
 		}
 
 		cloud_pair();
+		cloud_ack_config_change();
 		lte_lc_psm_req(true);
 	} else {
-		printk("LTE not connected within %d minutes, starting gps search\n",
+		printk("LTE not connected within %d minutes, starting gps search...\n",
 		       CONFIG_LTE_CONN_TIMEOUT);
 		lte_lc_gps_mode();
 	}
@@ -345,7 +597,7 @@ void main(void)
 {
 	int err;
 
-	work_init();
+	// work_init();
 
 #if defined(CONFIG_USE_UI_MODULE)
 	ui_init();
@@ -354,14 +606,16 @@ void main(void)
 	printk("The cat tracker has started\n");
 
 	cloud_backend = cloud_get_binding("BIFRAVST_CLOUD");
-	__ASSERT(cloud_backend != NULL, "Cat Cloud backend not found");
+	__ASSERT(cloud_backend != NULL, "Bifravst Cloud backend not found");
 
-	err = cloud_init_config(cloud_backend);
+	err = cloud_init(cloud_backend, cloud_event_handler);
 	if (err) {
-		printk("Cloud backend could not be initialized, error: %d\n",
+		printk("Cloud backend could not be initialized, error: %d\n ",
 		       err);
 		cloud_error_handler(err);
 	}
+
+	printk("Cloud backend initialized\n");
 
 	adxl362_init();
 	gps_control_init(gps_control_handler);
@@ -370,7 +624,7 @@ void main(void)
 	while (true) {
 		switch (state) {
 		case CHECK_MODE:
-			start_restart_mov_timer();
+			// start_restart_mov_timer();
 			if (check_mode()) {
 				ui_led_set_pattern(UI_LED_ACTIVE_MODE);
 				active = true;
@@ -405,16 +659,16 @@ void main(void)
 			break;
 
 		case GPS_SEARCH:
-			ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 			gps_control_start();
 			if (!k_sem_take(&gps_timeout_sem,
-					K_SECONDS(check_gps_timeout()))) {
-				cloud_report(true);
+					K_SECONDS(cloud_data.gps_timeout))) {
+				cloud_data.gps_found = true;
+				cloud_process_cycle();
 			} else {
 				gps_control_stop();
-				cloud_report(false);
+				cloud_data.gps_found = false;
+				cloud_process_cycle();
 			}
-			ui_stop_leds();
 			k_sleep(K_SECONDS(check_active_wait(active)));
 			state = CHECK_MODE;
 			break;

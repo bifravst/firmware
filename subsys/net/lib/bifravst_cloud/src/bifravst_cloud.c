@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <gps.h>
-#include <bifravst_cloud_codec.h>
 #include <logging/log.h>
 
 LOG_MODULE_REGISTER(bifravst_cloud_transport, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
@@ -62,15 +61,14 @@ static const struct mqtt_topic cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-struct cloud_data_gps_t cir_buf_gps[CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX];
+struct transmit_data_t {
+	char *buf;
+	size_t len;
+	u8_t *topic;
+};
 
-struct cloud_data_t cloud_data = { .gps_timeout = 1000,
-				   .active = true,
-				   .active_wait = 60,
-				   .passive_wait = 300,
-				   .movement_timeout = 3600,
-				   .accel_threshold = 100,
-				   .gps_found = false };
+/* Temporary defined, idea is to remove transmit data type */
+struct transmit_data_t transmit_data;
 
 static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
@@ -84,91 +82,9 @@ static struct pollfd fds;
 
 static int nfds;
 
-static int head_cir_buf;
-static int num_queued_entries;
-
 static bool connected;
-static bool queued_entries;
-static bool include_static_modem_data;
 
-void set_gps_found(bool gps_found)
-{
-	cloud_data.gps_found = gps_found;
-}
-
-int check_mode(void)
-{
-	if (cloud_data.active) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-int check_active_wait(bool mode)
-{
-	if (mode) {
-		return cloud_data.active_wait;
-	} else {
-		return cloud_data.passive_wait;
-	}
-}
-
-int check_gps_timeout(void)
-{
-	return cloud_data.gps_timeout;
-}
-
-int check_mov_timeout(void)
-{
-	return cloud_data.movement_timeout;
-}
-
-double check_accel_thres(void)
-{
-	double accel_threshold_double;
-
-	if (cloud_data.accel_threshold == 0) {
-		accel_threshold_double = 0;
-	} else {
-		accel_threshold_double = cloud_data.accel_threshold / 10;
-	}
-
-	return accel_threshold_double;
-}
-
-void attach_gps_data(struct gps_data gps_data)
-{
-	head_cir_buf += 1;
-	if (head_cir_buf == CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX - 1) {
-		head_cir_buf = 0;
-	}
-
-	cir_buf_gps[head_cir_buf].longitude = gps_data.pvt.longitude;
-	cir_buf_gps[head_cir_buf].latitude = gps_data.pvt.latitude;
-	cir_buf_gps[head_cir_buf].altitude = gps_data.pvt.altitude;
-	cir_buf_gps[head_cir_buf].accuracy = gps_data.pvt.accuracy;
-	cir_buf_gps[head_cir_buf].speed = gps_data.pvt.speed;
-	cir_buf_gps[head_cir_buf].heading = gps_data.pvt.heading;
-	cir_buf_gps[head_cir_buf].gps_timestamp = k_uptime_get();
-	cir_buf_gps[head_cir_buf].queued = true;
-
-	LOG_DBG("Entry: %d in gps_buffer filled", head_cir_buf);
-}
-
-void attach_battery_data(int battery_voltage)
-{
-	cloud_data.bat_voltage = battery_voltage;
-	cloud_data.bat_timestamp = k_uptime_get();
-}
-
-void attach_accel_data(double x, double y, double z)
-{
-	cloud_data.acc[0] = x;
-	cloud_data.acc[1] = y;
-	cloud_data.acc[2] = z;
-	cloud_data.acc_timestamp = k_uptime_get();
-}
+static struct cloud_backend *bifravst_cloud_backend;
 
 static int client_id_get(char *id)
 {
@@ -249,17 +165,25 @@ static int topics_populate(void)
 	return 0;
 }
 
-static int init_config(const struct cloud_backend *const backend)
+static int bifravst_cloud_init()
 {
 	int err;
 
 	err = topics_populate();
 	if (err) {
-		LOG_ERR("Could not populate topics: %d", err);
 		return err;
 	}
 
-	return 0;
+	return err;
+}
+
+static int bifravst_init(const struct cloud_backend *const backend,
+			 cloud_evt_handler_t handler)
+{
+	backend->config->handler = handler;
+	bifravst_cloud_backend = (struct cloud_backend *)backend;
+
+	return bifravst_cloud_init();
 }
 
 static void data_print(u8_t *prefix, u8_t *data, size_t len)
@@ -352,36 +276,46 @@ static void clear_fds(void)
 }
 
 static void mqtt_evt_handler(struct mqtt_client *const c,
-			     const struct mqtt_evt *evt)
+			     const struct mqtt_evt *bifravst_cloud_evt)
 {
 	int err;
+	struct cloud_backend_config *config = bifravst_cloud_backend->config;
+	struct cloud_event evt = { 0 };
 
-	switch (evt->type) {
+	switch (bifravst_cloud_evt->type) {
 	case MQTT_EVT_CONNACK:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT connect failed %d", evt->result);
-			break;
-		}
+		// if (bifravst_cloud_evt->result != 0) {
+		//      LOG_ERR("MQTT connect failed %d", evt->result);
+		//      break;
+		// }
 		connected = true;
-		LOG_DBG("[%s:%d] MQTT client connected!", __func__, __LINE__);
+		// LOG_DBG("[%s:%d] MQTT client connected!", __func__, __LINE__);
 
 		subscribe();
+
+		evt.type = CLOUD_EVT_CONNECTED;
+		cloud_notify_event(bifravst_cloud_backend, &evt, config->user_data);
 
 		break;
 
 	case MQTT_EVT_DISCONNECT:
-		LOG_DBG("[%s:%d] MQTT client disconnected %d", __func__,
-			__LINE__, evt->result);
+		// LOG_DBG("[%s:%d] MQTT client disconnected %d", __func__,
+		//      __LINE__, evt->result);
 
 		connected = false;
 		clear_fds();
+
+		evt.type = CLOUD_EVT_DISCONNECTED;
+		cloud_notify_event(bifravst_cloud_backend, &evt, config->user_data);
 		break;
 
 	case MQTT_EVT_PUBLISH: {
-		const struct mqtt_publish_param *p = &evt->param.publish;
+		const struct mqtt_publish_param *p = &bifravst_cloud_evt->param.publish;
 
-		LOG_DBG("[%s:%d] MQTT PUBLISH result=%d len=%d", __func__,
-			__LINE__, evt->result, p->message.payload.len);
+		LOG_DBG("MQTT_EVT_PUBLISH: id=%d len=%d ",
+			p->message_id,
+			p->message.payload.len);
+
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
 			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
@@ -395,37 +329,37 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
-		if (p->message.payload.len > 2) {
-			err = decode_response(payload_buf, &cloud_data);
-			if (err != 0) {
-				LOG_ERR("Could not decode response%d", err);
-			}
-		}
+		evt.type = CLOUD_EVT_DATA_RECEIVED;
+		evt.data.msg.buf = payload_buf;
+		evt.data.msg.len = p->message.payload.len;
+
+		cloud_notify_event(bifravst_cloud_backend, &evt,
+				   config->user_data);
 
 	} break;
 
 	case MQTT_EVT_PUBACK:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT PUBACK error %d", evt->result);
-			break;
-		}
+		// if (evt->result != 0) {
+		//      LOG_ERR("MQTT PUBACK error %d", evt->result);
+		//      break;
+		// }
 
-		LOG_DBG("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
-			evt->param.puback.message_id);
+		// LOG_DBG("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
+		//      evt->param.puback.message_id);
 		break;
 
 	case MQTT_EVT_SUBACK:
-		if (evt->result != 0) {
-			LOG_ERR("MQTT SUBACK error %d", evt->result);
-			break;
-		}
+		// if (evt->result != 0) {
+		//      LOG_ERR("MQTT SUBACK error %d", evt->result);
+		//      break;
+		// }
 
-		LOG_DBG("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
-			evt->param.suback.message_id);
+		// LOG_DBG("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
+		//      evt->param.suback.message_id);
 		break;
 
 	default:
-		LOG_ERR("[%s:%d] default: %d", __func__, __LINE__, evt->type);
+		// LOG_ERR("[%s:%d] default: %d", __func__, __LINE__, evt->type);
 		break;
 	}
 }
@@ -583,7 +517,6 @@ static int mqtt_enable(struct mqtt_client *client)
 #else
 		fds.fd = client->transport.tcp.sock;
 #endif
-
 		fds.events = POLLIN;
 		nfds = 1;
 
@@ -602,177 +535,264 @@ static int mqtt_enable(struct mqtt_client *client)
 	return -EINVAL;
 }
 
-static int report_and_update(const struct cloud_backend *const backend,
-			     const enum cloud_action_type action)
+// static int report_and_update(const struct cloud_backend *const backend,
+//                           const enum cloud_action_type action)
+// {
+//      int err;
+//      struct transmit_data_t transmit_data;
+
+//      err = mqtt_enable(&client);
+//      if (err) {
+//              LOG_ERR("Could not connect to client: %d", err);
+//              goto end;
+//      }
+
+//      switch (action) {
+//      case CLOUD_PAIR:
+
+//              transmit_data.buf = "";
+//              transmit_data.len = strlen(transmit_data.buf);
+//              transmit_data.topic = get_topic;
+
+//              err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+//                                 transmit_data.buf, transmit_data.len,
+//                                 transmit_data.topic);
+
+//              if (err != 0) {
+//                      goto end;
+//              }
+
+//              err = process_mqtt_and_sleep(
+//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//              if (err != 0) {
+//                      goto end;
+//              }
+
+//              include_static_modem_data = true;
+
+//              break;
+
+//      case CLOUD_REPORT:
+
+//              err = encode_message(&transmit_data, &cloud_data,
+//                                   &cir_buf_gps[head_cir_buf]);
+//              if (err != 0) {
+//                      goto end;
+//              }
+//              transmit_data.topic = update_topic;
+
+//              err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+//                                 transmit_data.buf, transmit_data.len,
+//                                 transmit_data.topic);
+
+//              if (err != 0) {
+//                      goto end;
+//              }
+
+//              err = process_mqtt_and_sleep(
+//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//              if (err != 0) {
+//                      goto end;
+//              }
+
+//              if (cloud_data.gps_found) {
+//                      LOG_DBG("Entry: %d in gps_buffer published",
+//                              head_cir_buf);
+//                      cir_buf_gps[head_cir_buf].queued = false;
+//              }
+
+//              include_static_modem_data = false;
+
+//              break;
+
+//      default:
+//              break;
+//      }
+
+//      if (check_config_change()) {
+//              err = encode_message(&transmit_data, &cloud_data,
+//                                   &cir_buf_gps[head_cir_buf]);
+//              if (err != 0) {
+//                      goto end;
+//              }
+//              transmit_data.topic = update_topic;
+
+//              data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+//                           transmit_data.buf, transmit_data.len,
+//                           transmit_data.topic);
+//              if (err != 0) {
+//                      goto end;
+//              }
+
+//              err = process_mqtt_and_sleep(
+//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//              if (err != 0) {
+//                      goto end;
+//              }
+//      }
+
+//      for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
+//              if (cir_buf_gps[i].queued) {
+//                      queued_entries = true;
+//                      num_queued_entries++;
+//              }
+//      }
+
+//      if (queued_entries) {
+//              while (num_queued_entries > 0) {
+//                      err = encode_gps_buffer(
+//                              &transmit_data, cir_buf_gps,
+//                              CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
+//                      if (err != 0) {
+//                              goto end;
+//                      }
+//                      transmit_data.topic = batch_topic;
+
+//                      data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+//                                   transmit_data.buf, transmit_data.len,
+//                                   transmit_data.topic);
+//                      if (err != 0) {
+//                              goto end;
+//                      }
+
+//                      err = process_mqtt_and_sleep(
+//                              &client,
+//                              CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//                      if (err != 0) {
+//                              goto end;
+//                      }
+
+//                      num_queued_entries -=
+//                              CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
+//              }
+//      }
+
+//      // err = encode_modem_data(&transmit_data, include_static_modem_data);
+//      // if (err != 0) {
+//      //      goto end;
+//      // }
+//      // transmit_data.topic = update_topic;
+
+//      // data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
+//      //           transmit_data.len, transmit_data.topic);
+//      // if (err != 0) {
+//      //      goto end;
+//      // }
+
+//      // err = process_mqtt_and_sleep(&client,
+//      //                           CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//      // if (err != 0) {
+//      //      goto end;
+//      // }
+
+// end:
+//      err = mqtt_disconnect(&client);
+//      if (err) {
+//              LOG_ERR("Could not disconnect\n");
+//      }
+
+//      wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+//      err = mqtt_input(&client);
+//      if (err) {
+//              LOG_ERR("Could not input data");
+//      }
+
+//      num_queued_entries = 0;
+//      queued_entries = false;
+
+//      return err;
+// }
+
+static int bifravst_cloud_connect(void)
 {
 	int err;
-	struct transmit_data_t transmit_data;
+
+	LOG_DBG("BIFRAVST CLOUD CONNECT");
 
 	err = mqtt_enable(&client);
 	if (err) {
-		LOG_ERR("Could not connect to client: %d", err);
-		goto end;
+		return err;
 	}
 
-	switch (action) {
-	case CLOUD_PAIR:
+	return 0;
+}
 
-		transmit_data.buf = "";
-		transmit_data.len = strlen(transmit_data.buf);
-		transmit_data.topic = get_topic;
-
-		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				   transmit_data.buf, transmit_data.len,
-				   transmit_data.topic);
-
-		if (err != 0) {
-			goto end;
-		}
-
-		err = process_mqtt_and_sleep(
-			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-		if (err != 0) {
-			goto end;
-		}
-
-		include_static_modem_data = true;
-
-		break;
-
-	case CLOUD_REPORT:
-
-		err = encode_message(&transmit_data, &cloud_data,
-				     &cir_buf_gps[head_cir_buf]);
-		if (err != 0) {
-			goto end;
-		}
-		transmit_data.topic = update_topic;
-
-		err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				   transmit_data.buf, transmit_data.len,
-				   transmit_data.topic);
-
-		if (err != 0) {
-			goto end;
-		}
-
-		err = process_mqtt_and_sleep(
-			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-		if (err != 0) {
-			goto end;
-		}
-
-		if (cloud_data.gps_found) {
-			LOG_DBG("Entry: %d in gps_buffer published",
-				head_cir_buf);
-			cir_buf_gps[head_cir_buf].queued = false;
-		}
-
-		include_static_modem_data = false;
-
-		break;
-
-	default:
-		break;
-	}
-
-	if (check_config_change()) {
-		err = encode_message(&transmit_data, &cloud_data,
-				     &cir_buf_gps[head_cir_buf]);
-		if (err != 0) {
-			goto end;
-		}
-		transmit_data.topic = update_topic;
-
-		data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			     transmit_data.buf, transmit_data.len,
-			     transmit_data.topic);
-		if (err != 0) {
-			goto end;
-		}
-
-		err = process_mqtt_and_sleep(
-			&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-		if (err != 0) {
-			goto end;
-		}
-	}
-
-	for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
-		if (cir_buf_gps[i].queued) {
-			queued_entries = true;
-			num_queued_entries++;
-		}
-	}
-
-	if (queued_entries) {
-		while (num_queued_entries > 0) {
-			err = encode_gps_buffer(
-				&transmit_data, cir_buf_gps,
-				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
-			if (err != 0) {
-				goto end;
-			}
-			transmit_data.topic = batch_topic;
-
-			data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-				     transmit_data.buf, transmit_data.len,
-				     transmit_data.topic);
-			if (err != 0) {
-				goto end;
-			}
-
-			err = process_mqtt_and_sleep(
-				&client,
-				CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-			if (err != 0) {
-				goto end;
-			}
-
-			num_queued_entries -=
-				CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
-		}
-	}
-
-	// err = encode_modem_data(&transmit_data, include_static_modem_data);
-	// if (err != 0) {
-	//      goto end;
-	// }
-	// transmit_data.topic = update_topic;
-
-	// data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-	//           transmit_data.len, transmit_data.topic);
-	// if (err != 0) {
-	//      goto end;
-	// }
-
-	// err = process_mqtt_and_sleep(&client,
-	//                           CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-	// if (err != 0) {
-	//      goto end;
-	// }
-
-end:
-	err = mqtt_disconnect(&client);
-	if (err) {
-		LOG_ERR("Could not disconnect\n");
-	}
+static int bifravst_cloud_disconnect(void)
+{
+	int err;
 
 	wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 	err = mqtt_input(&client);
 	if (err) {
-		LOG_ERR("Could not input data");
+		return err;
 	}
 
-	num_queued_entries = 0;
-	queued_entries = false;
+	err = mqtt_disconnect(&client);
+	if (err != 0) {
+		return err;
+	}
+	return err;
+}
+
+static int bifravst_connect(const struct cloud_backend *const backend)
+{
+	int err;
+
+	err = bifravst_cloud_connect();
+
+	// backend->config->socket = nct_socket_get();
 
 	return err;
 }
 
+static int bifravst_disconnect(const struct cloud_backend *const backend)
+{
+	return bifravst_cloud_disconnect();
+}
+
+static int bifravst_send(const struct cloud_backend *const backend,
+			 const struct cloud_msg *const msg)
+{
+	int err;
+
+	transmit_data.buf = msg->buf;
+	transmit_data.len = msg->len;
+
+	switch (msg->endpoint.type) {
+	case CLOUD_EP_TOPIC_PAIR:
+		transmit_data.topic = get_topic;
+		break;
+	case CLOUD_EP_TOPIC_MSG:
+		transmit_data.topic = update_topic;
+		break;
+	case CLOUD_EP_BATCH:
+		transmit_data.topic = batch_topic;
+		break;
+	default:
+		break;
+	}
+
+	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
+			   transmit_data.buf, transmit_data.len,
+			   transmit_data.topic);
+	if (err != 0) {
+		return err;
+	}
+
+	err = process_mqtt_and_sleep(
+		&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	if (err != 0) {
+		return err;
+	}
+
+	return 0;
+}
+
 static const struct cloud_api bifravst_cloud_api = {
-	.report_and_update = report_and_update,
-	.init_config = init_config,
+	.init = bifravst_init,
+	.connect = bifravst_connect,
+	.disconnect = bifravst_disconnect,
+	.send = bifravst_send
 };
 
 CLOUD_BACKEND_DEFINE(BIFRAVST_CLOUD, bifravst_cloud_api);
