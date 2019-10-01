@@ -5,12 +5,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <net/cloud.h>
+#include <modem_info.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct cloud_data_gps_t {
+struct cloud_data_gps {
 	double longitude;
 	double latitude;
 	float altitude;
@@ -21,7 +22,7 @@ struct cloud_data_gps_t {
 	bool queued;
 };
 
-struct cloud_data_t {
+struct cloud_data {
 	int bat_voltage;
 	s64_t bat_timestamp;
 
@@ -38,28 +39,28 @@ struct cloud_data_t {
 	bool gps_found;
 };
 
-struct transmit_data_t {
-	char *buf;
-	size_t len;
-	u8_t *topic;
+struct cloud_data_time {
+	s64_t epoch;
+	s64_t update_time;
+	s64_t delta_time;
 };
 
-struct modem_data_t {
-	s64_t static_timestamp;
-	s64_t dynamic_timestamp;
-};
-
-int decode_response(char *input, struct cloud_data_t *cloud_data);
+int decode_response(char *input, struct cloud_data *cloud_data);
 
 int encode_message(struct cloud_msg *output,
-		   struct cloud_data_t *cloud_data,
-		   struct cloud_data_gps_t *cir_buf_gps);
+		   struct cloud_data *cloud_data,
+		   struct cloud_data_gps *cir_buf_gps,
+		   struct cloud_data_time *cloud_data_time);
 
 int encode_gps_buffer(struct cloud_msg *output,
-		      struct cloud_data_gps_t *cir_buf_gps,
-		      int max_per_publish);
+		      struct cloud_data_gps *cir_buf_gps,
+		      struct cloud_data_time *cloud_data_time);
 
-int encode_modem_data(struct cloud_msg *output, bool syncronization);
+int encode_modem_data(struct cloud_msg *output,
+		      struct modem_param_info *modem_info,
+		      bool syncronization,
+		      int rsrp,
+		      struct cloud_data_time *cloud_data_time);
 
 bool check_config_change(void);
 

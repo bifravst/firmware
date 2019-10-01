@@ -61,18 +61,17 @@ static const struct mqtt_topic cc_rx_list[] = {
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
 };
 
-struct transmit_data_t {
+struct bifravst_tx_data {
 	char *buf;
 	size_t len;
 	u8_t *topic;
 };
 
-/* Temporary defined, idea is to remove transmit data type */
-struct transmit_data_t transmit_data;
+struct bifravst_tx_data tx_data;
 
 static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
 static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
-static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_PAYLOAD_SIZE];
+static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
 
 static struct mqtt_client client;
 
@@ -535,211 +534,16 @@ static int mqtt_enable(struct mqtt_client *client)
 	return -EINVAL;
 }
 
-// static int report_and_update(const struct cloud_backend *const backend,
-//                           const enum cloud_action_type action)
-// {
-//      int err;
-//      struct transmit_data_t transmit_data;
-
-//      err = mqtt_enable(&client);
-//      if (err) {
-//              LOG_ERR("Could not connect to client: %d", err);
-//              goto end;
-//      }
-
-//      switch (action) {
-//      case CLOUD_PAIR:
-
-//              transmit_data.buf = "";
-//              transmit_data.len = strlen(transmit_data.buf);
-//              transmit_data.topic = get_topic;
-
-//              err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-//                                 transmit_data.buf, transmit_data.len,
-//                                 transmit_data.topic);
-
-//              if (err != 0) {
-//                      goto end;
-//              }
-
-//              err = process_mqtt_and_sleep(
-//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//              if (err != 0) {
-//                      goto end;
-//              }
-
-//              include_static_modem_data = true;
-
-//              break;
-
-//      case CLOUD_REPORT:
-
-//              err = encode_message(&transmit_data, &cloud_data,
-//                                   &cir_buf_gps[head_cir_buf]);
-//              if (err != 0) {
-//                      goto end;
-//              }
-//              transmit_data.topic = update_topic;
-
-//              err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-//                                 transmit_data.buf, transmit_data.len,
-//                                 transmit_data.topic);
-
-//              if (err != 0) {
-//                      goto end;
-//              }
-
-//              err = process_mqtt_and_sleep(
-//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//              if (err != 0) {
-//                      goto end;
-//              }
-
-//              if (cloud_data.gps_found) {
-//                      LOG_DBG("Entry: %d in gps_buffer published",
-//                              head_cir_buf);
-//                      cir_buf_gps[head_cir_buf].queued = false;
-//              }
-
-//              include_static_modem_data = false;
-
-//              break;
-
-//      default:
-//              break;
-//      }
-
-//      if (check_config_change()) {
-//              err = encode_message(&transmit_data, &cloud_data,
-//                                   &cir_buf_gps[head_cir_buf]);
-//              if (err != 0) {
-//                      goto end;
-//              }
-//              transmit_data.topic = update_topic;
-
-//              data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-//                           transmit_data.buf, transmit_data.len,
-//                           transmit_data.topic);
-//              if (err != 0) {
-//                      goto end;
-//              }
-
-//              err = process_mqtt_and_sleep(
-//                      &client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//              if (err != 0) {
-//                      goto end;
-//              }
-//      }
-
-//      for (int i = 0; i < CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX; i++) {
-//              if (cir_buf_gps[i].queued) {
-//                      queued_entries = true;
-//                      num_queued_entries++;
-//              }
-//      }
-
-//      if (queued_entries) {
-//              while (num_queued_entries > 0) {
-//                      err = encode_gps_buffer(
-//                              &transmit_data, cir_buf_gps,
-//                              CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX);
-//                      if (err != 0) {
-//                              goto end;
-//                      }
-//                      transmit_data.topic = batch_topic;
-
-//                      data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-//                                   transmit_data.buf, transmit_data.len,
-//                                   transmit_data.topic);
-//                      if (err != 0) {
-//                              goto end;
-//                      }
-
-//                      err = process_mqtt_and_sleep(
-//                              &client,
-//                              CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//                      if (err != 0) {
-//                              goto end;
-//                      }
-
-//                      num_queued_entries -=
-//                              CONFIG_BIFRAVST_CLOUD_CIRCULAR_BUFFER_MAX;
-//              }
-//      }
-
-//      // err = encode_modem_data(&transmit_data, include_static_modem_data);
-//      // if (err != 0) {
-//      //      goto end;
-//      // }
-//      // transmit_data.topic = update_topic;
-
-//      // data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, transmit_data.buf,
-//      //           transmit_data.len, transmit_data.topic);
-//      // if (err != 0) {
-//      //      goto end;
-//      // }
-
-//      // err = process_mqtt_and_sleep(&client,
-//      //                           CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//      // if (err != 0) {
-//      //      goto end;
-//      // }
-
-// end:
-//      err = mqtt_disconnect(&client);
-//      if (err) {
-//              LOG_ERR("Could not disconnect\n");
-//      }
-
-//      wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//      err = mqtt_input(&client);
-//      if (err) {
-//              LOG_ERR("Could not input data");
-//      }
-
-//      num_queued_entries = 0;
-//      queued_entries = false;
-
-//      return err;
-// }
-
-static int bifravst_cloud_connect(void)
+static int bifravst_connect(const struct cloud_backend *const backend)
 {
 	int err;
 
-	LOG_DBG("BIFRAVST CLOUD CONNECT");
+	// LOG_DBG("BIFRAVST CLOUD CONNECT");
 
 	err = mqtt_enable(&client);
 	if (err) {
 		return err;
 	}
-
-	return 0;
-}
-
-static int bifravst_cloud_disconnect(void)
-{
-	int err;
-
-	wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-	err = mqtt_input(&client);
-	if (err) {
-		return err;
-	}
-
-	err = mqtt_disconnect(&client);
-	if (err != 0) {
-		return err;
-	}
-	return err;
-}
-
-static int bifravst_connect(const struct cloud_backend *const backend)
-{
-	int err;
-
-	err = bifravst_cloud_connect();
-
 	// backend->config->socket = nct_socket_get();
 
 	return err;
@@ -747,7 +551,20 @@ static int bifravst_connect(const struct cloud_backend *const backend)
 
 static int bifravst_disconnect(const struct cloud_backend *const backend)
 {
-	return bifravst_cloud_disconnect();
+	int err;
+
+	// wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	// err = mqtt_input(&client);
+	// if (err) {
+	//      return err;
+	// }
+
+	err = mqtt_disconnect(&client);
+	if (err != 0) {
+		return err;
+	}
+
+	return err;
 }
 
 static int bifravst_send(const struct cloud_backend *const backend,
@@ -755,33 +572,35 @@ static int bifravst_send(const struct cloud_backend *const backend,
 {
 	int err;
 
-	transmit_data.buf = msg->buf;
-	transmit_data.len = msg->len;
+	tx_data.buf = msg->buf;
+	tx_data.len = msg->len;
 
 	switch (msg->endpoint.type) {
 	case CLOUD_EP_TOPIC_PAIR:
-		transmit_data.topic = get_topic;
+		tx_data.topic = get_topic;
 		break;
 	case CLOUD_EP_TOPIC_MSG:
-		transmit_data.topic = update_topic;
+		tx_data.topic = update_topic;
 		break;
 	case CLOUD_EP_BATCH:
-		transmit_data.topic = batch_topic;
+		tx_data.topic = batch_topic;
 		break;
 	default:
 		break;
 	}
 
 	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			   transmit_data.buf, transmit_data.len,
-			   transmit_data.topic);
+			   tx_data.buf, tx_data.len,
+			   tx_data.topic);
 	if (err != 0) {
+		LOG_ERR("Publishing data failed, error %d", err);
 		return err;
 	}
 
 	err = process_mqtt_and_sleep(
 		&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
 	if (err != 0) {
+		LOG_ERR("Processing MQTT failed, error %d", err);
 		return err;
 	}
 

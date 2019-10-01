@@ -3,7 +3,6 @@
 #include <string.h>
 #include <zephyr.h>
 #include <zephyr/types.h>
-#include <modem_data.h>
 #include <modem_info.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +19,7 @@ static bool change_movement_timeout = true;
 static bool change_accel_threshold = true;
 static bool change_config = true;
 
-struct modem_data_t modem_data;
+#define MAX_PER_PUBLISH 7
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
@@ -89,12 +88,7 @@ static int json_add_str(cJSON *parent, const char *str, const char *item)
 	return json_add_obj(parent, str, json_str);
 }
 
-s64_t convert_to_timestamp(time_t timestamp_type)
-{
-	return get_current_time() + timestamp_type;
-}
-
-int decode_response(char *input, struct cloud_data_t *cloud_data)
+int decode_response(char *input, struct cloud_data *cloud_data)
 {
 	char *string = NULL;
 	cJSON *root_obj = NULL;
@@ -209,7 +203,8 @@ struct twins_gps_buf {
 };
 
 int encode_gps_buffer(struct cloud_msg *output,
-		      struct cloud_data_gps_t *cir_buf_gps, int max_per_publish)
+		      struct cloud_data_gps *cir_buf_gps,
+		      struct cloud_data_time *cloud_data_time)
 {
 	int err;
 	char *buffer;
@@ -244,13 +239,15 @@ int encode_gps_buffer(struct cloud_msg *output,
 		return -ENOMEM;
 	}
 
+	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
+
 	err = json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued &&
-		    (encoded_counter < max_per_publish)) {
+		    (encoded_counter < MAX_PER_PUBLISH)) {
 			err += json_add_number(
 				twins_gps_buf[i].gps_buf_val_objects, "lng",
 				cir_buf_gps[i].longitude);
@@ -274,9 +271,7 @@ int encode_gps_buffer(struct cloud_msg *output,
 				twins_gps_buf[i].gps_buf_objects, "v",
 				twins_gps_buf[i].gps_buf_val_objects);
 			err += json_add_number(
-				twins_gps_buf[i].gps_buf_objects, "ts",
-				convert_to_timestamp(
-					cir_buf_gps[i].gps_timestamp));
+				twins_gps_buf[i].gps_buf_objects, "ts", gps_ts);
 			err += json_add_obj_array(
 				gps_obj, twins_gps_buf[i].gps_buf_objects);
 			cir_buf_gps[i].queued = false;
@@ -308,12 +303,13 @@ int encode_gps_buffer(struct cloud_msg *output,
 	return 0;
 }
 
-int encode_modem_data(struct cloud_msg *output, bool syncronization)
+int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_info,
+		      bool syncronization,
+		      int rsrp,
+		      struct cloud_data_time *cloud_data_time)
 {
 	int err;
 	char *buffer;
-	int rsrp;
-	struct modem_param_info *modem_info;
 
 	static const char lte_string[] = "LTE-M";
 	static const char nbiot_string[] = "NB-IoT";
@@ -340,12 +336,8 @@ int encode_modem_data(struct cloud_msg *output, bool syncronization)
 		return -ENOMEM;
 	}
 
-	modem_info = get_modem_info();
-
-	rsrp = get_rsrp_values();
-
-	modem_data.dynamic_timestamp = k_uptime_get();
-	modem_data.static_timestamp = k_uptime_get();
+	s64_t dyn_ts = cloud_data_time->delta_time + k_uptime_get();
+	s64_t stat_ts = cloud_data_time->delta_time + k_uptime_get();
 
 	if (modem_info->network.lte_mode.value == 1) {
 		strcat(modem_info->network.network_mode, lte_string);
@@ -389,14 +381,10 @@ int encode_modem_data(struct cloud_msg *output, bool syncronization)
 			    modem_info->network.ip_address.value_string);
 
 	err += json_add_obj(static_m_data, "v", static_m_data_v);
-	err += json_add_number(
-		static_m_data, "ts",
-		convert_to_timestamp(modem_data.static_timestamp));
+	err += json_add_number(static_m_data, "ts", stat_ts);
 
 	err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
-	err += json_add_number(
-		dynamic_m_data, "ts",
-		convert_to_timestamp(modem_data.dynamic_timestamp));
+	err += json_add_number(dynamic_m_data, "ts", dyn_ts);
 
 	if (syncronization) {
 		err += json_add_obj(reported_obj, "dev", static_m_data);
@@ -430,8 +418,9 @@ int encode_modem_data(struct cloud_msg *output, bool syncronization)
 }
 
 int encode_message(struct cloud_msg *output,
-		   struct cloud_data_t *cloud_data,
-		   struct cloud_data_gps_t *cir_buf_gps)
+		   struct cloud_data *cloud_data,
+		   struct cloud_data_gps *cir_buf_gps,
+		   struct cloud_data_time *cloud_data_time)
 {
 	int err;
 	char *buffer;
@@ -459,14 +448,16 @@ int encode_message(struct cloud_msg *output,
 		return -ENOMEM;
 	}
 
+	s64_t bat_ts = cloud_data_time->delta_time + cloud_data->bat_timestamp;
+	s64_t acc_ts = cloud_data_time->delta_time + cloud_data->acc_timestamp;
+	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
+
 	/*BAT*/
 	err = json_add_number(bat_obj, "v", cloud_data->bat_voltage);
-	err += json_add_number(bat_obj, "ts",
-			       convert_to_timestamp(cloud_data->bat_timestamp));
+	err += json_add_number(bat_obj, "ts", bat_ts);
 	/*ACC*/
 	err += json_add_DoubleArray(acc_obj, "v", cloud_data->acc);
-	err += json_add_number(acc_obj, "ts",
-			       convert_to_timestamp(cloud_data->acc_timestamp));
+	err += json_add_number(acc_obj, "ts", acc_ts);
 
 	/*GPS*/
 	err += json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
@@ -515,10 +506,7 @@ int encode_message(struct cloud_msg *output,
 		if (cloud_data->active && cloud_data->gps_found) {
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(
-				gps_obj, "ts",
-				convert_to_timestamp(
-					cir_buf_gps->gps_timestamp));
+			err += json_add_number(gps_obj, "ts", gps_ts);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 
@@ -531,10 +519,7 @@ int encode_message(struct cloud_msg *output,
 			err = json_add_obj(reported_obj, "bat", bat_obj);
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(
-				gps_obj, "ts",
-				convert_to_timestamp(
-					cir_buf_gps->gps_timestamp));
+			err += json_add_number(gps_obj, "ts", gps_ts);
 			err += json_add_obj(reported_obj, "gps", gps_obj);
 		}
 	}

@@ -47,12 +47,6 @@ config GPS_TRIGGER
 
 endmenu	# GPS
 
-menu "Modem Data"
-
-rsource "src/modem_data/Kconfig"
-
-endmenu # Modem Data
-
 menu "Governing FSM"
 
 config LTE_CONN_TIMEOUT
