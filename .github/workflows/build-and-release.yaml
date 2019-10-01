@@ -2,6 +2,9 @@ name: Build and Release
 
 on: push
 
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -42,8 +45,6 @@ jobs:
         run: npm ci
 
       - name: Determine next release version
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
           echo "#define DEVICE_APP_VERSION \"$NEXT_VERSION\"" > ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
@@ -67,8 +68,6 @@ jobs:
 
       - name: Semantic release
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           npm i --no-save @bifravst/semantic-release-github@15.14.0-release-in-assets
           npx semantic-release
