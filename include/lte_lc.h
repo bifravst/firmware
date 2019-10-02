@@ -99,6 +99,12 @@ int lte_lc_normal(void);
  */
 int lte_lc_gps_mode(void);
 
+/** @brief Function for requesting current network status
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int lte_lc_registration_status(void);
+
 /** @brief Function for requesting modem to go to or disable
  * power saving mode (PSM) with default settings defined in kconfig.
  * For reference see 3GPP 27.007 Ch. 7.38.

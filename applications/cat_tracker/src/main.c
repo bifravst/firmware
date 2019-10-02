@@ -17,7 +17,6 @@
 #include <time.h>
 #include <nrf_socket.h>
 
-#define AT_CMD_SIZE(x) (sizeof(x) - 1)
 #define TIME_LEN 50
 #define BAT_LEN 50
 #define RSRP_LEN 50
@@ -28,6 +27,12 @@ enum governing_states {
 	ACTIVE_MODE,
 	PASSIVE_MODE,
 	GPS_SEARCH,
+	PUBLISH_TO_CLOUD_AND_SLEEP,
+};
+
+enum lte_conn_actions {
+	LTE_INIT,
+	LTE_CYCLE
 };
 
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
@@ -44,7 +49,7 @@ struct cloud_data_time cloud_data_time;
 
 struct modem_param_info modem_param;
 
-enum governing_states state = CHECK_MODE;
+enum governing_states state = LTE_CHECK_CONNECTION;
 
 static struct cloud_backend *cloud_backend;
 
@@ -74,7 +79,7 @@ enum error_type {
 
 void error_handler(enum error_type err_type, int err_code)
 {
-#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
+#if !defined(CONFIG_DEBUG) && defined(COIALIZATIONNFIG_REBOOT)
 	LOG_PANIC();
 	sys_reboot(0);
 #else
@@ -261,15 +266,6 @@ static void get_rsrp_values(void)
 	rsrp = atoi(rsrp_level);
 }
 #endif
-
-int check_mode(void)
-{
-	if (cloud_data.active) {
-		return true;
-	} else {
-		return false;
-	}
-}
 
 int check_active_wait(bool mode)
 {
@@ -505,49 +501,6 @@ static void work_init(void)
 	k_work_init(&cloud_process_cycle_work, cloud_process_cycle_work_fn);
 }
 
-static const char home[] = "+CEREG: 1";
-static const char home_2[] = "+CEREG:1";
-static const char roam[] = "+CEREG: 5";
-static const char roam_2[] = "+CEREG:5";
-static const char home_unreg[] = "+CEREG: 1,\"FFFE\"";
-static const char home_unreg2[] = "+CEREG:1,\"FFFE\"";
-static const char roam_unreg[] = "+CEREG: 5,\"FFFE\"";
-static const char roam_unreg2[] = "+CEREG:5,\"FFFE\"";
-
-void connection_handler(char *response)
-{
-
-	if (!memcmp(home_unreg, response, AT_CMD_SIZE(home_unreg)) ||
-	    !memcmp(roam_unreg, response, AT_CMD_SIZE(roam_unreg)) ||
-	    !memcmp(home_unreg2, response, AT_CMD_SIZE(home_unreg2)) ||
-	    !memcmp(roam_unreg2, response, AT_CMD_SIZE(roam_unreg2))) {
-		goto no_connection;
-	}
-
-	if (!memcmp(home, response, AT_CMD_SIZE(home)) ||
-	    !memcmp(roam, response, AT_CMD_SIZE(roam)) ||
-	    !memcmp(home_2, response, AT_CMD_SIZE(home_2)) ||
-	    !memcmp(roam_2, response, AT_CMD_SIZE(roam_2))) {
-		goto connection;
-	}
-
-	goto no_connection;
-
-connection:
-	if (!k_sem_count_get(&connect_sem)) {
-		printk("LTE connection obtained\n");
-		k_sem_give(&connect_sem);
-	}
-
-	return;
-
-no_connection:
-	if (k_sem_count_get(&connect_sem)) {
-		printk("LTE connection not obtained\n");
-		k_sem_take(&connect_sem, 0);
-	}
-}
-
 static void adxl362_trigger_handler(struct device *dev,
 				    struct sensor_trigger *trig)
 {
@@ -669,40 +622,57 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	}
 }
 
-static void lte_connect(void)
+static void lte_connect(enum lte_conn_actions action)
 {
 	int err;
 
 	ui_led_set_pattern(UI_LTE_CONNECTING);
 
-	err = lte_lc_init_connect_manager(connection_handler);
-	if (err != 0) {
-		printk("Error setting lte connection manager: %d\n", err);
-	}
+	if (action == LTE_INIT) {
+		if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
+			/* Do nothing, modem is already turned on
+			 * and connected.
+			 */
+		} else {
 
-	printk("Searching for LTE connection... timeout in %d minutes\n",
-	       CONFIG_LTE_CONN_TIMEOUT);
-
-	if (!k_sem_take(&connect_sem, K_MINUTES(CONFIG_LTE_CONN_TIMEOUT))) {
-		k_sem_give(&connect_sem);
-
-		printk("LTE connected!\nFetching modem time...\n");
-
-		k_sleep(5000);
-
-		err = modem_time_get();
-		if (err != 0) {
-			printk("Error fetching modem time: %d\n", err);
+			printk("Connecting to LTE network. ");
+			printk("This may take several minutes.\n");
+			err = lte_lc_init_and_connect();
+			if (err == -ETIMEDOUT) {
+				printk("LTE link could not be established.\n");
+				goto gps_mode;
+			}
 		}
+	} else if (action == LTE_CYCLE) {
+		err = lte_lc_registration_status();
+		if (err == -ENOTCONN) {
+			printk("LTE not connected.\n");
+			printk("Connecting to LTE network. ");
+			printk("This may take several minutes.\n");
+			err = lte_lc_init_and_connect();
+			if (err == -ETIMEDOUT) {
+				printk("LTE link could not be established.\n");
+				goto gps_mode;
+			}
 
-		cloud_pairing();
-
-		lte_lc_psm_req(true);
-	} else {
-		printk("LTE not connected within %d minutes, starting gps search...\n",
-		       CONFIG_LTE_CONN_TIMEOUT);
-		lte_lc_gps_mode();
+		}
 	}
+
+	printk("LTE connected!\nFetching modem time...\n");
+
+	k_sleep(5000);
+
+	err = modem_time_get();
+	if (err != 0) {
+		printk("Error fetching modem time: %d\n", err);
+	}
+
+	cloud_pairing();
+	lte_lc_psm_req(true);
+	return;
+
+gps_mode:
+	lte_lc_gps_mode();
 }
 
 #if defined(CONFIG_MODEM_INFO)
@@ -762,12 +732,17 @@ void main(void)
 	modem_data_init();
 #endif
 
-	lte_connect();
+	lte_connect(LTE_INIT);
 
 	while (true) {
 		switch (state) {
+		case LTE_CHECK_CONNECTION:
+			lte_connect(LTE_CYCLE);
+			state = CHECK_MODE;
+			break;
+
 		case CHECK_MODE:
-			if (check_mode()) {
+			if (cloud_data.active) {
 				ui_led_set_pattern(UI_LED_ACTIVE_MODE);
 				active = true;
 				k_sleep(CONFIG_MODE_INDICATION_TIME);
@@ -782,20 +757,13 @@ void main(void)
 
 		case ACTIVE_MODE:
 			printk("ACTIVE MODE\n");
-			state = LTE_CHECK_CONNECTION;
+			state = GPS_SEARCH;
 			break;
 
 		case PASSIVE_MODE:
 			printk("PASSIVE MODE\n");
 			ui_stop_leds();
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
-			}
-			state = LTE_CHECK_CONNECTION;
-			break;
-
-		case LTE_CHECK_CONNECTION:
-			if (!k_sem_count_get(&connect_sem)) {
-				lte_connect();
 			}
 			state = GPS_SEARCH;
 			break;
@@ -809,9 +777,13 @@ void main(void)
 				cloud_data.gps_found = false;
 				gps_control_stop();
 			}
+			state = PUBLISH_TO_CLOUD_AND_SLEEP;
+			break;
+
+		case PUBLISH_TO_CLOUD_AND_SLEEP:
 			cloud_process_cycle();
 			k_sleep(K_SECONDS(check_active_wait(active)));
-			state = CHECK_MODE;
+			state = LTE_CHECK_CONNECTION;
 			break;
 
 		default:
