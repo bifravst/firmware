@@ -25,18 +25,18 @@ jobs:
       - name: Install Zephyr dependencies
         run: |
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
-          pip3 install --user cmake west wheel
+          sudo pip3 install cmake west wheel
 
       - name: West init
         run: |
           export PATH=~/.local/bin:$PATH
           west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
           west update
-          pip3 install --user -r zephyr/scripts/requirements.txt
-          pip3 install --user -r nrf/scripts/requirements.txt
+          sudo pip3 install -r zephyr/scripts/requirements.txt
+          sudo pip3 install -r nrf/scripts/requirements.txt
           # Remove system provided python cryptography module so the next step does not crash
           sudo apt-get -y remove python-cryptography python3-cryptography
-          pip3 install --user -r mcuboot/scripts/requirements.txt
+          sudo pip3 install -r mcuboot/scripts/requirements.txt
 
       - name: Patch West to enable nrf9160_pca10015ns
         run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
