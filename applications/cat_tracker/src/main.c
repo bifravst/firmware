@@ -723,8 +723,6 @@ void main(void)
 		cloud_error_handler(err);
 	}
 
-	printk("Cloud backend initialized\n");
-
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 

@@ -52,6 +52,8 @@ enum lte_lc_func_mode {
 int lte_lc_init_connect_manager(at_cmd_handler_t connection_handler);
 >>>>>>> feat: connection handler
 
+=======
+>>>>>>> fix: removed comment
 /** @brief Function for initializing
  * the modem.  NOTE: a follow-up call to lte_lc_connect()
  * must be made.
