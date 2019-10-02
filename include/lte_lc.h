@@ -99,7 +99,7 @@ int lte_lc_normal(void);
  *
  * @return Zero on success or (negative) error code otherwise.
  */
-int lte_lc_gps_mode(void);
+int lte_lc_gps_nw_mode(void);
 
 /** @brief Function for requesting current network status
  *

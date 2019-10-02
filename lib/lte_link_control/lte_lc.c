@@ -238,6 +238,56 @@ static int w_lte_lc_init(void)
 	return 0;
 }
 
+int lte_lc_registration_status(void)
+{
+	int err;
+	char id[16];
+	u32_t val;
+	size_t len = 16;
+	char buf[50] = { 0 };
+
+	at_params_list_init(&params, 10);
+
+	if (at_cmd_write(current_nw_status, buf, sizeof(buf), NULL) != 0) {
+		return -EIO;
+	}
+
+	LOG_DBG("recv: %s", log_strdup(buf));
+
+	at_parser_params_from_str(buf, NULL, &params);
+	at_params_string_get(&params, 0, id, &len);
+
+	if ((len > 0) &&
+	    (memcmp(id, "+CEREG", 6) == 0)) {
+		at_params_int_get(&params, 1, &val);
+
+		if (!((val == 1) || (val == 5))) {
+			err = -ENOTCONN;
+		}
+	}
+
+	at_params_list_free(&params);
+
+	return 0;
+}
+
+int lte_lc_gps_nw_mode(void)
+{
+	if (at_cmd_write(offline, NULL, 0, NULL) != 0) {
+		return -EIO;
+	}
+
+	if (at_cmd_write(gps_mode, NULL, 0, NULL) != 0) {
+		return -EIO;
+	}
+
+	if (at_cmd_write(normal, NULL, 0, NULL) != 0) {
+		return -EIO;
+	}
+
+	return 0;
+}
+
 static int w_lte_lc_connect(void)
 {
 	int err, rc;
@@ -307,56 +357,6 @@ static int w_lte_lc_init_and_connect(struct device *unused)
 	}
 
 	return w_lte_lc_connect();
-}
-
-int lte_lc_gps_mode(void)
-{
-	if (at_cmd_write(offline, NULL, 0, NULL) != 0) {
-		return -EIO;
-	}
-
-	if (at_cmd_write(gps_mode, NULL, 0, NULL) != 0) {
-		return -EIO;
-	}
-
-	if (at_cmd_write(normal, NULL, 0, NULL) != 0) {
-		return -EIO;
-	}
-
-	return 0;
-}
-
-int lte_lc_registration_status(void)
-{
-	int err;
-	char id[16];
-	u32_t val;
-	size_t len = 16;
-	char buf[50] = { 0 };
-
-	at_params_list_init(&params, 10);
-
-	if (at_cmd_write(current_nw_status, buf, sizeof(buf), NULL) != 0) {
-		return -EIO;
-	}
-
-	LOG_DBG("recv: %s", log_strdup(buf));
-
-	at_parser_params_from_str(buf, NULL, &params);
-	at_params_string_get(&params, 0, id, &len);
-
-	if ((len > 0) &&
-	    (memcmp(id, "+CEREG", 6) == 0)) {
-		at_params_int_get(&params, 1, &val);
-
-		if (!((val == 1) || (val == 5))) {
-			err = -ENOTCONN;
-		}
-	}
-
-	at_params_list_free(&params);
-
-	return 0;
 }
 
 /* lte lc Init wrapper */

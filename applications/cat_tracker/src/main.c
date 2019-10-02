@@ -122,7 +122,7 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	ARG_UNUSED(esf);
 
 	LOG_PANIC();
-	z_fatal_print("Running main.c error handler");
+	printk("Running main.c error handler");
 	error_handler(ERROR_SYSTEM_FAULT, reason);
 	CODE_UNREACHABLE;
 }
@@ -672,7 +672,7 @@ static void lte_connect(enum lte_conn_actions action)
 	return;
 
 gps_mode:
-	lte_lc_gps_mode();
+	lte_lc_gps_nw_mode();
 }
 
 #if defined(CONFIG_MODEM_INFO)
