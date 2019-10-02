@@ -17,9 +17,9 @@
 #include <time.h>
 #include <nrf_socket.h>
 
-#define TIME_LEN 50
-#define BAT_LEN 50
-#define RSRP_LEN 50
+#define TIME_LEN 25
+#define BAT_LEN 12
+#define RSRP_LEN 28
 
 enum governing_states {
 	LTE_CHECK_CONNECTION,
@@ -197,8 +197,6 @@ static int modem_time_get(void)
 		modem_ts[i - 8] = modem_ts_buf[i];
 	}
 
-	printk("Time from modem: %s\n", modem_ts);
-
 	err = nrf_close(at_socket_fd);
 	__ASSERT_NO_MSG(err == 0);
 
@@ -208,6 +206,15 @@ static int modem_time_get(void)
 	info.tm_hour = get_time_info(modem_ts, 9, 10);
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
+
+	
+
+	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday,
+				info.tm_mon,
+				(info.tm_year - 100),
+				info.tm_hour,
+				info.tm_min,
+				info.tm_sec);
 
 	cloud_data_time.epoch = mktime(&info);
 	cloud_data_time.update_time = k_uptime_get();
@@ -467,6 +474,11 @@ static void cloud_pairing(void)
 	cloud_connect(cloud_backend);
 	cloud_pair();
 	cloud_ack_config_change();
+	
+#if defined(CONFIG_MODEM_INFO)
+	cloud_send_modem_data();
+#endif
+
 	cloud_disconnect(cloud_backend);
 }
 
@@ -477,9 +489,9 @@ static void cloud_process_cycle(void)
 	cloud_send_sensor_data();
 	cloud_ack_config_change();
 
-	#if defined(CONFIG_MODEM_INFO)
+#if defined(CONFIG_MODEM_INFO)
 	cloud_send_modem_data();
-	#endif
+#endif
 
 	// cloud_send_buffered_data();
 	cloud_disconnect(cloud_backend);
@@ -644,7 +656,7 @@ static void lte_connect(enum lte_conn_actions action)
 			}
 		}
 	} else if (action == LTE_CYCLE) {
-		err = lte_lc_registration_status();
+		err = lte_lc_nw_reg_status();
 		if (err == -ENOTCONN) {
 			printk("LTE not connected.\n");
 			printk("Connecting to LTE network. ");
@@ -655,6 +667,8 @@ static void lte_connect(enum lte_conn_actions action)
 				goto gps_mode;
 			}
 
+		} else if (err == 0) {
+			goto exit;
 		}
 	}
 
@@ -673,14 +687,14 @@ static void lte_connect(enum lte_conn_actions action)
 
 gps_mode:
 	lte_lc_gps_nw_mode();
+	return;
+exit:
+	return;
 }
+
+
 
 #if defined(CONFIG_MODEM_INFO)
-static void modem_rsrp_handler(char rsrp_value)
-{
-	rsrp = rsrp_value;
-}
-
 static int modem_data_init(void)
 {
 	int err;
@@ -695,8 +709,6 @@ static int modem_data_init(void)
 		return err;
 	}
 
-	modem_info_rsrp_register(modem_rsrp_handler);
-
 	return 0;
 }
 #endif
@@ -704,12 +716,6 @@ static int modem_data_init(void)
 void main(void)
 {
 	int err;
-
-	work_init();
-
-#if defined(CONFIG_USE_UI_MODULE)
-	ui_init();
-#endif
 
 	printk("The cat tracker has started\n");
 
@@ -723,14 +729,20 @@ void main(void)
 		cloud_error_handler(err);
 	}
 
-	adxl362_init();
-	gps_control_init(gps_control_handler);
+#if defined(CONFIG_USE_UI_MODULE)
+	ui_init();
+#endif
 
 #if defined(CONFIG_MODEM_INFO)
 	modem_data_init();
 #endif
 
+	work_init();
+
 	lte_connect(LTE_INIT);
+
+	adxl362_init();
+	gps_control_init(gps_control_handler);
 
 	while (true) {
 		switch (state) {
@@ -779,7 +791,7 @@ void main(void)
 			break;
 
 		case PUBLISH_TO_CLOUD_AND_SLEEP:
-			cloud_process_cycle();
+			// cloud_process_cycle();
 			k_sleep(K_SECONDS(check_active_wait(active)));
 			state = LTE_CHECK_CONNECTION;
 			break;

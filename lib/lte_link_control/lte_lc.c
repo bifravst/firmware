@@ -238,37 +238,49 @@ static int w_lte_lc_init(void)
 	return 0;
 }
 
-int lte_lc_registration_status(void)
+int lte_lc_nw_reg_status(void)
 {
-	int err;
+	int err = 0;
 	char id[16];
 	u32_t val;
 	size_t len = 16;
-	char buf[50] = { 0 };
+	char buf[100] = { 0 };
 
 	at_params_list_init(&params, 10);
 
 	if (at_cmd_write(current_nw_status, buf, sizeof(buf), NULL) != 0) {
-		return -EIO;
+		err = -EIO;
+		goto exit;
 	}
 
-	LOG_DBG("recv: %s", log_strdup(buf));
+	LOG_DBG("nw status: %s", log_strdup(buf));
 
-	at_parser_params_from_str(buf, NULL, &params);
-	at_params_string_get(&params, 0, id, &len);
+	if (at_parser_params_from_str(buf, NULL, &params) != 0) {
+		err = -EIO;
+		goto exit;
+	}
+
+	if (at_params_string_get(&params, 0, id, &len) != 0) {
+		err = -EIO;
+		goto exit;
+	}
 
 	if ((len > 0) &&
 	    (memcmp(id, "+CEREG", 6) == 0)) {
-		at_params_int_get(&params, 1, &val);
+		if (at_params_int_get(&params, 1, &val) != 0) {
+			err = -EIO;
+			goto exit;
+		}
 
 		if (!((val == 1) || (val == 5))) {
 			err = -ENOTCONN;
 		}
 	}
 
+exit:
 	at_params_list_free(&params);
 
-	return 0;
+	return err;
 }
 
 int lte_lc_gps_nw_mode(void)

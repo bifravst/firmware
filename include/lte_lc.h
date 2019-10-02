@@ -105,7 +105,7 @@ int lte_lc_gps_nw_mode(void);
  *
  * @return Zero on success or (negative) error code otherwise.
  */
-int lte_lc_registration_status(void);
+int lte_lc_nw_reg_status(void);
 
 /** @brief Function for requesting modem to go to or disable
  * power saving mode (PSM) with default settings defined in kconfig.
