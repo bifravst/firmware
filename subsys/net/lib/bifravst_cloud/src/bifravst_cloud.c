@@ -553,11 +553,11 @@ static int bifravst_disconnect(const struct cloud_backend *const backend)
 {
 	int err;
 
-	// wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-	// err = mqtt_input(&client);
-	// if (err) {
-	//      return err;
-	// }
+	wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	err = mqtt_input(&client);
+	if (err) {
+	     return err;
+	}
 
 	err = mqtt_disconnect(&client);
 	if (err != 0) {

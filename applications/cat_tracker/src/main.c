@@ -240,7 +240,7 @@ static void set_current_time(struct gps_data gps_data)
 
 static void get_delta_time(void)
 {
-	cloud_data_time.delta_time = cloud_data_time.epoch - cloud_data_time.update_time / 1000;
+	cloud_data_time.delta_time = cloud_data_time.epoch * (time_t)1000 - cloud_data_time.update_time;
 }
 
 #if defined(CONFIG_MODEM_INFO)
@@ -410,7 +410,9 @@ static void cloud_send_modem_data(void)
 		printk("Error getting modem_info: %d", err);
 	}
 
+	get_delta_time();
 	get_rsrp_values();
+
 
 	err = encode_modem_data(&msg, &modem_param, true, rsrp,
 				&cloud_data_time);
@@ -474,7 +476,7 @@ static void cloud_pairing(void)
 	cloud_connect(cloud_backend);
 	cloud_pair();
 	cloud_ack_config_change();
-	
+
 #if defined(CONFIG_MODEM_INFO)
 	cloud_send_modem_data();
 #endif
@@ -791,7 +793,7 @@ void main(void)
 			break;
 
 		case PUBLISH_TO_CLOUD_AND_SLEEP:
-			// cloud_process_cycle();
+			cloud_process_cycle();
 			k_sleep(K_SECONDS(check_active_wait(active)));
 			state = LTE_CHECK_CONNECTION;
 			break;
