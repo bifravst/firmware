@@ -71,8 +71,9 @@ jobs:
           wget https://github.com/github/hub/releases/download/v2.12.8/hub-linux-amd64-2.12.8.tgz
           tar xzf hub-linux-amd64-2.12.8.tgz
           export NEXT_VERSION=`cat .version`
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex cat-tracker-PCA10015-AssetTracker-NEXT_VERSION.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-NEXT_VERSION.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-NEXT_VERSION.hex
-          echo "machine github.com login github password ${GH_TOKEN}" > ~/.netrc 
-          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-NEXT_VERSION.hex#Pre-build HEX file for PCA10015 / Asset Tracker (NEXT_VERSION)" -a "cat-tracker-PCA20035-Thingy52-NEXT_VERSION.hex#Pre-build HEX file for PCA20035 / Thingy:91 (NEXT_VERSION)" -a "cat-tracker-PCA10090-nRF9160DK-NEXT_VERSION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK (NEXT_VERSION)" $NEXT_VERSION
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex
+          echo "machine github.com login bifravst-ci password ${GH_TOKEN}" > ~/.netrc
+          cat ~/.netrc
+          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERSION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION)" $NEXT_VERSION
