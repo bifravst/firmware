@@ -22,7 +22,6 @@
   "devDependencies": {
     "@commitlint/cli": "^8.1.0",
     "@commitlint/config-angular": "^8.1.0",
-    "@semantic-release/commit-analyzer": "^6.3.0",
     "husky": "^3.0.5",
     "semantic-release": "^15.13.24",
     "standard": "^14.1.0",
@@ -32,35 +31,5 @@
     "hooks": {
       "commit-msg": "commitlint -e"
     }
-  },
-  "release": {
-    "branch": "saga",
-    "remoteTags": true,
-    "plugins": [
-      "@semantic-release/commit-analyzer",
-      "@semantic-release/release-notes-generator",
-      [
-        "@bifravst/semantic-release-github",
-        {
-          "assets": [
-            {
-              "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca10015ns.hex",
-              "name": "cat-tracker-PCA10015-AssetTracker-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA10015 / Asset Tracker (%RELEASE%)"
-            },
-            {
-              "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca20035ns.hex",
-              "name": "cat-tracker-PCA20035-Thingy52-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA20035 / Thingy:91 (%RELEASE%)"
-            },
-            {
-              "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca10090ns.hex",
-              "name": "cat-tracker-PCA10090-nRF9160DK-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA10090 / nRF9160 DK (%RELEASE%)"
-            }
-          ]
-        }
-      ]
-    ]
   }
 }
