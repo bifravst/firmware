@@ -47,23 +47,15 @@ config GPS_TRIGGER
 
 endmenu	# GPS
 
-menu "Governing FSM"
-
-config LTE_CONN_TIMEOUT
-	int "Number of minutes of trying to connect to lte"
-	default 10
-
-config MODEM_TIME_RETRIES
-	int "Number of seconds between each modem time fetch"
-	default 10
-
-config MODE_INDICATION_TIME
-	int "Number of ms to indicate the current device mode, active or passive"
-	default 10000
+menu "Sensor Buffer"
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
 	default 10
+
+config MAX_PER_ENCODED_ENTRIES
+	int "Maximum amount of encoded and published sensor buffer entries"
+	default 7
 
 endmenu # Governing FSM
 

@@ -17,9 +17,11 @@ static bool change_active_wait = true;
 static bool change_passive_wait = true;
 static bool change_movement_timeout = true;
 static bool change_accel_threshold = true;
-static bool change_config = true;
 
-#define MAX_PER_PUBLISH 7
+struct twins_gps_buf {
+	cJSON *gps_buf_objects;
+	cJSON *gps_buf_val_objects;
+};
 
 static int json_add_obj(cJSON *parent, const char *str, cJSON *item)
 {
@@ -88,7 +90,7 @@ static int json_add_str(cJSON *parent, const char *str, const char *item)
 	return json_add_obj(parent, str, json_str);
 }
 
-int decode_response(char *input, struct cloud_data *cloud_data)
+int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 {
 	char *string = NULL;
 	cJSON *root_obj = NULL;
@@ -153,28 +155,24 @@ get_data:
 		cloud_data->gps_timeout = gpst->valueint;
 		printk("SETTING GPST TO: %d\n", gpst->valueint);
 		change_gpst = true;
-		change_config = true;
 	}
 
 	if (active != NULL) {
 		cloud_data->active = active->valueint;
 		printk("SETTING ACTIVE TO: %d\n", active->valueint);
 		change_active = true;
-		change_config = true;
 	}
 
 	if (active_wait != NULL) {
 		cloud_data->active_wait = active_wait->valueint;
 		printk("SETTING ACTIVE WAIT TO: %d\n", active_wait->valueint);
 		change_active_wait = true;
-		change_config = true;
 	}
 
 	if (passive_wait != NULL) {
 		cloud_data->passive_wait = passive_wait->valueint;
 		printk("SETTING PASSIVE_WAIT TO: %d\n", passive_wait->valueint);
 		change_passive_wait = true;
-		change_config = true;
 	}
 
 	if (movement_timeout != NULL) {
@@ -182,7 +180,6 @@ get_data:
 		printk("SETTING MOVEMENT TIMEOUT TO: %d\n",
 		       movement_timeout->valueint);
 		change_movement_timeout = true;
-		change_config = true;
 	}
 
 	if (accel_threshold != NULL) {
@@ -190,33 +187,27 @@ get_data:
 		printk("SETTING ACCEL THRESHOLD TIMEOUT TO: %d\n",
 		       accel_threshold->valueint);
 		change_accel_threshold = true;
-		change_config = true;
 	}
 end:
 	cJSON_Delete(root_obj);
 	return 0;
 }
 
-struct twins_gps_buf {
-	cJSON *gps_buf_objects;
-	cJSON *gps_buf_val_objects;
-};
-
-int encode_gps_buffer(struct cloud_msg *output,
-		      struct cloud_data_gps *cir_buf_gps,
-		      struct cloud_data_time *cloud_data_time)
+int cloud_encode_gps_buffer(struct cloud_msg *output,
+			    struct cloud_data_gps *cir_buf_gps,
+			    struct cloud_data_time *cloud_data_time)
 {
 	int err;
 	char *buffer;
 	int encoded_counter = 0;
 
+	struct twins_gps_buf twins_gps_buf[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
+	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
+
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateArray();
-
-	struct twins_gps_buf
-		twins_gps_buf[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		twins_gps_buf[i].gps_buf_objects = NULL;
@@ -231,23 +222,20 @@ int encode_gps_buffer(struct cloud_msg *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
-		     i++) {
+		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}
 		return -ENOMEM;
 	}
 
-	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
-
-	err = json_add_obj(reported_obj, "gps", gps_obj);
+	err += json_add_obj(reported_obj, "gps", gps_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued &&
-		    (encoded_counter < MAX_PER_PUBLISH)) {
+		    (encoded_counter < CONFIG_MAX_PER_ENCODED_ENTRIES)) {
 			err += json_add_number(
 				twins_gps_buf[i].gps_buf_val_objects, "lng",
 				cir_buf_gps[i].longitude);
@@ -270,8 +258,8 @@ int encode_gps_buffer(struct cloud_msg *output,
 			err += json_add_obj(
 				twins_gps_buf[i].gps_buf_objects, "v",
 				twins_gps_buf[i].gps_buf_val_objects);
-			err += json_add_number(
-				twins_gps_buf[i].gps_buf_objects, "ts", gps_ts);
+			err += json_add_number(twins_gps_buf[i].gps_buf_objects,
+					       "ts", gps_ts);
 			err += json_add_obj_array(
 				gps_obj, twins_gps_buf[i].gps_buf_objects);
 			cir_buf_gps[i].queued = false;
@@ -286,8 +274,7 @@ int encode_gps_buffer(struct cloud_msg *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(gps_obj);
-		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
-		     i++) {
+		for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 			cJSON_Delete(twins_gps_buf[i].gps_buf_objects);
 			cJSON_Delete(twins_gps_buf[i].gps_buf_val_objects);
 		}
@@ -303,10 +290,10 @@ int encode_gps_buffer(struct cloud_msg *output,
 	return 0;
 }
 
-int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_info,
-		      bool syncronization,
-		      int rsrp,
-		      struct cloud_data_time *cloud_data_time)
+int cloud_encode_modem_data(struct cloud_msg *output,
+			    struct modem_param_info *modem_info,
+			    bool dynamic_modem_data, int rsrp,
+			    struct cloud_data_time *cloud_data_time)
 {
 	int err;
 	char *buffer;
@@ -314,6 +301,9 @@ int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_i
 	static const char lte_string[] = "LTE-M";
 	static const char nbiot_string[] = "NB-IoT";
 	static const char gps_string[] = " GPS";
+
+	s64_t dyn_ts = cloud_data_time->delta_time + k_uptime_get();
+	s64_t stat_ts = cloud_data_time->delta_time + k_uptime_get();
 
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
@@ -336,9 +326,6 @@ int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_i
 		return -ENOMEM;
 	}
 
-	s64_t dyn_ts = cloud_data_time->delta_time + k_uptime_get();
-	s64_t stat_ts = cloud_data_time->delta_time + k_uptime_get();
-
 	if (modem_info->network.lte_mode.value == 1) {
 		strcat(modem_info->network.network_mode, lte_string);
 	} else if (modem_info->network.nbiot_mode.value == 1) {
@@ -349,8 +336,8 @@ int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_i
 		strcat(modem_info->network.network_mode, gps_string);
 	}
 
-	err = json_add_number(static_m_data_v, "band",
-			      modem_info->network.current_band.value);
+	err += json_add_number(static_m_data_v, "band",
+			       modem_info->network.current_band.value);
 
 	err += json_add_str(static_m_data_v, "nw",
 			    modem_info->network.network_mode);
@@ -386,7 +373,7 @@ int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_i
 	err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
 	err += json_add_number(dynamic_m_data, "ts", dyn_ts);
 
-	if (syncronization) {
+	if (dynamic_modem_data) {
 		err += json_add_obj(reported_obj, "dev", static_m_data);
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	} else {
@@ -412,15 +399,15 @@ int encode_modem_data(struct cloud_msg *output, struct modem_param_info *modem_i
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
+
+	/* Clear network mode string */
 	strcpy(modem_info->network.network_mode, "");
 
 	return 0;
 }
 
-int encode_message(struct cloud_msg *output,
-		   struct cloud_data *cloud_data,
-		   struct cloud_data_gps *cir_buf_gps,
-		   struct cloud_data_time *cloud_data_time)
+int cloud_encode_cfg_data(struct cloud_msg *output,
+			  struct cloud_data *cloud_data)
 {
 	int err;
 	char *buffer;
@@ -428,44 +415,16 @@ int encode_message(struct cloud_msg *output,
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
 	cJSON *reported_obj = cJSON_CreateObject();
-	cJSON *bat_obj = cJSON_CreateObject();
-	cJSON *acc_obj = cJSON_CreateObject();
-	cJSON *gps_obj = cJSON_CreateObject();
 	cJSON *cfg_obj = cJSON_CreateObject();
-	cJSON *gps_val_obj = cJSON_CreateObject();
 
 	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
-	    bat_obj == NULL || acc_obj == NULL || cfg_obj == NULL ||
-	    gps_obj == NULL || gps_val_obj == NULL) {
+	    cfg_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
-		cJSON_Delete(bat_obj);
-		cJSON_Delete(acc_obj);
-		cJSON_Delete(gps_obj);
 		cJSON_Delete(cfg_obj);
-		cJSON_Delete(gps_val_obj);
 		return -ENOMEM;
 	}
-
-	s64_t bat_ts = cloud_data_time->delta_time + cloud_data->bat_timestamp;
-	s64_t acc_ts = cloud_data_time->delta_time + cloud_data->acc_timestamp;
-	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
-
-	/*BAT*/
-	err = json_add_number(bat_obj, "v", cloud_data->bat_voltage);
-	err += json_add_number(bat_obj, "ts", bat_ts);
-	/*ACC*/
-	err += json_add_DoubleArray(acc_obj, "v", cloud_data->acc);
-	err += json_add_number(acc_obj, "ts", acc_ts);
-
-	/*GPS*/
-	err += json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
-	err += json_add_number(gps_val_obj, "lat", cir_buf_gps->latitude);
-	err += json_add_number(gps_val_obj, "acc", cir_buf_gps->accuracy);
-	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
-	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
-	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
 
 	/*CFG*/
 
@@ -498,43 +457,111 @@ int encode_message(struct cloud_msg *output,
 				       cloud_data->accel_threshold);
 	}
 
-	if (!change_config) {
-		if (cloud_data->active && !cloud_data->gps_found) {
-			err = json_add_obj(reported_obj, "bat", bat_obj);
-		}
+	err += json_add_obj(reported_obj, "cfg", cfg_obj);
+	err += json_add_obj(state_obj, "reported", reported_obj);
+	err += json_add_obj(root_obj, "state", state_obj);
 
-		if (cloud_data->active && cloud_data->gps_found) {
-			err = json_add_obj(reported_obj, "bat", bat_obj);
-			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(gps_obj, "ts", gps_ts);
-			err += json_add_obj(reported_obj, "gps", gps_obj);
-		}
-
-		if (!cloud_data->active && !cloud_data->gps_found) {
-			err = json_add_obj(reported_obj, "bat", bat_obj);
-			err += json_add_obj(reported_obj, "acc", acc_obj);
-		}
-
-		if (!cloud_data->active && cloud_data->gps_found) {
-			err = json_add_obj(reported_obj, "bat", bat_obj);
-			err += json_add_obj(reported_obj, "acc", acc_obj);
-			err += json_add_obj(gps_obj, "v", gps_val_obj);
-			err += json_add_number(gps_obj, "ts", gps_ts);
-			err += json_add_obj(reported_obj, "gps", gps_obj);
-		}
+	if (err != 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(cfg_obj);
+		return -EAGAIN;
 	}
 
-	if (change_gpst || change_active || change_active_wait ||
-	    change_passive_wait || change_movement_timeout ||
-	    change_accel_threshold || change_config) {
-		err += json_add_obj(reported_obj, "cfg", cfg_obj);
-		change_gpst = false;
-		change_active = false;
-		change_active_wait = false;
-		change_passive_wait = false;
-		change_movement_timeout = false;
-		change_accel_threshold = false;
-		change_config = false;
+	buffer = cJSON_Print(root_obj);
+	cJSON_Delete(root_obj);
+
+	output->buf = buffer;
+	output->len = strlen(buffer);
+
+	change_gpst = false;
+	change_active = false;
+	change_active_wait = false;
+	change_passive_wait = false;
+	change_movement_timeout = false;
+	change_accel_threshold = false;
+
+	return 0;
+}
+
+int cloud_encode_sensor_data(struct cloud_msg *output,
+			     struct cloud_data *cloud_data,
+			     struct cloud_data_gps *cir_buf_gps,
+			     struct cloud_data_time *cloud_data_time)
+{
+	int err;
+	char *buffer;
+
+	s64_t bat_ts = cloud_data_time->delta_time + cloud_data->bat_timestamp;
+	s64_t acc_ts = cloud_data_time->delta_time + cloud_data->acc_timestamp;
+	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
+
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *state_obj = cJSON_CreateObject();
+	cJSON *reported_obj = cJSON_CreateObject();
+	cJSON *bat_obj = cJSON_CreateObject();
+	cJSON *acc_obj = cJSON_CreateObject();
+	cJSON *gps_obj = cJSON_CreateObject();
+	cJSON *gps_val_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
+	    bat_obj == NULL || acc_obj == NULL || gps_obj == NULL ||
+	    gps_val_obj == NULL) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(bat_obj);
+		cJSON_Delete(acc_obj);
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(gps_val_obj);
+		return -ENOMEM;
+	}
+
+	/*BAT*/
+#if defined(CONFIG_MODEM_INFO)
+	err += json_add_number(bat_obj, "v", cloud_data->bat_voltage);
+	err += json_add_number(bat_obj, "ts", bat_ts);
+#endif
+
+	/*ACC*/
+	err += json_add_DoubleArray(acc_obj, "v", cloud_data->acc);
+	err += json_add_number(acc_obj, "ts", acc_ts);
+
+	/*GPS*/
+	err += json_add_number(gps_val_obj, "lng", cir_buf_gps->longitude);
+	err += json_add_number(gps_val_obj, "lat", cir_buf_gps->latitude);
+	err += json_add_number(gps_val_obj, "acc", cir_buf_gps->accuracy);
+	err += json_add_number(gps_val_obj, "alt", cir_buf_gps->altitude);
+	err += json_add_number(gps_val_obj, "spd", cir_buf_gps->speed);
+	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
+
+	/*Parameters included depending on mode and obtained gps fix*/
+
+#if defined(CONFIG_MODEM_INFO)
+	if (cloud_data->active && !cloud_data->gps_found) {
+		err += json_add_obj(reported_obj, "bat", bat_obj);
+	}
+#endif
+
+	if (cloud_data->active && cloud_data->gps_found) {
+		err += json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(gps_obj, "v", gps_val_obj);
+		err += json_add_number(gps_obj, "ts", gps_ts);
+		err += json_add_obj(reported_obj, "gps", gps_obj);
+	}
+
+	if (!cloud_data->active && !cloud_data->gps_found) {
+		err += json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "acc", acc_obj);
+	}
+
+	if (!cloud_data->active && cloud_data->gps_found) {
+		err += json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "acc", acc_obj);
+		err += json_add_obj(gps_obj, "v", gps_val_obj);
+		err += json_add_number(gps_obj, "ts", gps_ts);
+		err += json_add_obj(reported_obj, "gps", gps_obj);
 	}
 
 	err += json_add_obj(state_obj, "reported", reported_obj);
@@ -547,7 +574,6 @@ int encode_message(struct cloud_msg *output,
 		cJSON_Delete(bat_obj);
 		cJSON_Delete(acc_obj);
 		cJSON_Delete(gps_obj);
-		cJSON_Delete(cfg_obj);
 		cJSON_Delete(gps_val_obj);
 		return -EAGAIN;
 	}
@@ -559,9 +585,4 @@ int encode_message(struct cloud_msg *output,
 	output->len = strlen(buffer);
 
 	return 0;
-}
-
-bool check_config_change(void)
-{
-	return change_config;
 }

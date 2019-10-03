@@ -53,7 +53,17 @@ static struct cloud_backend *cloud_backend;
 static struct k_work cloud_pairing_work;
 static struct k_work cloud_process_cycle_work;
 
-int rsrp;
+struct rsrp_data {
+	u16_t value;
+	u16_t offset;
+};
+
+#if CONFIG_MODEM_INFO
+static struct rsrp_data rsrp = {
+	.value = 0,
+	.offset = MODEM_INFO_RSRP_OFFSET_VAL,
+};
+#endif
 
 static bool active;
 
@@ -140,36 +150,6 @@ static int get_time_info(char *datetime_string, int min, int max)
 	return atoi(buf);
 }
 
-static int request_battery_status(void)
-{
-	int err;
-	char battery_level[4];
-
-	int at_socket_fd;
-	int bytes_written;
-	int bytes_read;
-	char bat_buf[BAT_LEN + 1];
-
-	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
-	__ASSERT_NO_MSG(at_socket_fd >= 0);
-
-	bytes_written = nrf_write(at_socket_fd, "AT%XVBAT", 8);
-	__ASSERT_NO_MSG(bytes_written == 8);
-
-	bytes_read = nrf_read(at_socket_fd, bat_buf, BAT_LEN);
-	__ASSERT_NO_MSG(bytes_read == BAT_LEN);
-	bat_buf[BAT_LEN] = 0;
-
-	for (int i = 8; i < 12; i++) {
-		battery_level[i - 8] = bat_buf[i];
-	}
-
-	err = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(err == 0);
-
-	return atoi(battery_level);
-}
-
 static int modem_time_get(void)
 {
 	int err;
@@ -234,37 +214,6 @@ static void get_delta_time(void)
 				     cloud_data_time.update_time;
 }
 
-#if defined(CONFIG_MODEM_INFO)
-static void get_rsrp_values(void)
-{
-	int err;
-	char rsrp_level[50];
-	int at_socket_fd;
-	int bytes_written;
-	int bytes_read;
-	char rsrp_buf[RSRP_LEN + 1];
-
-	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
-	__ASSERT_NO_MSG(at_socket_fd >= 0);
-
-	bytes_written = nrf_write(at_socket_fd, "AT+CESQ", 7);
-	__ASSERT_NO_MSG(bytes_written == 7);
-
-	bytes_read = nrf_read(at_socket_fd, rsrp_buf, RSRP_LEN);
-	__ASSERT_NO_MSG(bytes_read == RSRP_LEN);
-	rsrp_buf[RSRP_LEN] = 0;
-
-	for (int i = 25; i < 28; i++) {
-		rsrp_level[i - 25] = rsrp_buf[i];
-	}
-
-	err = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(err == 0);
-
-	rsrp = atoi(rsrp_level);
-}
-#endif
-
 int check_active_wait(bool mode)
 {
 	if (mode) {
@@ -287,7 +236,7 @@ double check_accel_thres(void)
 	return accel_threshold_double;
 }
 
-static void attach_gps_data(struct gps_data gps_data)
+static void populate_gps_buffer(struct gps_data gps_data)
 {
 	head_cir_buf += 1;
 	if (head_cir_buf == CONFIG_CIRCULAR_SENSOR_BUFFER_MAX - 1) {
@@ -306,13 +255,15 @@ static void attach_gps_data(struct gps_data gps_data)
 	printk("Entry: %d in gps_buffer filled", head_cir_buf);
 }
 
-static int request_voltage_level(void)
+#if defined(CONFIG_MODEM_INFO)
+static int get_voltage_level(void)
 {
-	cloud_data.bat_voltage = request_battery_status();
+	cloud_data.bat_voltage = modem_param.device.battery.value;
 	cloud_data.bat_timestamp = k_uptime_get();
 
 	return 0;
 }
+#endif
 
 static void cloud_pair(void)
 {
@@ -322,6 +273,8 @@ static void cloud_pair(void)
 				 .endpoint.type = CLOUD_EP_TOPIC_PAIR,
 				 .buf = "",
 				 .len = 0 };
+
+	get_delta_time();
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
@@ -336,18 +289,16 @@ static void cloud_ack_config_change(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
-	if (check_config_change()) {
-		err = encode_message(&msg, &cloud_data,
-				     &cir_buf_gps[head_cir_buf],
-				     &cloud_data_time);
-		if (err != 0) {
-			printk("error encoding device configurations\n");
-		}
+	get_delta_time();
 
-		err = cloud_send(cloud_backend, &msg);
-		if (err != 0) {
-			printk("Cloud send failed, err: %d\n", err);
-		}
+	err = cloud_encode_cfg_data(&msg, &cloud_data;
+	if (err != 0) {
+		printk("Error encoding device configurations\n");
+	}
+
+	err = cloud_send(cloud_backend, &msg);
+	if (err != 0) {
+		printk("Cloud send failed, err: %d\n", err);
 	}
 }
 
@@ -358,15 +309,18 @@ static void cloud_send_sensor_data(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
-	err = request_voltage_level();
+	get_delta_time();
+
+	err = get_voltage_level();
 	if (err != 0) {
 		printk("Error requesting voltage level %d\n", err);
 	}
 
 	get_delta_time();
 
-	err = encode_message(&msg, &cloud_data, &cir_buf_gps[head_cir_buf],
-			     &cloud_data_time);
+	err = cloud_encode_sensor_data(&msg, &cloud_data,
+				       &cir_buf_gps[head_cir_buf],
+				       &cloud_data_time);
 	if (err != 0) {
 		printk("Error enconding message %d\n", err);
 	}
@@ -385,16 +339,15 @@ static void cloud_send_modem_data(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
+	get_delta_time();
+
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
 		printk("Error getting modem_info: %d", err);
 	}
 
-	get_delta_time();
-	get_rsrp_values();
-
-	err = encode_modem_data(&msg, &modem_param, true, rsrp,
-				&cloud_data_time);
+	err = cloud_encode_modem_data(&msg, &modem_param, true, rsrp,
+				      &cloud_data_time);
 	if (err != 0) {
 		printk("Error encoding modem data");
 	}
@@ -406,66 +359,54 @@ static void cloud_send_modem_data(void)
 }
 #endif
 
-// static void cloud_send_buffered_data(void)
-// {
-//      // for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
-//      //      if (cir_buf_gps[i].queued) {
-//      //              queued_entries = true;
-//      //              num_queued_entries++;
-//      //      }
-//      // }
+static void cloud_send_buffered_data(void)
+{
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+				 .endpoint.type = CLOUD_EP_BATCH };
 
-//      // if (queued_entries) {
-//      //      while (num_queued_entries > 0) {
-//      //              err = encode_gps_buffer(
-//      //                      &transmit_data, cir_buf_gps,
-//      //                      CONFIG_CIRCULAR_SENSOR_BUFFER_MAX);
-//      //              if (err != 0) {
-//      //                      goto end;
-//      //              }
-//      //              transmit_data.topic = batch_topic;
+	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
+		if (cir_buf_gps[i].queued) {
+			queued_entries = true;
+			num_queued_entries++;
+		}
+	}
 
-//      //              data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-//      //                           transmit_data.buf, transmit_data.len,
-//      //                           transmit_data.topic);
-//      //              if (err != 0) {
-//      //                      goto end;
-//      //              }
+	while (num_queued_entries > 0 && queued_entries) {
+		err = encode_gps_buffer(&msg, cir_buf_gps,
+					CONFIG_CIRCULAR_SENSOR_BUFFER_MAX);
+		if (err != 0) {
+			printk("Error encoding circular buffer\n", err);
+			goto exit;
+		}
 
-//      //              err = process_mqtt_and_sleep(
-//      //                      &client,
-//      //                      CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-//      //              if (err != 0) {
-//      //                      goto end;
-//      //              }
+		err = cloud_send(cloud_backend, &msg);
+		if (err != 0) {
+			printk("Cloud send failed, err: %d\n", err);
+			goto exit;
+		}
 
-//      //              num_queued_entries -=
-//      //                      CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
-//      //      }
-//      // }
+		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
+	}
 
-//      // num_queued_entries = 0;
-//      // queued_entries = false;
-// }
+exit:
+	num_queued_entries = 0;
+	queued_entries = false;
+}
 
 static void cloud_pairing(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	cloud_connect(cloud_backend);
 	cloud_pair();
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
 	cloud_send_modem_data();
 #endif
-
-	cloud_disconnect(cloud_backend);
 }
 
 static void cloud_process_cycle(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	cloud_connect(cloud_backend);
 	cloud_send_sensor_data();
 	cloud_ack_config_change();
 
@@ -473,8 +414,7 @@ static void cloud_process_cycle(void)
 	cloud_send_modem_data();
 #endif
 
-	// cloud_send_buffered_data();
-	cloud_disconnect(cloud_backend);
+	cloud_send_buffered_data();
 }
 
 static void cloud_pairing_work_fn(struct k_work *work)
@@ -540,7 +480,7 @@ static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
 		gps_control_on_trigger();
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		set_current_time(gps_data);
-		attach_gps_data(gps_data);
+		populate_gps_buffer(gps_data);
 		k_sem_give(&gps_timeout_sem);
 		break;
 
@@ -671,6 +611,11 @@ exit:
 }
 
 #if defined(CONFIG_MODEM_INFO)
+static void modem_rsrp_handler(char rsrp_value)
+{
+	rsrp.value = rsrp_value;
+}
+
 static int modem_data_init(void)
 {
 	int err;
@@ -684,6 +629,8 @@ static int modem_data_init(void)
 	if (err != 0) {
 		return err;
 	}
+
+	modem_info_rsrp_register(modem_rsrp_handler);
 
 	return 0;
 }
