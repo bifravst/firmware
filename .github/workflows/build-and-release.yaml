@@ -45,7 +45,7 @@ jobs:
         run: |
           npm ci
           export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
-          echo $NEXT_VERSION > .version
+          echo -n $NEXT_VERSION > .version
           echo "#define DEVICE_APP_VERSION \"$NEXT_VERSION\"" > ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
           cat ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
 
@@ -71,7 +71,7 @@ jobs:
           wget https://github.com/github/hub/releases/download/v2.12.8/hub-linux-amd64-2.12.8.tgz
           tar xzf hub-linux-amd64-2.12.8.tgz
           export NEXT_VERSION=`cat .version`
-          cp ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex cat-tracker-PCA10015-AssetTracker-$NEXT_VERION.hex
-          cp ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERION.hex
-          cp ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERION.hex
-          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERION.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERION)"
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex cat-tracker-PCA10015-AssetTracker-$NEXT_VERION.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERION.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERION.hex
+          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERION.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERION)" $NEXT_VERSION
