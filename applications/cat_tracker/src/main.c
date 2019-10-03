@@ -30,10 +30,7 @@ enum governing_states {
 	PUBLISH_TO_CLOUD_AND_SLEEP,
 };
 
-enum lte_conn_actions {
-	LTE_INIT,
-	LTE_CYCLE
-};
+enum lte_conn_actions { LTE_INIT, LTE_CYCLE };
 
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
@@ -207,14 +204,8 @@ static int modem_time_get(void)
 	info.tm_min = get_time_info(modem_ts, 12, 13);
 	info.tm_sec = get_time_info(modem_ts, 15, 16);
 
-	
-
-	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday,
-				info.tm_mon,
-				(info.tm_year - 100),
-				info.tm_hour,
-				info.tm_min,
-				info.tm_sec);
+	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday, info.tm_mon,
+	       (info.tm_year - 100), info.tm_hour, info.tm_min, info.tm_sec);
 
 	cloud_data_time.epoch = mktime(&info);
 	cloud_data_time.update_time = k_uptime_get();
@@ -235,12 +226,12 @@ static void set_current_time(struct gps_data gps_data)
 
 	cloud_data_time.epoch = mktime(&info);
 	cloud_data_time.update_time = k_uptime_get();
-
 }
 
 static void get_delta_time(void)
 {
-	cloud_data_time.delta_time = cloud_data_time.epoch * (time_t)1000 - cloud_data_time.update_time;
+	cloud_data_time.delta_time = cloud_data_time.epoch * (time_t)1000 -
+				     cloud_data_time.update_time;
 }
 
 #if defined(CONFIG_MODEM_INFO)
@@ -327,29 +318,23 @@ static void cloud_pair(void)
 {
 	int err;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_PAIR,
-		.buf = "",
-		.len = 0
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_PAIR,
+				 .buf = "",
+				 .len = 0 };
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 	}
-
 }
 
 static void cloud_ack_config_change(void)
 {
-
 	int err;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
 	if (check_config_change()) {
 		err = encode_message(&msg, &cloud_data,
@@ -370,10 +355,8 @@ static void cloud_send_sensor_data(void)
 {
 	int err;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
 	err = request_voltage_level();
 	if (err != 0) {
@@ -382,8 +365,7 @@ static void cloud_send_sensor_data(void)
 
 	get_delta_time();
 
-	err = encode_message(&msg, &cloud_data,
-			     &cir_buf_gps[head_cir_buf],
+	err = encode_message(&msg, &cloud_data, &cir_buf_gps[head_cir_buf],
 			     &cloud_data_time);
 	if (err != 0) {
 		printk("Error enconding message %d\n", err);
@@ -400,10 +382,8 @@ static void cloud_send_modem_data(void)
 {
 	int err;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
@@ -412,7 +392,6 @@ static void cloud_send_modem_data(void)
 
 	get_delta_time();
 	get_rsrp_values();
-
 
 	err = encode_modem_data(&msg, &modem_param, true, rsrp,
 				&cloud_data_time);
@@ -464,7 +443,6 @@ static void cloud_send_modem_data(void)
 //      //                      CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 //      //      }
 //      // }
-
 
 //      // num_queued_entries = 0;
 //      // queued_entries = false;
@@ -592,8 +570,7 @@ static void adxl362_init(void)
 }
 
 void cloud_event_handler(const struct cloud_backend *const backend,
-			 const struct cloud_event *const evt,
-			 void *user_data)
+			 const struct cloud_event *const evt, void *user_data)
 {
 	ARG_UNUSED(user_data);
 
@@ -648,7 +625,6 @@ static void lte_connect(enum lte_conn_actions action)
 			 * and connected.
 			 */
 		} else {
-
 			printk("Connecting to LTE network. ");
 			printk("This may take several minutes.\n");
 			err = lte_lc_init_and_connect();
@@ -693,8 +669,6 @@ gps_mode:
 exit:
 	return;
 }
-
-
 
 #if defined(CONFIG_MODEM_INFO)
 static int modem_data_init(void)
@@ -746,7 +720,64 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
+	// event manager should be used
+	// draw plans
+
+connect:
+
+	// SEMA BLOCK HERE ONLY GIVEN BY CONNECTION
+	// NON OF THESE FUNCTION SHOULD BLOCK NEITHER REBOOT THE DEVICE
+
+	err = cloud_connect(cloud_backend);
+	if (err) {
+		printk("cloud_connect failed: %d\n", err);
+	}
+
+	struct pollfd fds[] = { { .fd = cloud_backend->config->socket,
+				  .events = POLLIN } };
+
 	while (true) {
+		err = poll(fds, ARRAY_SIZE(fds),
+			   K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+
+		if (err < 0) {
+			printk("poll() returned an error: %d\n", err);
+			error_handler(ERROR_CLOUD, err);
+			continue;
+		}
+
+		if (err == 0) {
+			cloud_ping(cloud_backend);
+			continue;
+		}
+
+		if ((fds[0].revents & POLLIN) == POLLIN) {
+			cloud_input(cloud_backend);
+		}
+
+		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
+			printk("Socket error: POLLNVAL\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+
+		if ((fds[0].revents & POLLHUP) == POLLHUP) {
+			printk("Socket error: POLLHUP\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+
+		if ((fds[0].revents & POLLERR) == POLLERR) {
+			printk("Socket error: POLLERR\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+	}
+
+	cloud_disconnect(cloud_backend);
+	goto connect;
+
+	/* 	while (true) {
 		switch (state) {
 		case LTE_CHECK_CONNECTION:
 			lte_connect(LTE_CYCLE);
@@ -802,5 +833,5 @@ void main(void)
 			printk("Unknown governing state\n");
 			break;
 		}
-	}
+	} */
 }

@@ -79,10 +79,6 @@ static struct sockaddr_storage broker;
 
 static struct pollfd fds;
 
-static int nfds;
-
-static bool connected;
-
 static struct cloud_backend *bifravst_cloud_backend;
 
 static int client_id_get(char *id)
@@ -91,7 +87,7 @@ static int client_id_get(char *id)
 	int bytes_written;
 	int bytes_read;
 	char imei_buf[IMEI_LEN + 1];
-	int ret;
+	int err;
 
 	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
 	__ASSERT_NO_MSG(at_socket_fd >= 0);
@@ -105,8 +101,8 @@ static int client_id_get(char *id)
 
 	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
 
-	ret = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(ret == 0);
+	err = nrf_close(at_socket_fd);
+	__ASSERT_NO_MSG(err == 0);
 
 	return 0;
 }
@@ -240,13 +236,13 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 	}
 
 	while (buf < end) {
-		int ret = mqtt_read_publish_payload(c, buf, end - buf);
+		int err = mqtt_read_publish_payload(c, buf, end - buf);
 
-		if (ret < 0) {
+		if (err < 0) {
 			int err;
 
-			if (ret != -EAGAIN) {
-				return ret;
+			if (err != -EAGAIN) {
+				return err;
 			}
 
 			LOG_DBG("mqtt_read_publish_payload: EAGAIN");
@@ -259,19 +255,14 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 			}
 		}
 
-		if (ret == 0) {
+		if (err == 0) {
 			return -EIO;
 		}
 
-		buf += ret;
+		buf += err;
 	}
 
 	return 0;
-}
-
-static void clear_fds(void)
-{
-	nfds = 0;
 }
 
 static void mqtt_evt_handler(struct mqtt_client *const c,
@@ -283,49 +274,28 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 
 	switch (bifravst_cloud_evt->type) {
 	case MQTT_EVT_CONNACK:
-		// if (bifravst_cloud_evt->result != 0) {
-		//      LOG_ERR("MQTT connect failed %d", evt->result);
-		//      break;
-		// }
-		connected = true;
-		// LOG_DBG("[%s:%d] MQTT client connected!", __func__, __LINE__);
 
 		subscribe();
 
 		evt.type = CLOUD_EVT_CONNECTED;
-		cloud_notify_event(bifravst_cloud_backend, &evt, config->user_data);
-
+		cloud_notify_event(bifravst_cloud_backend, &evt,
+				   config->user_data);
 		break;
 
 	case MQTT_EVT_DISCONNECT:
-		// LOG_DBG("[%s:%d] MQTT client disconnected %d", __func__,
-		//      __LINE__, evt->result);
-
-		connected = false;
-		clear_fds();
 
 		evt.type = CLOUD_EVT_DISCONNECTED;
-		cloud_notify_event(bifravst_cloud_backend, &evt, config->user_data);
+		cloud_notify_event(bifravst_cloud_backend, &evt,
+				   config->user_data);
 		break;
 
 	case MQTT_EVT_PUBLISH: {
-		const struct mqtt_publish_param *p = &bifravst_cloud_evt->param.publish;
-
-		LOG_DBG("MQTT_EVT_PUBLISH: id=%d len=%d ",
-			p->message_id,
-			p->message.payload.len);
+		const struct mqtt_publish_param *p =
+			&bifravst_cloud_evt->param.publish;
 
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
 			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
-			LOG_ERR("Disconnecting MQTT client...");
-
-			err = mqtt_disconnect(c);
-			if (err) {
-				LOG_ERR("Could not disconnect: %d", err);
-			}
-
-			break;
 		}
 
 		evt.type = CLOUD_EVT_DATA_RECEIVED;
@@ -334,31 +304,15 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 
 		cloud_notify_event(bifravst_cloud_backend, &evt,
 				   config->user_data);
-
 	} break;
 
 	case MQTT_EVT_PUBACK:
-		// if (evt->result != 0) {
-		//      LOG_ERR("MQTT PUBACK error %d", evt->result);
-		//      break;
-		// }
-
-		// LOG_DBG("[%s:%d] PUBACK packet id: %u", __func__, __LINE__,
-		//      evt->param.puback.message_id);
 		break;
 
 	case MQTT_EVT_SUBACK:
-		// if (evt->result != 0) {
-		//      LOG_ERR("MQTT SUBACK error %d", evt->result);
-		//      break;
-		// }
-
-		// LOG_DBG("[%s:%d] SUBACK packet id: %u", __func__, __LINE__,
-		//      evt->param.suback.message_id);
 		break;
 
 	default:
-		// LOG_ERR("[%s:%d] default: %d", __func__, __LINE__, evt->type);
 		break;
 	}
 }
@@ -392,7 +346,7 @@ static int broker_init(void)
 
 			broker4->sin_addr.s_addr =
 				((struct sockaddr_in *)addr->ai_addr)
-				->sin_addr.s_addr;
+					->sin_addr.s_addr;
 			broker4->sin_family = AF_INET;
 			broker4->sin_port = htons(CONFIG_BIFRAVST_CLOUD_PORT);
 
@@ -458,113 +412,23 @@ static int client_init(struct mqtt_client *client)
 	return 0;
 }
 
-static void wait(int timeout)
-{
-	if (nfds > 0) {
-		if (poll(&fds, nfds, timeout) < 0) {
-			LOG_ERR("poll error: %d", errno);
-		}
-	}
-}
-
-static int process_mqtt_and_sleep(struct mqtt_client *client, int timeout)
-{
-	s64_t remaining = timeout;
-	s64_t start_time = k_uptime_get();
-	int err;
-
-	while (remaining > 0 && connected) {
-		wait(remaining);
-
-		err = mqtt_live(client);
-		if (err != 0) {
-			LOG_ERR("mqtt_live error");
-			return err;
-		}
-
-		err = mqtt_input(client);
-		if (err != 0) {
-			LOG_ERR("mqtt_input error");
-			return err;
-		}
-
-		remaining = timeout + start_time - k_uptime_get();
-	}
-
-	return 0;
-}
-
-static int mqtt_enable(struct mqtt_client *client)
-{
-	int err, i = 0;
-
-	while (i++ < CONFIG_BIFRAVST_CLOUD_CONNECTION_TRIES && !connected) {
-		err = client_init(client);
-		if (err != 0) {
-			continue;
-		}
-
-		err = mqtt_connect(client);
-		if (err != 0) {
-			LOG_ERR("ERROR: mqtt_connect %d", err);
-			k_sleep(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-			continue;
-		}
-
-#if defined(CONFIG_MQTT_LIB_TLS)
-		fds.fd = client->transport.tls.sock;
-#else
-		fds.fd = client->transport.tcp.sock;
-#endif
-		fds.events = POLLIN;
-		nfds = 1;
-
-		wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-		mqtt_input(client);
-
-		if (!connected) {
-			mqtt_abort(client);
-		}
-	}
-
-	if (connected) {
-		return 0;
-	}
-
-	return -EINVAL;
-}
-
 static int bifravst_connect(const struct cloud_backend *const backend)
 {
 	int err;
 
-	// LOG_DBG("BIFRAVST CLOUD CONNECT");
-
-	err = mqtt_enable(&client);
-	if (err) {
-		return err;
-	}
-	// backend->config->socket = nct_socket_get();
-
-	return err;
-}
-
-static int bifravst_disconnect(const struct cloud_backend *const backend)
-{
-	int err;
-
-	wait(CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
-	err = mqtt_input(&client);
-	if (err) {
-	     return err;
-	}
-
-	err = mqtt_disconnect(&client);
+	err = client_init(&client);
 	if (err != 0) {
 		return err;
 	}
 
-	return err;
+	backend->config->socket = &client.transport.tls.sock;
+
+	return mqtt_connect(&client);
+}
+
+static int bifravst_disconnect(const struct cloud_backend *const backend)
+{
+	return mqtt_disconnect(&client);
 }
 
 static int bifravst_send(const struct cloud_backend *const backend,
@@ -589,18 +453,44 @@ static int bifravst_send(const struct cloud_backend *const backend,
 		break;
 	}
 
-	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE,
-			   tx_data.buf, tx_data.len,
-			   tx_data.topic);
+	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, tx_data.buf,
+			   tx_data.len, tx_data.topic);
 	if (err != 0) {
 		LOG_ERR("Publishing data failed, error %d", err);
 		return err;
 	}
 
-	err = process_mqtt_and_sleep(
-		&client, CONFIG_BIFRAVST_MQTT_TRANSMISSION_SLEEP);
+	return 0;
+}
+
+static int bifravst_input(const struct cloud_backend *const backend)
+{
+	int err;
+
+	err = mqtt_live(&client);
 	if (err != 0) {
-		LOG_ERR("Processing MQTT failed, error %d", err);
+		return err;
+	}
+
+	err = mqtt_input(&client);
+	if (err != 0) {
+		return err;
+	}
+
+	return 0;
+}
+
+static int bifravst_ping(const struct cloud_backend *const backend)
+{
+	int err;
+
+	err = mqtt_live(&client);
+	if (err != 0) {
+		return err;
+	}
+
+	err = mqtt_input(&client);
+	if (err != 0) {
 		return err;
 	}
 
@@ -611,7 +501,9 @@ static const struct cloud_api bifravst_cloud_api = {
 	.init = bifravst_init,
 	.connect = bifravst_connect,
 	.disconnect = bifravst_disconnect,
-	.send = bifravst_send
+	.send = bifravst_send,
+	.ping = bifravst_ping,
+	.input = bifravst_input
 };
 
 CLOUD_BACKEND_DEFINE(BIFRAVST_CLOUD, bifravst_cloud_api);
