@@ -1,4 +1,4 @@
-#include <bifravst_cloud_codec.h>
+#include <cloud_codec.h>
 #include <stdbool.h>
 #include <string.h>
 #include <zephyr.h>
@@ -117,7 +117,7 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 		printk("Failed to print message.\n");
 	}
 
-	printk("Incoming message %s\n", string);
+	printk("Encoded message: %s\n", string);
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {
@@ -197,11 +197,15 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 			    struct cloud_data_gps *cir_buf_gps,
 			    struct cloud_data_time *cloud_data_time)
 {
-	int err;
+	int err = 0;
 	char *buffer;
 	int encoded_counter = 0;
 
 	struct twins_gps_buf twins_gps_buf[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
+
+	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -
+				     cloud_data_time->update_time;
+
 	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
 
 	cJSON *root_obj = cJSON_CreateObject();
@@ -295,12 +299,15 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 			    bool dynamic_modem_data, int rsrp,
 			    struct cloud_data_time *cloud_data_time)
 {
-	int err;
+	int err = 0;
 	char *buffer;
 
 	static const char lte_string[] = "LTE-M";
 	static const char nbiot_string[] = "NB-IoT";
 	static const char gps_string[] = " GPS";
+
+	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -
+				     cloud_data_time->update_time;
 
 	s64_t dyn_ts = cloud_data_time->delta_time + k_uptime_get();
 	s64_t stat_ts = cloud_data_time->delta_time + k_uptime_get();
@@ -493,6 +500,9 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	int err;
 	char *buffer;
 
+	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -
+				     cloud_data_time->update_time;
+
 	s64_t bat_ts = cloud_data_time->delta_time + cloud_data->bat_timestamp;
 	s64_t acc_ts = cloud_data_time->delta_time + cloud_data->acc_timestamp;
 	s64_t gps_ts = cloud_data_time->delta_time + cir_buf_gps->gps_timestamp;
@@ -545,7 +555,9 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 #endif
 
 	if (cloud_data->active && cloud_data->gps_found) {
+#if defined(CONFIG_MODEM_INFO)
 		err += json_add_obj(reported_obj, "bat", bat_obj);
+#endif
 		err += json_add_obj(gps_obj, "v", gps_val_obj);
 		err += json_add_number(gps_obj, "ts", gps_ts);
 		err += json_add_obj(reported_obj, "gps", gps_obj);

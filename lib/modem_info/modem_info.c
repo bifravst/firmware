@@ -20,16 +20,16 @@
 
 LOG_MODULE_REGISTER(modem_info);
 
-#define INVALID_DESCRIPTOR	-1
+#define INVALID_DESCRIPTOR 		-1
 
-#define AT_CMD_CESQ		"AT+CESQ"
-#define AT_CMD_CESQ_ON		"AT%CESQ=1"
-#define AT_CMD_CESQ_OFF		"AT%CESQ=0"
-#define AT_CMD_CESQ_RESP	"%CESQ"
-#define AT_CMD_CURRENT_BAND	"AT%XCBAND"
-#define AT_CMD_SUPPORTED_BAND	"AT%XCBAND=?"
-#define AT_CMD_CURRENT_MODE	"AT+CEMODE?"
-#define AT_CMD_CURRENT_OP	"AT+COPS?"
+#define AT_CMD_CESQ 			"AT+CESQ"
+#define AT_CMD_CESQ_ON 			"AT%CESQ=1"
+#define AT_CMD_CESQ_OFF 		"AT%CESQ=0"
+#define AT_CMD_CESQ_RESP 		"%CESQ"
+#define AT_CMD_CURRENT_BAND 	"AT%XCBAND"
+#define AT_CMD_SUPPORTED_BAND 	"AT%XCBAND=?"
+#define AT_CMD_CURRENT_MODE 	"AT+CEMODE?"
+#define AT_CMD_CURRENT_OP 		"AT+COPS?"
 #define AT_CMD_NETWORK_STATUS	"AT+CEREG?"
 #define AT_CMD_PDP_CONTEXT	"AT+CGDCONT?"
 #define AT_CMD_UICC_STATE	"AT%XSIM?"
@@ -270,19 +270,27 @@ static const struct modem_info_data gps_mode_data = {
 };
 
 static const struct modem_info_data imsi_data = {
-	.cmd		= AT_CMD_IMSI,
-	.data_name	= IMSI_DATA_NAME,
-	.param_index	= IMSI_PARAM_INDEX,
-	.param_count	= IMSI_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_IMSI,
+	.data_name = IMSI_DATA_NAME,
+	.param_index = IMSI_PARAM_INDEX,
+	.param_count = IMSI_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data imei_data = {
-	.cmd		= AT_CMD_IMEI,
-	.data_name	= MODEM_IMEI_DATA_NAME,
-	.param_index	= MODEM_IMEI_PARAM_INDEX,
-	.param_count	= MODEM_IMEI_PARAM_COUNT,
-	.data_type	= AT_PARAM_TYPE_STRING,
+	.cmd = AT_CMD_IMEI,
+	.data_name = MODEM_IMEI_DATA_NAME,
+	.param_index = MODEM_IMEI_PARAM_INDEX,
+	.param_count = MODEM_IMEI_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
+};
+
+static const struct modem_info_data time_data = {
+	.cmd = AT_CMD_NW_TIME,
+	.data_name = MODEM_NW_TIME_NAME,
+	.param_index = MODEM_TIME_PARAM_INDEX,
+	.param_count = MODEM_TIME_PARAM_COUNT,
+	.data_type = AT_PARAM_TYPE_STRING,
 };
 
 static const struct modem_info_data date_time_data = {
@@ -383,7 +391,9 @@ int modem_info_name_get(enum modem_info info, char *name)
 		return -EINVAL;
 	}
 
-	memcpy(name, modem_data[info]->data_name, len);
+	memcpy(name,
+		modem_data[info]->data_name,
+		len);
 
 	return len;
 }
@@ -391,7 +401,7 @@ int modem_info_name_get(enum modem_info info, char *name)
 int modem_info_short_get(enum modem_info info, u16_t *buf)
 {
 	int err;
-	char recv_buf[CONFIG_MODEM_INFO_BUFFER_SIZE] = { 0 };
+	char recv_buf[CONFIG_MODEM_INFO_BUFFER_SIZE] = {0};
 	int cmd_length = 0;
 
 	if (buf == NULL) {
@@ -402,8 +412,10 @@ int modem_info_short_get(enum modem_info info, u16_t *buf)
 		return -EINVAL;
 	}
 
-	err = at_cmd_write(modem_data[info]->cmd, recv_buf,
-			   CONFIG_MODEM_INFO_BUFFER_SIZE, NULL);
+	err = at_cmd_write(modem_data[info]->cmd,
+			   recv_buf,
+			   CONFIG_MODEM_INFO_BUFFER_SIZE,
+			   NULL);
 
 	if (err != 0) {
 		return -EIO;
@@ -415,7 +427,8 @@ int modem_info_short_get(enum modem_info info, u16_t *buf)
 		return err;
 	}
 
-	err = at_params_short_get(&m_param_list, modem_data[info]->param_index,
+	err = at_params_short_get(&m_param_list,
+				  modem_data[info]->param_index,
 				  buf);
 
 	if (err) {
@@ -437,8 +450,10 @@ int modem_info_string_get(enum modem_info info, char *buf)
 		return -EINVAL;
 	}
 
-	err = at_cmd_write(modem_data[info]->cmd, recv_buf,
-			   CONFIG_MODEM_INFO_BUFFER_SIZE, NULL);
+	err = at_cmd_write(modem_data[info]->cmd,
+			  recv_buf,
+			  CONFIG_MODEM_INFO_BUFFER_SIZE,
+			  NULL);
 
 	if (err != 0) {
 		return -EIO;
@@ -529,12 +544,7 @@ int modem_info_init(void)
 {
 	/* Init at_cmd_parser storage module */
 	int err = at_params_list_init(&m_param_list,
-				      CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
-	return err;
-}
+				CONFIG_MODEM_INFO_MAX_AT_PARAMS_RSP);
 
-int modem_info_uninit(void)
-{
-	at_params_list_free(&m_param_list);
-	return 0;
+	return err;
 }

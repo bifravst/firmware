@@ -21,4 +21,4 @@ zephyr_include_directories(src)
 # Application directories
 add_subdirectory(src/gps_controller)
 add_subdirectory(src/ui)
-add_subdirectory(src/bifravst_cloud_codec)
+add_subdirectory(src/cloud_codec)

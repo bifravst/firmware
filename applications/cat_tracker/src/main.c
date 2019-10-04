@@ -10,16 +10,24 @@
 #include <gps_controller.h>
 #include <ui.h>
 #include <net/cloud.h>
-#include <bifravst_cloud_codec.h>
+#include <cloud_codec.h>
 #include <lte_lc.h>
 #include <stdlib.h>
 #include <modem_info.h>
 #include <time.h>
 #include <nrf_socket.h>
 
-#define TIME_LEN 25
-#define BAT_LEN 12
-#define RSRP_LEN 28
+enum lte_conn_actions {
+	LTE_INIT,
+	LTE_CYCLE,
+};
+
+enum error_type {
+	ERROR_BSD_RECOVERABLE,
+	ERROR_BSD_IRRECOVERABLE,
+	ERROR_SYSTEM_FAULT,
+	ERROR_CLOUD
+};
 
 enum governing_states {
 	LTE_CHECK_CONNECTION,
@@ -30,7 +38,7 @@ enum governing_states {
 	PUBLISH_TO_CLOUD_AND_SLEEP,
 };
 
-enum lte_conn_actions { LTE_INIT, LTE_CYCLE };
+enum governing_states state = LTE_CHECK_CONNECTION;
 
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
@@ -45,8 +53,6 @@ struct cloud_data cloud_data = { .gps_timeout = 1000,
 struct cloud_data_time cloud_data_time;
 
 struct modem_param_info modem_param;
-
-enum governing_states state = LTE_CHECK_CONNECTION;
 
 static struct cloud_backend *cloud_backend;
 
@@ -65,24 +71,15 @@ static struct rsrp_data rsrp = {
 };
 #endif
 
-static bool active;
-
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(connect_sem, 0, 1);
 
+static bool active;
+static bool queued_entries;
+
 static int head_cir_buf;
-
-// static bool queued_entries;
-// static bool include_static_modem_data;
-// static int num_queued_entries;
-
-enum error_type {
-	ERROR_BSD_RECOVERABLE,
-	ERROR_BSD_IRRECOVERABLE,
-	ERROR_SYSTEM_FAULT,
-	ERROR_CLOUD
-};
+static int num_queued_entries;
 
 void error_handler(enum error_type err_type, int err_code)
 {
@@ -139,7 +136,7 @@ void cloud_error_handler(int err)
 	error_handler(ERROR_CLOUD, err);
 }
 
-static int get_time_info(char *datetime_string, int min, int max)
+static int parse_time_entries(char *datetime_string, int min, int max)
 {
 	char buf[50];
 
@@ -150,39 +147,20 @@ static int get_time_info(char *datetime_string, int min, int max)
 	return atoi(buf);
 }
 
-static int modem_time_get(void)
+#if defined(CONFIG_MODEM_INFO)
+static void parse_modem_time_data(void)
 {
-	int err;
-	int at_socket_fd;
-	int bytes_written;
-	int bytes_read;
-	char modem_ts[TIME_LEN + 1];
-	char modem_ts_buf[TIME_LEN + 1];
 	struct tm info;
+	char time[100];
 
-	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
-	__ASSERT_NO_MSG(at_socket_fd >= 0);
+	time = modem_param.network.time.value_string
 
-	bytes_written = nrf_write(at_socket_fd, "AT+CCLK?", 8);
-	__ASSERT_NO_MSG(bytes_written == 8);
-
-	bytes_read = nrf_read(at_socket_fd, modem_ts_buf, TIME_LEN);
-	__ASSERT_NO_MSG(bytes_read == TIME_LEN);
-	modem_ts_buf[TIME_LEN] = 0;
-
-	for (int i = 8; i < 25; i++) {
-		modem_ts[i - 8] = modem_ts_buf[i];
-	}
-
-	err = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(err == 0);
-
-	info.tm_year = get_time_info(modem_ts, 0, 1) + 2000 - 1900;
-	info.tm_mon = get_time_info(modem_ts, 3, 4) - 1;
-	info.tm_mday = get_time_info(modem_ts, 6, 7);
-	info.tm_hour = get_time_info(modem_ts, 9, 10);
-	info.tm_min = get_time_info(modem_ts, 12, 13);
-	info.tm_sec = get_time_info(modem_ts, 15, 16);
+	info.tm_year = parse_time_entries(time, 0, 1) + 2000 - 1900;
+	info.tm_mon  = parse_time_entries(time, 3, 4) - 1;
+	info.tm_mday = parse_time_entries(time, 6, 7);
+	info.tm_hour = parse_time_entries(time, 9, 10);
+	info.tm_min  = parse_time_entries(time, 12, 13);
+	info.tm_sec  = parse_time_entries(time, 15, 16);
 
 	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday, info.tm_mon,
 	       (info.tm_year - 100), info.tm_hour, info.tm_min, info.tm_sec);
@@ -190,8 +168,8 @@ static int modem_time_get(void)
 	cloud_data_time.epoch = mktime(&info);
 	cloud_data_time.update_time = k_uptime_get();
 
-	return 0;
 }
+#endif
 
 static void set_current_time(struct gps_data gps_data)
 {
@@ -208,13 +186,7 @@ static void set_current_time(struct gps_data gps_data)
 	cloud_data_time.update_time = k_uptime_get();
 }
 
-static void get_delta_time(void)
-{
-	cloud_data_time.delta_time = cloud_data_time.epoch * (time_t)1000 -
-				     cloud_data_time.update_time;
-}
-
-int check_active_wait(bool mode)
+static int check_active_wait(bool mode)
 {
 	if (mode) {
 		return cloud_data.active_wait;
@@ -223,7 +195,7 @@ int check_active_wait(bool mode)
 	}
 }
 
-double check_accel_thres(void)
+static double get_accel_thres(void)
 {
 	double accel_threshold_double;
 
@@ -274,8 +246,6 @@ static void cloud_pair(void)
 				 .buf = "",
 				 .len = 0 };
 
-	get_delta_time();
-
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
@@ -286,10 +256,10 @@ static void cloud_ack_config_change(void)
 {
 	int err;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
-
-	get_delta_time();
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_MSG,
+	};
 
 	err = cloud_encode_cfg_data(&msg, &cloud_data;
 	if (err != 0) {
@@ -306,17 +276,15 @@ static void cloud_send_sensor_data(void)
 {
 	int err;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
-
-	get_delta_time();
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_MSG,
+	};
 
 	err = get_voltage_level();
 	if (err != 0) {
 		printk("Error requesting voltage level %d\n", err);
 	}
-
-	get_delta_time();
 
 	err = cloud_encode_sensor_data(&msg, &cloud_data,
 				       &cir_buf_gps[head_cir_buf],
@@ -336,10 +304,10 @@ static void cloud_send_modem_data(void)
 {
 	int err;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
-
-	get_delta_time();
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_MSG,
+	};
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
@@ -361,8 +329,10 @@ static void cloud_send_modem_data(void)
 
 static void cloud_send_buffered_data(void)
 {
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
-				 .endpoint.type = CLOUD_EP_BATCH };
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.endpoint.type = CLOUD_EP_BATCH,
+	};
 
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued) {
@@ -372,8 +342,9 @@ static void cloud_send_buffered_data(void)
 	}
 
 	while (num_queued_entries > 0 && queued_entries) {
-		err = encode_gps_buffer(&msg, cir_buf_gps,
-					CONFIG_CIRCULAR_SENSOR_BUFFER_MAX);
+		err = cloud_encode_gps_buffer(&msg, cir_buf_gps,
+						CONFIG_CIRCULAR_SENSOR_BUFFER_MAX,
+						&cloud_data_time);
 		if (err != 0) {
 			printk("Error encoding circular buffer\n", err);
 			goto exit;
@@ -454,9 +425,9 @@ static void adxl362_trigger_handler(struct device *dev,
 		double y = sensor_value_to_double(&accel[1]);
 		double z = sensor_value_to_double(&accel[2]);
 
-		if ((abs(x) > check_accel_thres()) ||
-		    (abs(y) > check_accel_thres()) ||
-		    (abs(z) > check_accel_thres())) {
+		if ((abs(x) > get_accel_thres()) ||
+		    (abs(y) > get_accel_thres()) ||
+		    (abs(z) > get_accel_thres())) {
 			cloud_data.acc[0] = x;
 			cloud_data.acc[1] = y;
 			cloud_data.acc[2] = z;
@@ -594,10 +565,21 @@ static void lte_connect(enum lte_conn_actions action)
 
 	k_sleep(5000);
 
-	err = modem_time_get();
+#if defined(CONFIG_MODEM_INFO)
+	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
-		printk("Error fetching modem time: %d\n", err);
+		printk("Error getting modem_info: %d", err);
 	}
+
+	parse_modem_time_data();
+
+	//if modem time is wrong, get time from time server
+
+#else
+
+	//get time from time server
+
+#endif
 
 	cloud_pairing();
 	lte_lc_psm_req(true);
@@ -606,8 +588,10 @@ static void lte_connect(enum lte_conn_actions action)
 gps_mode:
 	lte_lc_gps_nw_mode();
 	return;
+
 exit:
 	return;
+
 }
 
 #if defined(CONFIG_MODEM_INFO)

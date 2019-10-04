@@ -47,6 +47,14 @@ config GPS_TRIGGER
 
 endmenu	# GPS
 
+menu "Device and modem"
+
+config POWER_OPTIMIZATION_ENABLE
+	bool "Enable power optimization"
+	default y
+
+endmenu
+
 menu "Sensor Buffer"
 
 config CIRCULAR_SENSOR_BUFFER_MAX
@@ -57,9 +65,16 @@ config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
-endmenu # Governing FSM
+endmenu # Sensor Buffer
 
-endmenu
+menu "Cloud"
+
+config MQTT_KEEPALIVE
+	int
+	default 1000 if POWER_OPTIMIZATION_ENABLE
+	default 120
+
+endmenu # Cloud
 
 menu "Zephyr Kernel"
 source "$ZEPHYR_BASE/Kconfig.zephyr"
