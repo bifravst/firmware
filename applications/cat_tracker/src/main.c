@@ -347,13 +347,13 @@ static void cloud_pairing(void)
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	cloud_pair();
 
-	k_sleep(10000);
+	k_sleep(5000);
 
 	cloud_ack_config_change();
 
-// #if defined(CONFIG_MODEM_INFO)
-// 	cloud_send_modem_data();
-// #endif
+#if defined(CONFIG_MODEM_INFO)
+	cloud_send_modem_data();
+#endif
 }
 
 static void cloud_process_cycle(void)
@@ -546,7 +546,7 @@ static void lte_connect(enum lte_conn_actions action)
 	printk("LTE connected!\nFetching modem time...\n");
 
 #if defined(CONFIG_MODEM_INFO)
-	k_sleep(5000);
+	k_sleep(1000);
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {

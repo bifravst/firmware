@@ -420,9 +420,11 @@ static int bifravst_connect(const struct cloud_backend *const backend)
 		return err;
 	}
 
+	err = mqtt_connect(&client);
+
 	backend->config->socket = client.transport.tls.sock;
 
-	return mqtt_connect(&client);
+	return err;
 }
 
 static int bifravst_disconnect(const struct cloud_backend *const backend)
