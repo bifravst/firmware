@@ -62,7 +62,10 @@ enum modem_info {
 
 /**@brief LTE parameter data. **/
 struct lte_param {
-	u16_t value; /**< The retrieved value. */
+	union {
+		u16_t value; /**< The retrieved value. */
+		s64_t epoch;
+	};
 	char value_string
 		[MODEM_INFO_MAX_RESPONSE_SIZE]; /**< Value in string format. */
 	char *data_name; /**< The name of the information type. */
@@ -77,7 +80,7 @@ struct network_param {
 	struct lte_param current_operator; /**< Current operator. */
 	struct lte_param mcc; /**< Mobile country code. */
 	struct lte_param mnc; /**< Mobile network code. */
-	struct lte_param time; /**< Network time. */
+	struct lte_param date_time; /**< Network time. */
 	struct lte_param
 		cellid_hex; /**< Cell ID of the device (in HEX format). */
 	struct lte_param ip_address; /**< IP address of the device. */

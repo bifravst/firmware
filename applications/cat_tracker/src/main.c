@@ -16,6 +16,7 @@
 #include <modem_info.h>
 #include <time.h>
 #include <nrf_socket.h>
+#include <net/socket.h>
 
 enum lte_conn_actions {
 	LTE_INIT,
@@ -59,27 +60,16 @@ static struct cloud_backend *cloud_backend;
 static struct k_work cloud_pairing_work;
 static struct k_work cloud_process_cycle_work;
 
-struct rsrp_data {
-	u16_t value;
-	u16_t offset;
-};
+static bool active;
+static bool queued_entries;
 
-#if CONFIG_MODEM_INFO
-static struct rsrp_data rsrp = {
-	.value = 0,
-	.offset = MODEM_INFO_RSRP_OFFSET_VAL,
-};
-#endif
+static int rsrp;
+static int head_cir_buf;
+static int num_queued_entries;
 
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(connect_sem, 0, 1);
-
-static bool active;
-static bool queued_entries;
-
-static int head_cir_buf;
-static int num_queued_entries;
 
 void error_handler(enum error_type err_type, int err_code)
 {
@@ -151,16 +141,13 @@ static int parse_time_entries(char *datetime_string, int min, int max)
 static void parse_modem_time_data(void)
 {
 	struct tm info;
-	char time[100];
 
-	time = modem_param.network.time.value_string
-
-	info.tm_year = parse_time_entries(time, 0, 1) + 2000 - 1900;
-	info.tm_mon  = parse_time_entries(time, 3, 4) - 1;
-	info.tm_mday = parse_time_entries(time, 6, 7);
-	info.tm_hour = parse_time_entries(time, 9, 10);
-	info.tm_min  = parse_time_entries(time, 12, 13);
-	info.tm_sec  = parse_time_entries(time, 15, 16);
+	info.tm_year = parse_time_entries(modem_param.network.date_time.value_string, 0, 1) + 2000 - 1900;
+	info.tm_mon  = parse_time_entries(modem_param.network.date_time.value_string, 3, 4) - 1;
+	info.tm_mday = parse_time_entries(modem_param.network.date_time.value_string, 6, 7);
+	info.tm_hour = parse_time_entries(modem_param.network.date_time.value_string, 9, 10);
+	info.tm_min  = parse_time_entries(modem_param.network.date_time.value_string, 12, 13);
+	info.tm_sec  = parse_time_entries(modem_param.network.date_time.value_string, 15, 16);
 
 	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday, info.tm_mon,
 	       (info.tm_year - 100), info.tm_hour, info.tm_min, info.tm_sec);
@@ -261,7 +248,7 @@ static void cloud_ack_config_change(void)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
-	err = cloud_encode_cfg_data(&msg, &cloud_data;
+	err = cloud_encode_cfg_data(&msg, &cloud_data);
 	if (err != 0) {
 		printk("Error encoding device configurations\n");
 	}
@@ -329,6 +316,8 @@ static void cloud_send_modem_data(void)
 
 static void cloud_send_buffered_data(void)
 {
+	int err;
+	
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_LEAST_ONCE,
 		.endpoint.type = CLOUD_EP_BATCH,
@@ -343,10 +332,9 @@ static void cloud_send_buffered_data(void)
 
 	while (num_queued_entries > 0 && queued_entries) {
 		err = cloud_encode_gps_buffer(&msg, cir_buf_gps,
-						CONFIG_CIRCULAR_SENSOR_BUFFER_MAX,
 						&cloud_data_time);
 		if (err != 0) {
-			printk("Error encoding circular buffer\n", err);
+			printk("Error encoding circular buffer: %d\n", err);
 			goto exit;
 		}
 
@@ -506,7 +494,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_DATA_RECEIVED:
 		printk("CLOUD_EVT_DATA_RECEIVED\n");
 		if (evt->data.msg.len > 2) {
-			err = decode_response(evt->data.msg.buf, &cloud_data);
+			err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
 			if (err != 0) {
 				printk("Could not decode response %d", err);
 			}
@@ -563,25 +551,16 @@ static void lte_connect(enum lte_conn_actions action)
 
 	printk("LTE connected!\nFetching modem time...\n");
 
+#if defined(CONFIG_MODEM_INFO)
 	k_sleep(5000);
 
-#if defined(CONFIG_MODEM_INFO)
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
 		printk("Error getting modem_info: %d", err);
 	}
 
 	parse_modem_time_data();
-
-	//if modem time is wrong, get time from time server
-
-#else
-
-	//get time from time server
-
 #endif
-
-	cloud_pairing();
 	lte_lc_psm_req(true);
 	return;
 
@@ -591,13 +570,12 @@ gps_mode:
 
 exit:
 	return;
-
 }
 
 #if defined(CONFIG_MODEM_INFO)
 static void modem_rsrp_handler(char rsrp_value)
 {
-	rsrp.value = rsrp_value;
+	rsrp = atoi(&rsrp_value);
 }
 
 static int modem_data_init(void)
@@ -651,21 +629,19 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_control_handler);
 
-	// event manager should be used
-	// draw plans
-
 connect:
-
-	// SEMA BLOCK HERE ONLY GIVEN BY CONNECTION
-	// NON OF THESE FUNCTION SHOULD BLOCK NEITHER REBOOT THE DEVICE
 
 	err = cloud_connect(cloud_backend);
 	if (err) {
 		printk("cloud_connect failed: %d\n", err);
 	}
 
-	struct pollfd fds[] = { { .fd = cloud_backend->config->socket,
-				  .events = POLLIN } };
+	struct pollfd fds[] = {
+		{
+			.fd = cloud_backend->config->socket,
+			.events = POLLIN
+		}
+	};
 
 	while (true) {
 		err = poll(fds, ARRAY_SIZE(fds),
@@ -707,62 +683,4 @@ connect:
 
 	cloud_disconnect(cloud_backend);
 	goto connect;
-
-	/* 	while (true) {
-		switch (state) {
-		case LTE_CHECK_CONNECTION:
-			lte_connect(LTE_CYCLE);
-			state = CHECK_MODE;
-			break;
-
-		case CHECK_MODE:
-			if (cloud_data.active) {
-				ui_led_set_pattern(UI_LED_ACTIVE_MODE);
-				active = true;
-				k_sleep(CONFIG_MODE_INDICATION_TIME);
-				state = ACTIVE_MODE;
-			} else {
-				ui_led_set_pattern(UI_LED_PASSIVE_MODE);
-				active = false;
-				k_sleep(CONFIG_MODE_INDICATION_TIME);
-				state = PASSIVE_MODE;
-			}
-			break;
-
-		case ACTIVE_MODE:
-			printk("ACTIVE MODE\n");
-			state = GPS_SEARCH;
-			break;
-
-		case PASSIVE_MODE:
-			printk("PASSIVE MODE\n");
-			ui_stop_leds();
-			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
-			}
-			state = GPS_SEARCH;
-			break;
-
-		case GPS_SEARCH:
-			gps_control_start();
-			if (!k_sem_take(&gps_timeout_sem,
-					K_SECONDS(cloud_data.gps_timeout))) {
-				cloud_data.gps_found = true;
-			} else {
-				cloud_data.gps_found = false;
-				gps_control_stop();
-			}
-			state = PUBLISH_TO_CLOUD_AND_SLEEP;
-			break;
-
-		case PUBLISH_TO_CLOUD_AND_SLEEP:
-			cloud_process_cycle();
-			k_sleep(K_SECONDS(check_active_wait(active)));
-			state = LTE_CHECK_CONNECTION;
-			break;
-
-		default:
-			printk("Unknown governing state\n");
-			break;
-		}
-	} */
 }

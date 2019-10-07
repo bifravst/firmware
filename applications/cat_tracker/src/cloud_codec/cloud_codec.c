@@ -416,7 +416,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data)
 {
-	int err;
+	int err = 0;
 	char *buffer;
 
 	cJSON *root_obj = cJSON_CreateObject();
@@ -497,7 +497,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 			     struct cloud_data_gps *cir_buf_gps,
 			     struct cloud_data_time *cloud_data_time)
 {
-	int err;
+	int err = 0;
 	char *buffer;
 
 	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -

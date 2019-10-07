@@ -239,7 +239,6 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 		int err = mqtt_read_publish_payload(c, buf, end - buf);
 
 		if (err < 0) {
-			int err;
 
 			if (err != -EAGAIN) {
 				return err;
@@ -421,7 +420,7 @@ static int bifravst_connect(const struct cloud_backend *const backend)
 		return err;
 	}
 
-	backend->config->socket = &client.transport.tls.sock;
+	backend->config->socket = client.transport.tls.sock;
 
 	return mqtt_connect(&client);
 }

@@ -286,10 +286,10 @@ static const struct modem_info_data imei_data = {
 };
 
 static const struct modem_info_data time_data = {
-	.cmd = AT_CMD_NW_TIME,
-	.data_name = MODEM_NW_TIME_NAME,
-	.param_index = MODEM_TIME_PARAM_INDEX,
-	.param_count = MODEM_TIME_PARAM_COUNT,
+	.cmd = AT_CMD_DATE_TIME,
+	.data_name = DATE_TIME_DATA_NAME,
+	.param_index = DATE_TIME_PARAM_INDEX,
+	.param_count = DATE_TIME_PARAM_COUNT,
 	.data_type = AT_PARAM_TYPE_STRING,
 };
 

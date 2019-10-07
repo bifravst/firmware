@@ -76,6 +76,8 @@ config MQTT_KEEPALIVE
 
 endmenu # Cloud
 
+endmenu
+
 menu "Zephyr Kernel"
 source "$ZEPHYR_BASE/Kconfig.zephyr"
 endmenu
