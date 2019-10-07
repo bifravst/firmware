@@ -60,7 +60,6 @@ static struct cloud_backend *cloud_backend;
 static struct k_work cloud_pairing_work;
 static struct k_work cloud_process_cycle_work;
 
-static bool active;
 static bool queued_entries;
 
 static int rsrp;
@@ -171,15 +170,6 @@ static void set_current_time(struct gps_data gps_data)
 
 	cloud_data_time.epoch = mktime(&info);
 	cloud_data_time.update_time = k_uptime_get();
-}
-
-static int check_active_wait(bool mode)
-{
-	if (mode) {
-		return cloud_data.active_wait;
-	} else {
-		return cloud_data.passive_wait;
-	}
 }
 
 static double get_accel_thres(void)
@@ -356,11 +346,14 @@ static void cloud_pairing(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	cloud_pair();
+
+	k_sleep(10000);
+
 	cloud_ack_config_change();
 
-#if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data();
-#endif
+// #if defined(CONFIG_MODEM_INFO)
+// 	cloud_send_modem_data();
+// #endif
 }
 
 static void cloud_process_cycle(void)
@@ -478,6 +471,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
+		k_work_submit(&cloud_pairing_work);
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
