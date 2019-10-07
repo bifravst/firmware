@@ -141,12 +141,18 @@ static void parse_modem_time_data(void)
 {
 	struct tm info;
 
-	info.tm_year = parse_time_entries(modem_param.network.date_time.value_string, 0, 1) + 2000 - 1900;
-	info.tm_mon  = parse_time_entries(modem_param.network.date_time.value_string, 3, 4) - 1;
-	info.tm_mday = parse_time_entries(modem_param.network.date_time.value_string, 6, 7);
-	info.tm_hour = parse_time_entries(modem_param.network.date_time.value_string, 9, 10);
-	info.tm_min  = parse_time_entries(modem_param.network.date_time.value_string, 12, 13);
-	info.tm_sec  = parse_time_entries(modem_param.network.date_time.value_string, 15, 16);
+	info.tm_year = parse_time_entries(
+		modem_param.network.date_time.value_string, 0, 1) + 2000 - 1900;
+	info.tm_mon  = parse_time_entries(
+		modem_param.network.date_time.value_string, 3, 4) - 1;
+	info.tm_mday = parse_time_entries(
+		modem_param.network.date_time.value_string, 6, 7);
+	info.tm_hour = parse_time_entries(
+		modem_param.network.date_time.value_string, 9, 10);
+	info.tm_min  = parse_time_entries(
+		modem_param.network.date_time.value_string, 12, 13);
+	info.tm_sec  = parse_time_entries(
+		modem_param.network.date_time.value_string, 15, 16);
 
 	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday, info.tm_mon,
 	       (info.tm_year - 100), info.tm_hour, info.tm_min, info.tm_sec);
@@ -347,6 +353,8 @@ static void cloud_pairing(void)
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	cloud_pair();
 
+	/*Ensure that potential new config has been set
+		until sending cfg ack*/
 	k_sleep(5000);
 
 	cloud_ack_config_change();
@@ -360,6 +368,11 @@ static void cloud_process_cycle(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 	cloud_send_sensor_data();
+
+	/*Ensure that potential new config has been set
+	until sending cfg ack*/
+	k_sleep(5000);
+
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
@@ -554,7 +567,16 @@ static void lte_connect(enum lte_conn_actions action)
 	}
 
 	parse_modem_time_data();
+
+	//if parse modem time gives error it means that
+	//the time obtained is failse, use time server then
+	//to set epoch and update time, fallback
+
+
+#else
+	//Use time server to set epoch and update time
 #endif
+
 	lte_lc_psm_req(true);
 	return;
 
@@ -591,6 +613,32 @@ static int modem_data_init(void)
 	return 0;
 }
 #endif
+
+static void device_behaviour_timer_routine(void)
+{
+		// stop timer
+		if (cloud_data.active) {
+			printk("ACTIVE MODE\n");
+		} else {
+			printk("PASSIVE MODE\n");
+			k_sem_take(&accel_trig_sem, K_FOREVER)
+		}
+		
+		gps_control_start();
+		if (!k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
+			cloud_data.gps_found = true;
+		} else {
+			cloud_data.gps_found = false;
+			gps_control_stop();
+		}
+
+		lte_connect(LTE_CYCLE);
+
+		k_work_submit(&cloud_process_cycle_work);
+
+		//check_active_wait(cloud_data.active), start timer again with
+		//active_wait_time duration
+}
 
 void main(void)
 {
