@@ -436,7 +436,7 @@ static int bifravst_send(const struct cloud_backend *const backend,
 		break;
 	}
 
-	err = data_publish(&client, MQTT_QOS_1_AT_LEAST_ONCE, tx_data.buf,
+	err = data_publish(&client, MQTT_QOS_0_AT_MOST_ONCE, tx_data.buf,
 			   tx_data.len, tx_data.topic);
 	if (err != 0) {
 		LOG_ERR("Publishing data failed, error %d", err);

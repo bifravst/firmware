@@ -50,8 +50,6 @@ static struct cloud_backend *cloud_backend;
 
 static struct k_work cloud_pairing_work;
 static struct k_work cloud_process_cycle_work;
-static struct k_work gps_control_start_work;
-static struct k_work gps_control_stop_work;
 
 static bool queued_entries;
 
@@ -218,7 +216,7 @@ static void cloud_pair(void)
 {
 	int err;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_LEAST_ONCE,
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_PAIR,
 				 .buf = "",
 				 .len = 0 };
@@ -227,14 +225,18 @@ static void cloud_pair(void)
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 	}
+
+	k_free(msg.buf);
 }
 
 static void cloud_ack_config_change(void)
 {
 	int err;
 
+	k_sleep(5000);
+
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
@@ -249,6 +251,8 @@ static void cloud_ack_config_change(void)
 		printk("Cloud send failed, err: %d\n", err);
 		return;
 	}
+
+	k_free(msg.buf);
 }
 
 static void cloud_send_sensor_data(void)
@@ -256,7 +260,7 @@ static void cloud_send_sensor_data(void)
 	int err;
 
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
@@ -281,6 +285,7 @@ static void cloud_send_sensor_data(void)
 	}
 
 	cloud_data.gps_found = false;
+	k_free(msg.buf);
 }
 
 #if defined(CONFIG_MODEM_INFO)
@@ -289,7 +294,7 @@ static void cloud_send_modem_data(int inc_dyn_data)
 	int err;
 
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
@@ -311,6 +316,8 @@ static void cloud_send_modem_data(int inc_dyn_data)
 		printk("Cloud send failed, err: %d\n", err);
 		return;
 	}
+
+	k_free(msg.buf);
 }
 #endif
 
@@ -319,7 +326,7 @@ static void cloud_send_buffered_data(void)
 	int err;
 	
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_LEAST_ONCE,
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_BATCH,
 	};
 
@@ -350,16 +357,15 @@ static void cloud_send_buffered_data(void)
 end:
 	num_queued_entries = 0;
 	queued_entries = false;
+
+	k_free(msg.buf);
 }
 
 static void cloud_pairing(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	cloud_pair();
 
-	/*Ensure that potential new config has been set
-		until sending cfg ack*/
-	k_sleep(5000);
+	cloud_pair();
 
 	cloud_ack_config_change();
 
@@ -371,11 +377,8 @@ static void cloud_pairing(void)
 static void cloud_process_cycle(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-	cloud_send_sensor_data();
 
-	/*Ensure that potential new config has been set
-	until sending cfg ack*/
-	k_sleep(5000);
+	cloud_send_sensor_data();
 
 	cloud_ack_config_change();
 
@@ -397,22 +400,10 @@ static void cloud_process_cycle_work_fn(struct k_work *work)
 	cloud_process_cycle();
 }
 
-static void gps_control_start_work_fn(struct k_work *work)
-{
-	gps_control_start();
-}
-
-static void gps_control_stop_work_fn(struct k_work *work)
-{
-	gps_control_stop();
-}
-
 static void work_init(void)
 {
 	k_work_init(&cloud_pairing_work, cloud_pairing_work_fn);
 	k_work_init(&cloud_process_cycle_work, cloud_process_cycle_work_fn);
-	k_work_init(&gps_control_start_work, gps_control_start_work_fn);
-	k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -454,20 +445,23 @@ static void adxl362_trigger_handler(struct device *dev,
 
 static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 {
+	static u32_t fix_count;
 	struct gps_data gps_data;
 
-	switch (trigger->type) {
-	case GPS_TRIG_FIX:
-		printk("gps control handler triggered!\n");
-		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-		set_current_time(gps_data);
-		populate_gps_buffer(gps_data);
-		k_sem_give(&gps_search_sem);
-		break;
+	ARG_UNUSED(trigger);
 
-	default:
-		break;
+	if (++fix_count < CONFIG_GPS_CONTROL_FIX_COUNT) {
+		return;
 	}
+
+	fix_count = 0;
+
+	printk("gps control handler triggered!\n");
+
+	gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
+	set_current_time(gps_data);
+	populate_gps_buffer(gps_data);
+	gps_control_stop(K_NO_WAIT);
 }
 
 static void adxl362_init(void)
@@ -598,6 +592,7 @@ exit:
 #if defined(CONFIG_MODEM_INFO)
 static void modem_rsrp_handler(char rsrp_value)
 {
+	printk("Incoming rsrp event");
 	rsrp = atoi(&rsrp_value);
 }
 
@@ -623,20 +618,21 @@ static int modem_data_init(void)
 
 static void governing_routine_handler(struct k_timer *timer_id)
 {
-	k_timer_stop(&governing_timer);
 
 	if (cloud_data.active) {
 		printk("ACTIVE MODE\n");
 	} else {
 		printk("PASSIVE MODE\n");
 		if(k_sem_take(&accel_trig_sem, K_NO_WAIT)) {
+			printk("Asset not moving, going back to sleep\n");
 			goto set_timer_duration;
 		}
 	}
 
-	// k_work_submit(&gps_control_start_work);
-
-	// k_work_submit(&gps_control_stop_work);
+	if (!gps_control_is_active()) {
+		gps_control_start(K_SECONDS(1));
+		gps_control_stop(K_SECONDS(cloud_data.gpst));
+	}
 
 	k_work_submit(&cloud_process_cycle_work);
 
@@ -693,8 +689,6 @@ void main(void)
 	gps_control_init(gps_trigger_handler);
 
 	timer_init();
-
-	gps_control_start();
 
 connect:
 

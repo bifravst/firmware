@@ -23,16 +23,15 @@ config GPS_USE_SIM
 	help
 		Use simulated GPS data.
 
-
 config GPS_USE_EXTERNAL
 	bool "User provided GPS device"
 	help
 		Provide a GPS device that location data will be fetched from and
 		sent to nRF Cloud
 
-rsource "src/gps_controller/Kconfig"
-
 endchoice
+
+rsource "src/gps_controller/Kconfig"
 
 config GPS_DEV_NAME
 	string "GPS device name"
@@ -45,17 +44,14 @@ config GPS_TRIGGER
 	bool
 	default GPS_SIM_TRIGGER if GPS_USE_SIM
 
+config GPS_SIM_TRIGGER_TIMER_MSEC
+	int
+	default 120000 if POWER_OPTIMIZATION_ENABLE
+	default 2000
+
 endmenu	# GPS
 
-menu "Device and modem"
-
-config POWER_OPTIMIZATION_ENABLE
-	bool "Enable power optimization"
-	default y
-
-endmenu
-
-menu "Sensor Buffer"
+menu "Sensor buffer"
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
@@ -65,16 +61,7 @@ config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
-endmenu # Sensor Buffer
-
-menu "Cloud"
-
-config MQTT_KEEPALIVE
-	int
-	default 1000 if POWER_OPTIMIZATION_ENABLE
-	default 120
-
-endmenu # Cloud
+endmenu # Sensor buffer
 
 endmenu
 
