@@ -417,6 +417,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data)
 {
 	int err = 0;
+	int cnt = 0;
 	char *buffer;
 
 	cJSON *root_obj = cJSON_CreateObject();
@@ -438,41 +439,55 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	if (change_gpst) {
 		err += json_add_number(cfg_obj, "gpst",
 				       cloud_data->gps_timeout);
+		cnt++;
 	}
 
 	if (change_active) {
 		err += json_add_bool(cfg_obj, "act", cloud_data->active);
+		cnt++;
 	}
 
 	if (change_active_wait) {
 		err += json_add_number(cfg_obj, "actwt",
 				       cloud_data->active_wait);
+		cnt++;
 	}
 
 	if (change_passive_wait) {
 		err += json_add_number(cfg_obj, "mvres",
 				       cloud_data->passive_wait);
+		cnt++;
 	}
 
 	if (change_movement_timeout) {
 		err += json_add_number(cfg_obj, "mvt",
 				       cloud_data->movement_timeout);
+		cnt++;
 	}
 
 	if (change_accel_threshold) {
 		err += json_add_number(cfg_obj, "acct",
 				       cloud_data->accel_threshold);
+		cnt++;
 	}
 
 	err += json_add_obj(reported_obj, "cfg", cfg_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	if (err != 0) {
+	if (err != 0 || cnt == 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(cfg_obj);
+
+		change_gpst = false;
+		change_active = false;
+		change_active_wait = false;
+		change_passive_wait = false;
+		change_movement_timeout = false;
+		change_accel_threshold = false;
+
 		return -EAGAIN;
 	}
 

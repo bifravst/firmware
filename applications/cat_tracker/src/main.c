@@ -30,17 +30,6 @@ enum error_type {
 	ERROR_CLOUD
 };
 
-enum governing_states {
-	LTE_CHECK_CONNECTION,
-	CHECK_MODE,
-	ACTIVE_MODE,
-	PASSIVE_MODE,
-	GPS_SEARCH,
-	PUBLISH_TO_CLOUD_AND_SLEEP,
-};
-
-enum governing_states state = LTE_CHECK_CONNECTION;
-
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
 struct cloud_data cloud_data = { .gps_timeout = 1000,
@@ -51,6 +40,8 @@ struct cloud_data cloud_data = { .gps_timeout = 1000,
 				 .accel_threshold = 100,
 				 .gps_found = false };
 
+struct k_timer governing_timer;
+
 struct cloud_data_time cloud_data_time;
 
 struct modem_param_info modem_param;
@@ -59,6 +50,8 @@ static struct cloud_backend *cloud_backend;
 
 static struct k_work cloud_pairing_work;
 static struct k_work cloud_process_cycle_work;
+static struct k_work gps_control_start_work;
+static struct k_work gps_control_stop_work;
 
 static bool queued_entries;
 
@@ -66,9 +59,8 @@ static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
-K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
-K_SEM_DEFINE(connect_sem, 0, 1);
+K_SEM_DEFINE(gps_search_sem, 0, 1);
 
 void error_handler(enum error_type err_type, int err_code)
 {
@@ -193,6 +185,8 @@ static double get_accel_thres(void)
 
 static void populate_gps_buffer(struct gps_data gps_data)
 {
+	cloud_data.gps_found = true;
+
 	head_cir_buf += 1;
 	if (head_cir_buf == CONFIG_CIRCULAR_SENSOR_BUFFER_MAX - 1) {
 		head_cir_buf = 0;
@@ -246,12 +240,14 @@ static void cloud_ack_config_change(void)
 
 	err = cloud_encode_cfg_data(&msg, &cloud_data);
 	if (err != 0) {
-		printk("Error encoding device configurations\n");
+		printk("Error enconding configurations %d\n", err);
+		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
+		return;
 	}
 }
 
@@ -267,6 +263,7 @@ static void cloud_send_sensor_data(void)
 	err = get_voltage_level();
 	if (err != 0) {
 		printk("Error requesting voltage level %d\n", err);
+		return;
 	}
 
 	err = cloud_encode_sensor_data(&msg, &cloud_data,
@@ -274,16 +271,20 @@ static void cloud_send_sensor_data(void)
 				       &cloud_data_time);
 	if (err != 0) {
 		printk("Error enconding message %d\n", err);
+		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
+		return;
 	}
+
+	cloud_data.gps_found = false;
 }
 
 #if defined(CONFIG_MODEM_INFO)
-static void cloud_send_modem_data(void)
+static void cloud_send_modem_data(int inc_dyn_data)
 {
 	int err;
 
@@ -294,18 +295,21 @@ static void cloud_send_modem_data(void)
 
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
-		printk("Error getting modem_info: %d", err);
+		printk("Error getting modem_info: %d\n", err);
+		return;
 	}
 
-	err = cloud_encode_modem_data(&msg, &modem_param, true, rsrp,
+	err = cloud_encode_modem_data(&msg, &modem_param, inc_dyn_data, rsrp,
 				      &cloud_data_time);
 	if (err != 0) {
 		printk("Error encoding modem data");
+		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
+		return;
 	}
 }
 #endif
@@ -331,19 +335,19 @@ static void cloud_send_buffered_data(void)
 						&cloud_data_time);
 		if (err != 0) {
 			printk("Error encoding circular buffer: %d\n", err);
-			goto exit;
+			goto end;
 		}
 
 		err = cloud_send(cloud_backend, &msg);
 		if (err != 0) {
 			printk("Cloud send failed, err: %d\n", err);
-			goto exit;
+			goto end;
 		}
 
 		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 	}
 
-exit:
+end:
 	num_queued_entries = 0;
 	queued_entries = false;
 }
@@ -360,7 +364,7 @@ static void cloud_pairing(void)
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data();
+	cloud_send_modem_data(false);
 #endif
 }
 
@@ -376,10 +380,11 @@ static void cloud_process_cycle(void)
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data();
+	cloud_send_modem_data(true);
 #endif
 
 	cloud_send_buffered_data();
+
 }
 
 static void cloud_pairing_work_fn(struct k_work *work)
@@ -392,10 +397,22 @@ static void cloud_process_cycle_work_fn(struct k_work *work)
 	cloud_process_cycle();
 }
 
+static void gps_control_start_work_fn(struct k_work *work)
+{
+	gps_control_start();
+}
+
+static void gps_control_stop_work_fn(struct k_work *work)
+{
+	gps_control_stop();
+}
+
 static void work_init(void)
 {
 	k_work_init(&cloud_pairing_work, cloud_pairing_work_fn);
 	k_work_init(&cloud_process_cycle_work, cloud_process_cycle_work_fn);
+	k_work_init(&gps_control_start_work, gps_control_start_work_fn);
+	k_work_init(&gps_control_stop_work, gps_control_stop_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -435,18 +452,17 @@ static void adxl362_trigger_handler(struct device *dev,
 	}
 }
 
-static void gps_control_handler(struct device *dev, struct gps_trigger *trigger)
+static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 {
-	static struct gps_data gps_data;
+	struct gps_data gps_data;
 
 	switch (trigger->type) {
 	case GPS_TRIG_FIX:
 		printk("gps control handler triggered!\n");
-		gps_control_on_trigger();
 		gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 		set_current_time(gps_data);
 		populate_gps_buffer(gps_data);
-		k_sem_give(&gps_timeout_sem);
+		k_sem_give(&gps_search_sem);
 		break;
 
 	default:
@@ -503,7 +519,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		if (evt->data.msg.len > 2) {
 			err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
 			if (err != 0) {
-				printk("Could not decode response %d", err);
+				printk("Could not decode response %d\n", err);
 			}
 		}
 		break;
@@ -567,16 +583,7 @@ static void lte_connect(enum lte_conn_actions action)
 	}
 
 	parse_modem_time_data();
-
-	//if parse modem time gives error it means that
-	//the time obtained is failse, use time server then
-	//to set epoch and update time, fallback
-
-
-#else
-	//Use time server to set epoch and update time
 #endif
-
 	lte_lc_psm_req(true);
 	return;
 
@@ -614,30 +621,44 @@ static int modem_data_init(void)
 }
 #endif
 
-static void device_behaviour_timer_routine(void)
+static void governing_routine_handler(struct k_timer *timer_id)
 {
-		// stop timer
-		if (cloud_data.active) {
-			printk("ACTIVE MODE\n");
-		} else {
-			printk("PASSIVE MODE\n");
-			k_sem_take(&accel_trig_sem, K_FOREVER)
+	k_timer_stop(&governing_timer);
+
+	if (cloud_data.active) {
+		printk("ACTIVE MODE\n");
+	} else {
+		printk("PASSIVE MODE\n");
+		if(k_sem_take(&accel_trig_sem, K_NO_WAIT)) {
+			goto set_timer_duration;
 		}
-		
-		gps_control_start();
-		if (!k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
-			cloud_data.gps_found = true;
-		} else {
-			cloud_data.gps_found = false;
-			gps_control_stop();
-		}
+	}
 
-		lte_connect(LTE_CYCLE);
+	// k_work_submit(&gps_control_start_work);
 
-		k_work_submit(&cloud_process_cycle_work);
+	// k_work_submit(&gps_control_stop_work);
 
-		//check_active_wait(cloud_data.active), start timer again with
-		//active_wait_time duration
+	k_work_submit(&cloud_process_cycle_work);
+
+set_timer_duration:
+	
+	if (cloud_data.active) {
+		k_timer_start(&governing_timer,
+			K_SECONDS(cloud_data.active_wait),
+			K_SECONDS(cloud_data.active_wait));
+	} else {
+		k_timer_start(&governing_timer,
+			K_SECONDS(cloud_data.passive_wait),
+			K_SECONDS(cloud_data.passive_wait));
+	}
+}
+
+static void timer_init(void)
+{
+	k_timer_init(&governing_timer, governing_routine_handler, NULL);
+	k_timer_start(&governing_timer, 
+		K_SECONDS(cloud_data.active_wait),
+		K_SECONDS(cloud_data.active_wait));
 }
 
 void main(void)
@@ -669,7 +690,11 @@ void main(void)
 	lte_connect(LTE_INIT);
 
 	adxl362_init();
-	gps_control_init(gps_control_handler);
+	gps_control_init(gps_trigger_handler);
+
+	timer_init();
+
+	gps_control_start();
 
 connect:
 
@@ -726,3 +751,4 @@ connect:
 	cloud_disconnect(cloud_backend);
 	goto connect;
 }
+
