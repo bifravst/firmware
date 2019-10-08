@@ -77,8 +77,6 @@ static struct mqtt_client client;
 
 static struct sockaddr_storage broker;
 
-static struct pollfd fds;
-
 static struct cloud_backend *bifravst_cloud_backend;
 
 static int client_id_get(char *id)
@@ -239,28 +237,12 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 		int err = mqtt_read_publish_payload(c, buf, end - buf);
 
 		if (err < 0) {
-
-			if (err != -EAGAIN) {
-				return err;
-			}
-
-			LOG_DBG("mqtt_read_publish_payload: EAGAIN");
-
-			err = poll(&fds, 1, K_SECONDS(CONFIG_MQTT_KEEPALIVE));
-			if (err > 0 && (fds.revents & POLLIN) == POLLIN) {
-				continue;
-			} else {
-				return -EIO;
-			}
-		}
-
-		if (err == 0) {
+			return err;
+		} else if (err == 0) {
 			return -EIO;
 		}
-
 		buf += err;
 	}
-
 	return 0;
 }
 

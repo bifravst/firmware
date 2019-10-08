@@ -364,7 +364,7 @@ static void cloud_pairing(void)
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(false);
+	cloud_send_modem_data(true);
 #endif
 }
 
@@ -380,7 +380,7 @@ static void cloud_process_cycle(void)
 	cloud_ack_config_change();
 
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(true);
+	cloud_send_modem_data(false);
 #endif
 
 	cloud_send_buffered_data();
