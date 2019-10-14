@@ -220,53 +220,65 @@ static int publish_get_payload(struct mqtt_client *c, size_t length)
 }
 
 static void mqtt_evt_handler(struct mqtt_client *const c,
-			     const struct mqtt_evt *bifravst_cloud_evt)
+			     const struct mqtt_evt *mqtt_evt)
 {
 	int err;
 	struct cloud_backend_config *config = bifravst_cloud_backend->config;
-	struct cloud_event evt = { 0 };
+	struct cloud_event cloud_evt = { 0 };
 
-	switch (bifravst_cloud_evt->type) {
+	switch (mqtt_evt->type) {
 	case MQTT_EVT_CONNACK:
+		LOG_DBG("MQTT client connected!");
 
 		subscribe();
 
-		evt.type = CLOUD_EVT_CONNECTED;
-		cloud_notify_event(bifravst_cloud_backend, &evt,
+		cloud_evt.type = CLOUD_EVT_CONNECTED;
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
 		break;
 
 	case MQTT_EVT_DISCONNECT:
+		LOG_DBG("MQTT_EVT_DISCONNECT: result=%d", mqtt_evt->result);
 
-		evt.type = CLOUD_EVT_DISCONNECTED;
-		cloud_notify_event(bifravst_cloud_backend, &evt,
+		cloud_evt.type = CLOUD_EVT_DISCONNECTED;
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
 		break;
 
 	case MQTT_EVT_PUBLISH: {
-		const struct mqtt_publish_param *p =
-			&bifravst_cloud_evt->param.publish;
+		const struct mqtt_publish_param *p = &mqtt_evt->param.publish;
 
+		LOG_DBG("MQTT_EVT_PUBLISH: id=%d len=%d ",
+			p->message_id,
+			p->message.payload.len);
+		
 		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
 			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
+			break;
 		}
 
-		evt.type = CLOUD_EVT_DATA_RECEIVED;
-		evt.data.msg.buf = payload_buf;
-		evt.data.msg.len = p->message.payload.len;
+		cloud_evt.type = CLOUD_EVT_DATA_RECEIVED;
+		cloud_evt.data.msg.buf = payload_buf;
+		cloud_evt.data.msg.len = p->message.payload.len;
 
-		cloud_notify_event(bifravst_cloud_backend, &evt,
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
 	} break;
 
 	case MQTT_EVT_PUBACK:
+		LOG_DBG("MQTT_EVT_PUBACK: id=%d result=%d",
+			mqtt_evt->param.puback.message_id,
+			mqtt_evt->result);
 		break;
 
 	case MQTT_EVT_SUBACK:
+		LOG_DBG("MQTT_EVT_SUBACK: id=%d result=%d",
+			mqtt_evt->param.suback.message_id,
+			mqtt_evt->result);
 		break;
 
-	default:
+	default:	
 		break;
 	}
 }
@@ -346,8 +358,6 @@ static int client_init(struct mqtt_client *client)
 	client->rx_buf_size = sizeof(rx_buffer);
 	client->tx_buf = tx_buffer;
 	client->tx_buf_size = sizeof(tx_buffer);
-
-#if defined(CONFIG_MQTT_LIB_TLS)
 	client->transport.type = MQTT_TRANSPORT_SECURE;
 
 	static sec_tag_t sec_tag_list[] = { CONFIG_BIFRAVST_CLOUD_SEC_TAG };
@@ -359,9 +369,6 @@ static int client_init(struct mqtt_client *client)
 	tls_config->sec_tag_count = ARRAY_SIZE(sec_tag_list);
 	tls_config->sec_tag_list = sec_tag_list;
 	tls_config->hostname = CONFIG_BIFRAVST_CLOUD_HOST_NAME;
-#else
-	client->transport.type = MQTT_TRANSPORT_NON_SECURE;
-#endif
 
 	return 0;
 }
