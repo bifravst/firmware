@@ -307,10 +307,11 @@ static void cloud_pair(void)
 {
 	int err;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_PAIR,
-				 .buf = "",
-				 .len = 0 };
+	struct cloud_msg msg = { 
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
+		.endpoint.type = CLOUD_EP_TOPIC_PAIR,
+		.buf = "",
+		.len = 0 };
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err != 0) {

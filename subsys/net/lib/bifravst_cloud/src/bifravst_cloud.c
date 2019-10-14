@@ -65,6 +65,7 @@ struct bifravst_tx_data {
 	char *buf;
 	size_t len;
 	u8_t *topic;
+	enum mqtt_qos qos;
 };
 
 struct bifravst_tx_data tx_data;
@@ -180,7 +181,7 @@ static int bifravst_init(const struct cloud_backend *const backend,
 	return bifravst_cloud_init();
 }
 
-static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
+static int bifravst_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 			size_t len, u8_t *topic)
 {
 	struct mqtt_publish_param param;
@@ -398,6 +399,20 @@ static int bifravst_send(const struct cloud_backend *const backend,
 	tx_data.buf = msg->buf;
 	tx_data.len = msg->len;
 
+	switch(msg->qos) {
+	case CLOUD_QOS_AT_MOST_ONCE:
+		tx_data.qos = MQTT_QOS_0_AT_MOST_ONCE;
+		break;
+	case CLOUD_QOS_AT_LEAST_ONCE:
+		tx_data.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+		break;
+	case CLOUD_QOS_EXACTLY_ONCE:
+		tx_data.qos = MQTT_QOS_2_EXACTLY_ONCE;
+		break;
+	default:
+		break;
+	}
+
 	switch (msg->endpoint.type) {
 	case CLOUD_EP_TOPIC_PAIR:
 		tx_data.topic = get_topic;
@@ -412,7 +427,7 @@ static int bifravst_send(const struct cloud_backend *const backend,
 		break;
 	}
 
-	err = data_publish(&client, MQTT_QOS_0_AT_MOST_ONCE, tx_data.buf,
+	err = bifravst_publish(&client, tx_data.qos, tx_data.buf,
 			   tx_data.len, tx_data.topic);
 	if (err != 0) {
 		LOG_ERR("Publishing data failed, error %d", err);
