@@ -46,14 +46,7 @@ enum lte_lc_func_mode {
 	LTE_LC_FUNC_MODE_OFFLINE		= 4,
 	LTE_LC_FUNC_MODE_OFFLINE_UICC_ON	= 44
 };
-=======
-#include <at_cmd.h>
 
-int lte_lc_init_connect_manager(at_cmd_handler_t connection_handler);
->>>>>>> feat: connection handler
-
-=======
->>>>>>> fix: removed comment
 /** @brief Function for initializing
  * the modem.  NOTE: a follow-up call to lte_lc_connect()
  * must be made.
@@ -94,18 +87,6 @@ int lte_lc_power_off(void);
  * @return Zero on success or (negative) error code otherwise.
  */
 int lte_lc_normal(void);
-
-/** @brief Function for requesting gps mode
- *
- * @return Zero on success or (negative) error code otherwise.
- */
-int lte_lc_gps_nw_mode(void);
-
-/** @brief Function for requesting current network status
- *
- * @return Zero on success or (negative) error code otherwise.
- */
-int lte_lc_nw_reg_status(void);
 
 /** @brief Function for requesting modem to go to or disable
  * power saving mode (PSM) with default settings defined in kconfig.
@@ -167,5 +148,11 @@ int lte_lc_system_mode_get(enum lte_lc_system_mode *mode);
  * @return Zero on success or (negative) error code otherwise.
  */
 int lte_lc_func_mode_get(enum lte_lc_func_mode *mode);
+
+/**@brief Set network to GPS mode.
+ * 
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int lte_lc_gps_nw_mode(void);
 
 #endif /* ZEPHYR_INCLUDE_LTE_LINK_CONTROL_H_ */

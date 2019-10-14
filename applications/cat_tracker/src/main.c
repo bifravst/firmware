@@ -645,6 +645,8 @@ static void lte_connect(enum lte_conn_actions action)
 {
 	int err;
 
+	enum lte_lc_nw_reg_status nw_reg_status;
+
 	ui_led_set_pattern(UI_LTE_CONNECTING);
 
 	if (action == LTE_INIT) {
@@ -662,19 +664,29 @@ static void lte_connect(enum lte_conn_actions action)
 			}
 		}
 	} else if (action == LTE_CYCLE) {
-		err = lte_lc_nw_reg_status();
-		if (err == -ENOTCONN) {
-			printk("LTE not connected.\n");
-			printk("Connecting to LTE network. ");
-			printk("This may take several minutes.\n");
-			err = lte_lc_init_and_connect();
-			if (err == -ETIMEDOUT) {
-				printk("LTE link could not be established.\n");
-				goto gps_mode;
-			}
+		err = lte_lc_nw_reg_status_get(&nw_reg_status);
+		if (err != 0) {
+			printk("lte_lc_nw_reg_status error: %d\n", err);
+			goto gps_mode;
+		}
 
-		} else if (err == 0) {
-			return;
+		switch(nw_reg_status) {
+			case LTE_LC_NW_REG_REGISTERED_HOME:
+				printk("REGISTERED TO HOME NETWORK\n");
+				break;
+			case LTE_LC_NW_REG_REGISTERED_ROAMING:
+				printk("REGISTERED TO ROAMING NETWORK\n");
+				break;
+			default:
+				printk("LTE not connected.\n");
+				printk("Connecting to LTE network. ");
+				printk("This may take several minutes.\n");
+				err = lte_lc_init_and_connect();
+				if (err != 0) {
+					printk("LTE link could not be established.\n");
+					goto gps_mode;
+				}
+				break;
 		}
 	}
 
