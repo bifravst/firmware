@@ -58,9 +58,9 @@ static int start(void)
 
 	printk("GPS started successfully.\nSearching for satellites ");
 	printk("to get position fix. This may take several minutes.\n");
-	printk("The device will attempt to get a fix for %d seconds, ",
-		CONFIG_GPS_CONTROL_FIX_TRY_TIME);
-	printk("before the GPS is stopped.\n");
+	// printk("The device will attempt to get a fix for %d seconds, ",
+	// 	CONFIG_GPS_CONTROL_FIX_TRY_TIME);
+	// printk("before the GPS is stopped.\n");
 
 	return 0;
 }

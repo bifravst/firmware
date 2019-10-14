@@ -18,6 +18,7 @@
 #include <time.h>
 #include <nrf_socket.h>
 #include <net/socket.h>
+#include "version.h"
 
 enum lte_conn_actions {
 	LTE_INIT,
@@ -384,7 +385,7 @@ static void cloud_send_sensor_data(void)
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
-	}	
+	}
 
 	cloud_data.gps_found = false;
 }
@@ -741,6 +742,7 @@ void main(void)
 	int err;
 
 	printk("The cat tracker has started\n");
+	printk("Version: %s\n", DEVICE_APP_VERSION);
 
 	cloud_backend = cloud_get_binding("BIFRAVST_CLOUD");
 	__ASSERT(cloud_backend != NULL, "Bifravst Cloud backend not found");

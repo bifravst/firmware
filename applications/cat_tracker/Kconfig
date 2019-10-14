@@ -54,14 +54,12 @@ endmenu	# GPS
 config POWER_OPTIMIZATION_ENABLE
 	bool "Enable power optimization"
 	default y
-	select LTE_EDRX_REQ
 
 menu "Cloud"
 
 config MQTT_KEEPALIVE
 	int "MQTT KEEPALIVE"
-	default 1000 if POWER_OPTIMIZATION_ENABLE
-	default GPS_CONTROL_FIX_TRY_TIME if GPS_USE_EXTERNAL
+	default 3600 if POWER_OPTIMIZATION_ENABLE
 	default 120
 
 config CLOUD_POLL_WAIT

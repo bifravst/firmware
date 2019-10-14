@@ -7,6 +7,7 @@ menuconfig BIFRAVST_CLOUD
 	bool "BIFRAVST Cloud library"
 	select CJSON_LIB
 	select MQTT_LIB
+	select MQTT_LIB_TLS
 
 if BIFRAVST_CLOUD
 

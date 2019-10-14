@@ -81,11 +81,11 @@ static struct cloud_backend *bifravst_cloud_backend;
 
 static int client_id_get(char *id)
 {
+	int err;
 	int at_socket_fd;
 	int bytes_written;
 	int bytes_read;
 	char imei_buf[IMEI_LEN + 1];
-	int err;
 
 	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
 	__ASSERT_NO_MSG(at_socket_fd >= 0);
@@ -164,10 +164,11 @@ static int bifravst_cloud_init()
 
 	err = topics_populate();
 	if (err) {
+		LOG_DBG("Topics not populated, error: %d", err);
 		return err;
 	}
 
-	return err;
+	return 0;
 }
 
 static int bifravst_init(const struct cloud_backend *const backend,
@@ -177,15 +178,6 @@ static int bifravst_init(const struct cloud_backend *const backend,
 	bifravst_cloud_backend = (struct cloud_backend *)backend;
 
 	return bifravst_cloud_init();
-}
-
-static void data_print(u8_t *prefix, u8_t *data, size_t len)
-{
-	char buf[len + 1];
-
-	memcpy(buf, data, len);
-	buf[len] = 0;
-	printk("%s%s\n", prefix, buf);
 }
 
 static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
@@ -202,9 +194,6 @@ static int data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
 	param.dup_flag = 0;
 	param.retain_flag = 0;
 
-	data_print("Publishing: \n", data, len);
-	printk("to topic: %s len: %u\n", topic, (unsigned int)strlen(topic));
-
 	return mqtt_publish(c, &param);
 }
 
@@ -217,7 +206,7 @@ static int subscribe(void)
 	};
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
-		printk("Subscribing to: %s\n",
+		LOG_DBG("Subscribing to: %s",
 		       subscription_list.list[i].topic.utf8);
 	}
 
@@ -226,24 +215,7 @@ static int subscribe(void)
 
 static int publish_get_payload(struct mqtt_client *c, size_t length)
 {
-	u8_t *buf = payload_buf;
-	u8_t *end = buf + length;
-
-	if (length > sizeof(payload_buf)) {
-		return -EMSGSIZE;
-	}
-
-	while (buf < end) {
-		int err = mqtt_read_publish_payload(c, buf, end - buf);
-
-		if (err < 0) {
-			return err;
-		} else if (err == 0) {
-			return -EIO;
-		}
-		buf += err;
-	}
-	return 0;
+	return mqtt_readall_publish_payload(c, payload_buf, length);
 }
 
 static void mqtt_evt_handler(struct mqtt_client *const c,
@@ -333,7 +305,7 @@ static int broker_init(void)
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
-			printk("IPv4 Address found %s\n", ipv4_addr);
+			LOG_DBG("IPv4 Address found %s", ipv4_addr);
 
 			break;
 		}
@@ -358,7 +330,7 @@ static int client_init(struct mqtt_client *client)
 	mqtt_client_init(client);
 
 	err = broker_init();
-	if (err) {
+	if (err != 0) {
 		return err;
 	}
 
@@ -399,14 +371,18 @@ static int bifravst_connect(const struct cloud_backend *const backend)
 
 	err = client_init(&client);
 	if (err != 0) {
+		LOG_ERR("Client not initialized, error: %d", err);
 		return err;
 	}
 
 	err = mqtt_connect(&client);
+	if (err != 0) {
+		return err;
+	}
 
 	backend->config->socket = client.transport.tls.sock;
 
-	return err;
+	return 0;
 }
 
 static int bifravst_disconnect(const struct cloud_backend *const backend)
