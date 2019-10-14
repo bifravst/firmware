@@ -673,10 +673,10 @@ static void lte_connect(enum lte_conn_actions action)
 		switch(nw_reg_status) {
 			case LTE_LC_NW_REG_REGISTERED_HOME:
 				printk("REGISTERED TO HOME NETWORK\n");
-				break;
+				return;
 			case LTE_LC_NW_REG_REGISTERED_ROAMING:
 				printk("REGISTERED TO ROAMING NETWORK\n");
-				break;
+				return;
 			default:
 				printk("LTE not connected.\n");
 				printk("Connecting to LTE network. ");
