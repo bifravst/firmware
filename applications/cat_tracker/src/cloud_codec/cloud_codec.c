@@ -480,14 +480,6 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
 		cJSON_Delete(cfg_obj);
-
-		change_gpst = false;
-		change_active = false;
-		change_active_wait = false;
-		change_passive_wait = false;
-		change_movement_timeout = false;
-		change_accel_threshold = false;
-
 		return -EAGAIN;
 	}
 
@@ -497,12 +489,12 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-	change_gpst = false;
-	change_active = false;
-	change_active_wait = false;
-	change_passive_wait = false;
-	change_movement_timeout = false;
-	change_accel_threshold = false;
+	change_gpst 			= false;
+	change_active 			= false;
+	change_active_wait 		= false;
+	change_passive_wait		= false;
+	change_movement_timeout 	= false;
+	change_accel_threshold		= false;
 
 	return 0;
 }

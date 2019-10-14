@@ -450,11 +450,6 @@ static int bifravst_input(const struct cloud_backend *const backend)
 {
 	int err;
 
-	err = mqtt_live(&client);
-	if (err != 0) {
-		return err;
-	}
-
 	err = mqtt_input(&client);
 	if (err != 0) {
 		return err;
@@ -468,11 +463,6 @@ static int bifravst_ping(const struct cloud_backend *const backend)
 	int err;
 
 	err = mqtt_live(&client);
-	if (err != 0) {
-		return err;
-	}
-
-	err = mqtt_input(&client);
 	if (err != 0) {
 		return err;
 	}

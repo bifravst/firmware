@@ -102,10 +102,10 @@ static void gps_work_handler(struct k_work *work)
 		atomic_set(&gps_is_active, 1);
 		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 
-		gps_work.type = GPS_WORK_STOP;
+		// gps_work.type = GPS_WORK_STOP;
 
-		k_delayed_work_submit(&gps_work.work,
-				K_SECONDS(CONFIG_GPS_CONTROL_FIX_TRY_TIME));
+		// k_delayed_work_submit(&gps_work.work,
+		// 		K_SECONDS(CONFIG_GPS_CONTROL_FIX_TRY_TIME));
 
 		return;
 	} else if (gps_work.type == GPS_WORK_STOP) {

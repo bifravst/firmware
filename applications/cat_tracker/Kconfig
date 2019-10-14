@@ -51,7 +51,30 @@ config GPS_SIM_TRIGGER_TIMER_MSEC
 
 endmenu	# GPS
 
-menu "Sensor buffer"
+config POWER_OPTIMIZATION_ENABLE
+	bool "Enable power optimization"
+	default y
+	select LTE_EDRX_REQ
+
+menu "Cloud"
+
+config MQTT_KEEPALIVE
+	int
+	default 1000 if POWER_OPTIMIZATION_ENABLE
+	default GPS_CONTROL_FIX_TRY_TIME if GPS_USE_EXTERNAL
+	default 120
+
+endmenu # Cloud
+
+menu "Sensor data"
+
+config SENSOR_DATA_SEND
+	bool "Enable sending of sensor data"
+	default y
+
+config BUFFERED_DATA_SEND
+	bool "Option to send buffered sensor data"
+	default y
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
@@ -61,7 +84,7 @@ config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
-endmenu # Sensor buffer
+endmenu # Sensor data
 
 endmenu
 

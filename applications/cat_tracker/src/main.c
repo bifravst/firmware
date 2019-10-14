@@ -7,6 +7,7 @@
 #include <misc/reboot.h>
 #include <device.h>
 #include <sensor.h>
+#include <gps.h>
 #include <gps_controller.h>
 #include <ui.h>
 #include <net/cloud.h>
@@ -17,6 +18,8 @@
 #include <time.h>
 #include <nrf_socket.h>
 #include <net/socket.h>
+
+#define APP_SLEEP_MS 2000
 
 enum lte_conn_actions {
 	LTE_INIT,
@@ -34,7 +37,7 @@ struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
 struct cloud_data cloud_data = { .gps_timeout = 1000,
 				 .active = true,
-				 .active_wait = 60,
+				 .active_wait = 30,
 				 .passive_wait = 300,
 				 .movement_timeout = 3600,
 				 .accel_threshold = 100,
@@ -47,22 +50,24 @@ struct cloud_data_time cloud_data_time;
 struct modem_param_info modem_param;
 
 static struct cloud_backend *cloud_backend;
-
-static struct k_work cloud_pairing_work;
-static struct k_work cloud_process_cycle_work;
+static struct pollfd fds;
 
 static bool queued_entries;
+static bool cloud_connected;
 
+static int nfds;
 static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
+static struct k_work cloud_ack_config_change_work;
+
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
-K_SEM_DEFINE(gps_search_sem, 0, 1);
+K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 
 void error_handler(enum error_type err_type, int err_code)
 {
-#if !defined(CONFIG_DEBUG) && defined(COIALIZATIONNFIG_REBOOT)
+#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
 	LOG_PANIC();
 	sys_reboot(0);
 #else
@@ -115,6 +120,15 @@ void cloud_error_handler(int err)
 	error_handler(ERROR_CLOUD, err);
 }
 
+static int check_active_wait(void)
+{
+	if (!cloud_data.active) {
+		return cloud_data.passive_wait;
+	}
+
+	return cloud_data.active_wait;
+}
+
 static int parse_time_entries(char *datetime_string, int min, int max)
 {
 	char buf[50];
@@ -152,6 +166,84 @@ static void parse_modem_time_data(void)
 
 }
 #endif
+
+static void cloud_wait(int timeout)
+{
+	if (nfds > 0) {
+		if (poll(&fds, nfds, timeout) < 0) {
+			printk("poll error: %d\n", errno);
+		}
+	}
+}
+
+static int cloud_process_and_sleep(int timeout)
+{
+	s64_t remaining = timeout;
+	s64_t start_time = k_uptime_get();
+	int err;
+
+	while (remaining > 0 && cloud_connected) {
+		cloud_wait(remaining);
+
+		err = cloud_ping(cloud_backend);
+		if (err != 0) {
+			printk("cloud_ping error: %d\n", err);
+			return err;
+		}
+
+		err = cloud_input(cloud_backend);
+		if (err != 0) {
+			printk("cloud_ping error: %d\n", err);
+			return err;
+		}		
+
+		remaining = timeout + start_time - k_uptime_get();
+	}
+
+	return 0;
+}
+
+static int cloud_connect_process(void)
+{
+	int err;
+
+	if (!cloud_connected) {
+		err = cloud_connect(cloud_backend);
+		if (err != 0) {
+			return err;
+		}
+
+		fds.fd = cloud_backend->config->socket;
+		fds.fd = POLLIN;
+
+		nfds = 1;
+		cloud_wait(APP_SLEEP_MS);
+		err = cloud_input(cloud_backend);
+		if (err != 0) {
+			return err;
+		}
+	}
+
+	return 0;
+}
+
+static int cloud_disconnect_process(void)
+{
+	int err;
+
+	err = cloud_disconnect(cloud_backend);
+	if (err != 0) {
+		return err;
+	}
+
+	cloud_wait(APP_SLEEP_MS);
+	err = cloud_input(cloud_backend);
+	if (err != 0) {
+		return err;
+	}
+
+	return 0;
+}
 
 static void set_current_time(struct gps_data gps_data)
 {
@@ -226,14 +318,16 @@ static void cloud_pair(void)
 		printk("Cloud send failed, err: %d\n", err);
 	}
 
-	k_free(msg.buf);
+	cloud_process_and_sleep(APP_SLEEP_MS);
+	if (err != 0) {
+		printk("cloud_process_and_sleep error: %d\n", err);
+		cloud_disconnect_process();
+	}	
 }
 
 static void cloud_ack_config_change(void)
 {
 	int err;
-
-	k_sleep(5000);
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -252,7 +346,11 @@ static void cloud_ack_config_change(void)
 		return;
 	}
 
-	k_free(msg.buf);
+	err = cloud_process_and_sleep(APP_SLEEP_MS);
+	if (err != 0) {
+		printk("cloud_process_and_sleep error: %d\n", err);
+		cloud_disconnect_process();
+	}
 }
 
 static void cloud_send_sensor_data(void)
@@ -284,8 +382,13 @@ static void cloud_send_sensor_data(void)
 		return;
 	}
 
+	cloud_process_and_sleep(APP_SLEEP_MS);
+	if (err != 0) {
+		printk("cloud_process_and_sleep error: %d\n", err);
+		cloud_disconnect_process();
+	}	
+
 	cloud_data.gps_found = false;
-	k_free(msg.buf);
 }
 
 #if defined(CONFIG_MODEM_INFO)
@@ -317,7 +420,11 @@ static void cloud_send_modem_data(int inc_dyn_data)
 		return;
 	}
 
-	k_free(msg.buf);
+	cloud_process_and_sleep(APP_SLEEP_MS);
+	if (err != 0) {
+		printk("cloud_process_and_sleep error: %d\n", err);
+		cloud_disconnect_process();
+	}	
 }
 #endif
 
@@ -354,56 +461,56 @@ static void cloud_send_buffered_data(void)
 		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 	}
 
+	cloud_process_and_sleep(APP_SLEEP_MS);
+	if (err != 0) {
+		printk("cloud_process_and_sleep error: %d\n", err);
+		cloud_disconnect_process();
+	}
 end:
 	num_queued_entries = 0;
 	queued_entries = false;
-
-	k_free(msg.buf);
 }
 
 static void cloud_pairing(void)
 {
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+	ui_led_set_pattern(UI_CLOUD_CONNECTED);
+
+	cloud_connect_process();
 
 	cloud_pair();
 
-	cloud_ack_config_change();
-
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(true);
+	cloud_send_modem_data(false);
 #endif
 }
 
 static void cloud_process_cycle(void)
 {
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 
+	cloud_connect_process();
+
+#if defined(CONFIG_SENSOR_DATA_SEND)
 	cloud_send_sensor_data();
-
-	cloud_ack_config_change();
+#endif
 
 #if defined(CONFIG_MODEM_INFO)
 	cloud_send_modem_data(false);
 #endif
 
+#if defined(CONFIG_BUFFERED_DATA_SEND)
 	cloud_send_buffered_data();
-
+#endif
 }
 
-static void cloud_pairing_work_fn(struct k_work *work)
+static void cloud_ack_config_change_work_fn(struct k_work *work)
 {
-	cloud_pairing();
-}
-
-static void cloud_process_cycle_work_fn(struct k_work *work)
-{
-	cloud_process_cycle();
+	cloud_ack_config_change();
 }
 
 static void work_init(void)
 {
-	k_work_init(&cloud_pairing_work, cloud_pairing_work_fn);
-	k_work_init(&cloud_process_cycle_work, cloud_process_cycle_work_fn);
+	k_work_init(&cloud_ack_config_change_work, cloud_ack_config_change_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -461,7 +568,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 	gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 	set_current_time(gps_data);
 	populate_gps_buffer(gps_data);
-	gps_control_stop(K_NO_WAIT);
+	gps_control_stop(1);
 }
 
 static void adxl362_init(void)
@@ -494,13 +601,15 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
-		k_work_submit(&cloud_pairing_work);
+		cloud_connected = true;
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
 		break;
 	case CLOUD_EVT_DISCONNECTED:
 		printk("CLOUD_EVT_DISCONNECTED\n");
+		cloud_connected = false;
+		nfds = false;
 		break;
 	case CLOUD_EVT_ERROR:
 		printk("CLOUD_EVT_ERROR\n");
@@ -516,6 +625,9 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 				printk("Could not decode response %d\n", err);
 			}
 		}
+
+		k_work_submit(&cloud_ack_config_change_work);
+
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		printk("CLOUD_EVT_PAIR_REQUEST\n");
@@ -562,7 +674,7 @@ static void lte_connect(enum lte_conn_actions action)
 			}
 
 		} else if (err == 0) {
-			goto exit;
+			return;
 		}
 	}
 
@@ -578,14 +690,12 @@ static void lte_connect(enum lte_conn_actions action)
 
 	parse_modem_time_data();
 #endif
-	lte_lc_psm_req(true);
+	ui_led_set_pattern(UI_LTE_CONNECTED);
+	cloud_pairing();
 	return;
 
 gps_mode:
 	lte_lc_gps_nw_mode();
-	return;
-
-exit:
 	return;
 }
 
@@ -616,47 +726,6 @@ static int modem_data_init(void)
 }
 #endif
 
-static void governing_routine_handler(struct k_timer *timer_id)
-{
-
-	if (cloud_data.active) {
-		printk("ACTIVE MODE\n");
-	} else {
-		printk("PASSIVE MODE\n");
-		if(k_sem_take(&accel_trig_sem, K_NO_WAIT)) {
-			printk("Asset not moving, going back to sleep\n");
-			goto set_timer_duration;
-		}
-	}
-
-	if (!gps_control_is_active()) {
-		gps_control_start(K_SECONDS(1));
-		gps_control_stop(K_SECONDS(cloud_data.gpst));
-	}
-
-	k_work_submit(&cloud_process_cycle_work);
-
-set_timer_duration:
-	
-	if (cloud_data.active) {
-		k_timer_start(&governing_timer,
-			K_SECONDS(cloud_data.active_wait),
-			K_SECONDS(cloud_data.active_wait));
-	} else {
-		k_timer_start(&governing_timer,
-			K_SECONDS(cloud_data.passive_wait),
-			K_SECONDS(cloud_data.passive_wait));
-	}
-}
-
-static void timer_init(void)
-{
-	k_timer_init(&governing_timer, governing_routine_handler, NULL);
-	k_timer_start(&governing_timer, 
-		K_SECONDS(cloud_data.active_wait),
-		K_SECONDS(cloud_data.active_wait));
-}
-
 void main(void)
 {
 	int err;
@@ -680,69 +749,30 @@ void main(void)
 #if defined(CONFIG_MODEM_INFO)
 	modem_data_init();
 #endif
-
 	work_init();
-
 	lte_connect(LTE_INIT);
-
 	adxl362_init();
 	gps_control_init(gps_trigger_handler);
 
-	timer_init();
+check_mode:
 
-connect:
-
-	err = cloud_connect(cloud_backend);
-	if (err) {
-		printk("cloud_connect failed: %d\n", err);
-	}
-
-	struct pollfd fds[] = {
-		{
-			.fd = cloud_backend->config->socket,
-			.events = POLLIN
-		}
-	};
-
-	while (true) {
-		err = poll(fds, ARRAY_SIZE(fds),
-			   K_SECONDS(CONFIG_MQTT_KEEPALIVE));
-
-		if (err < 0) {
-			printk("poll() returned an error: %d\n", err);
-			error_handler(ERROR_CLOUD, err);
-			continue;
-		}
-
-		if (err == 0) {
-			cloud_ping(cloud_backend);
-			continue;
-		}
-
-		if ((fds[0].revents & POLLIN) == POLLIN) {
-			cloud_input(cloud_backend);
-		}
-
-		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
-			printk("Socket error: POLLNVAL\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
-		}
-
-		if ((fds[0].revents & POLLHUP) == POLLHUP) {
-			printk("Socket error: POLLHUP\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
-		}
-
-		if ((fds[0].revents & POLLERR) == POLLERR) {
-			printk("Socket error: POLLERR\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
+	if (!cloud_data.active)
+	{
+		if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
+			printk("Woops, the cat is moving!\n");
 		}
 	}
 
-	cloud_disconnect(cloud_backend);
-	goto connect;
+	gps_control_start(1);
+	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
+		gps_control_stop(1);
+	}
+
+	k_sleep(K_SECONDS(check_active_wait()));
+
+	lte_connect(LTE_CYCLE);
+	cloud_process_cycle();
+
+goto check_mode;
+
 }
-
