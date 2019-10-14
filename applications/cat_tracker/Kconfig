@@ -59,10 +59,14 @@ config POWER_OPTIMIZATION_ENABLE
 menu "Cloud"
 
 config MQTT_KEEPALIVE
-	int
+	int "MQTT KEEPALIVE"
 	default 1000 if POWER_OPTIMIZATION_ENABLE
 	default GPS_CONTROL_FIX_TRY_TIME if GPS_USE_EXTERNAL
 	default 120
+
+config CLOUD_POLL_WAIT
+	int "Duration of polling on cloud data, for every cloud instance"
+	default 2000
 
 endmenu # Cloud
 

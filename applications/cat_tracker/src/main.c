@@ -19,8 +19,6 @@
 #include <nrf_socket.h>
 #include <net/socket.h>
 
-#define APP_SLEEP_MS 2000
-
 enum lte_conn_actions {
 	LTE_INIT,
 	LTE_CYCLE,
@@ -217,7 +215,7 @@ static int cloud_connect_process(void)
 		fds.fd = POLLIN;
 
 		nfds = 1;
-		cloud_wait(APP_SLEEP_MS);
+		cloud_wait(CONFIG_CLOUD_POLL_WAIT);
 		err = cloud_input(cloud_backend);
 		if (err != 0) {
 			return err;
@@ -236,7 +234,7 @@ static int cloud_disconnect_process(void)
 		return err;
 	}
 
-	cloud_wait(APP_SLEEP_MS);
+	cloud_wait(CONFIG_CLOUD_POLL_WAIT);
 	err = cloud_input(cloud_backend);
 	if (err != 0) {
 		return err;
@@ -318,7 +316,7 @@ static void cloud_pair(void)
 		printk("Cloud send failed, err: %d\n", err);
 	}
 
-	cloud_process_and_sleep(APP_SLEEP_MS);
+	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
@@ -346,7 +344,7 @@ static void cloud_ack_config_change(void)
 		return;
 	}
 
-	err = cloud_process_and_sleep(APP_SLEEP_MS);
+	err = cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
@@ -382,7 +380,7 @@ static void cloud_send_sensor_data(void)
 		return;
 	}
 
-	cloud_process_and_sleep(APP_SLEEP_MS);
+	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
@@ -420,7 +418,7 @@ static void cloud_send_modem_data(int inc_dyn_data)
 		return;
 	}
 
-	cloud_process_and_sleep(APP_SLEEP_MS);
+	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
@@ -461,7 +459,7 @@ static void cloud_send_buffered_data(void)
 		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 	}
 
-	cloud_process_and_sleep(APP_SLEEP_MS);
+	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
