@@ -429,7 +429,7 @@ static int bifravst_send(const struct cloud_backend *const backend,
 	case CLOUD_EP_TOPIC_MSG:
 		tx_data.topic = update_topic;
 		break;
-	case CLOUD_EP_BATCH:
+	case CLOUD_EP_TOPIC_BATCH:
 		tx_data.topic = batch_topic;
 		break;
 	default:

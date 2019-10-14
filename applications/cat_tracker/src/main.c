@@ -434,7 +434,7 @@ static void cloud_send_buffered_data(void)
 	
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_BATCH,
+		.endpoint.type = CLOUD_EP_TOPIC_BATCH,
 	};
 
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
