@@ -296,6 +296,15 @@ static void populate_gps_buffer(struct gps_data gps_data)
 #if defined(CONFIG_MODEM_INFO)
 static int get_voltage_level(void)
 {
+	// int err;
+	//
+	/* This funtion should fetch battery voltage level from modem */
+	// err = modem_info_params_get(&modem_param);
+	// if (err != 0) {
+	// 	printk("Error getting modem_info: %d\n", err);
+	// 	return err;
+	// }
+
 	cloud_data.bat_voltage = modem_param.device.battery.value;
 	cloud_data.bat_timestamp = k_uptime_get();
 
@@ -322,7 +331,7 @@ static void cloud_pair(void)
 	if (err != 0) {
 		printk("cloud_process_and_sleep error: %d\n", err);
 		cloud_disconnect_process();
-	}	
+	}
 }
 
 static void cloud_ack_config_change(void)
@@ -625,9 +634,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 				printk("Could not decode response %d\n", err);
 			}
 		}
-
 		k_work_submit(&cloud_ack_config_change_work);
-
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		printk("CLOUD_EVT_PAIR_REQUEST\n");
@@ -715,6 +722,7 @@ gps_mode:
 static void modem_rsrp_handler(char rsrp_value)
 {
 	printk("Incoming rsrp event");
+	/*RSRP getting currently not working */
 	rsrp = atoi(&rsrp_value);
 }
 

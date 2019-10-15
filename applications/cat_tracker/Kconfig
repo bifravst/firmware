@@ -64,7 +64,7 @@ config MQTT_KEEPALIVE
 
 config CLOUD_POLL_WAIT
 	int "Duration of polling on cloud data, for every cloud instance"
-	default 2000
+	default 1000
 
 endmenu # Cloud
 
@@ -87,6 +87,14 @@ config MAX_PER_ENCODED_ENTRIES
 	default 7
 
 endmenu # Sensor data
+
+menu "FOTA"
+
+config APP_VERSION
+	string "Application version"
+	default "v1.0.0"
+
+endmenu # FOTA
 
 endmenu
 
