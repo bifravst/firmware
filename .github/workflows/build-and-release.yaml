@@ -55,6 +55,7 @@ jobs:
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:$PATH
           cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
+          # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
           sha256sum ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
@@ -64,6 +65,18 @@ jobs:
           west build -p auto -b nrf9160_pca10015ns
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex
           sha256sum ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex
+          # LTE-m
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=n/ applications/cat_tracker/prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ applications/cat_tracker/prj.conf
+          west build -p auto -b nrf9160_pca20035ns
+          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          sha256sum ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          west build -p auto -b nrf9160_pca10090ns
+          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          sha256sum ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          west build -p auto -b nrf9160_pca10015ns
+          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns-ltem.hex
+          sha256sum ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns-ltem.hex
 
       - name: Release
         if: startsWith(github.ref, 'refs/heads/saga')
@@ -74,4 +87,7 @@ jobs:
           cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015ns.hex cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION.hex
           cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex
           cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex
-          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERSION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION)" $NEXT_VERSION
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10015n-ltem.hex cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION-ltem.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem.hex
+          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem.hex
+          ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERSION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION)" -a "cat-tracker-PCA10015-AssetTracker-$NEXT_VERSION-ltem.hex#Pre-build HEX file for PCA10015 / Asset Tracker ($NEXT_VERSION)" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION)" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION)" $NEXT_VERSION
