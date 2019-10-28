@@ -31,11 +31,14 @@ LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 #define SHADOW_BASE_TOPIC AWS "%s/shadow"
 #define SHADOW_BASE_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 7)
 
-#define ACCEPTED_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
-#define ACCEPTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
+#define ACCEPTED_TOPIC AWS "%s/shadow/get/accepted"
+#define ACCEPTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
 
 #define REJECTED_TOPIC AWS "%s/shadow/get/rejected"
 #define REJECTED_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
+
+#define CFG_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
+#define CFG_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
 
 #define UPDATE_DELTA_TOPIC AWS "%s/shadow/update/delta"
 #define UPDATE_DELTA_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 20)
@@ -54,6 +57,7 @@ LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 static char shadow_base_topic[SHADOW_BASE_TOPIC_LEN + 1];
 static char accepted_topic[ACCEPTED_TOPIC_LEN + 1];
+static char cfg_topic[CFG_TOPIC_LEN + 1];
 static char rejected_topic[REJECTED_TOPIC_LEN + 1];
 static char update_delta_topic[UPDATE_DELTA_TOPIC_LEN + 1];
 static char update_topic[UPDATE_TOPIC_LEN + 1];
@@ -61,9 +65,9 @@ static char get_topic[SHADOW_GET_LEN + 1];
 static char batch_topic[BATCH_TOPIC_LEN + 1];
 
 static const struct mqtt_topic cc_rx_list[] = {
-	{ .topic = { .utf8 = accepted_topic, .size = ACCEPTED_TOPIC_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
 	{ .topic = { .utf8 = rejected_topic, .size = REJECTED_TOPIC_LEN },
+	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = { .utf8 = cfg_topic, .size = CFG_TOPIC_LEN },
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
 	{ .topic = { .utf8 = update_delta_topic, .size = UPDATE_DELTA_TOPIC_LEN },
 	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
@@ -139,6 +143,12 @@ static int mqtt_topics_populate(void)
 		return -ENOMEM;
 	}
 
+	err = snprintf(cfg_topic, sizeof(cfg_topic), CFG_TOPIC,
+		       client_id_buf);
+	if (err != CFG_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
 	err = snprintf(update_delta_topic, sizeof(update_delta_topic),
 		       UPDATE_DELTA_TOPIC, client_id_buf);
 	if (err != UPDATE_DELTA_TOPIC_LEN) {
@@ -168,11 +178,15 @@ static int mqtt_topics_populate(void)
 #if defined(CONFIG_AWS_FOTA)
 static void aws_fota_cb_handler(enum aws_fota_evt_id evt)
 {
+	struct cloud_backend_config *config = bifravst_cloud_backend->config;
+	struct cloud_event cloud_evt = { 0 };
+
 	switch (evt) {
 	case AWS_FOTA_EVT_DONE:
-		LOG_DBG("AWS_FOTA_EVT_DONE, rebooting to apply update.");
-		mqtt_disconnect(&client);
-		sys_reboot(0);
+		LOG_DBG("AWS_FOTA_EVT_DONE");
+		cloud_evt.type = CLOUD_EVT_FOTA_REBOOT;
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
+				   config->user_data);
 		break;
 
 	case AWS_FOTA_EVT_ERROR:
@@ -202,8 +216,6 @@ static int bifravst_init(const struct cloud_backend *const backend,
 		LOG_ERR("ERROR: aws_fota_init %d", err);
 		return err;
 	}
-
-	boot_write_img_confirmed();
 #endif
 	return err;	
 }
@@ -245,6 +257,11 @@ static int mqtt_ep_subscribe(void)
 
 static int mqtt_publish_get_payload(struct mqtt_client *c, size_t length)
 {
+	/*Check if length is greater than the size of tx buffer */
+	// if (length > sizeof(c->tx_buf)) {
+	// 	return -EMSGSIZE;
+	// }
+
 	return mqtt_readall_publish_payload(c, payload_buf, length);
 }
 
@@ -262,11 +279,9 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		return;
 	} else if (err < 0) {
 		LOG_ERR("aws_fota_mqtt_evt_handler: Failed! %d", err);
-		// LOG_ERR("Disconnecting MQTT client...");
-		// err = mqtt_disconnect(c);
-		// if (err) {
-		// 	LOG_ERR("Could not disconnect: %d", err);
-		// }
+		cloud_evt.type = CLOUD_EVT_ERROR;
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
+				   config->user_data);
 	}
 #endif
 
@@ -274,7 +289,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	case MQTT_EVT_CONNACK:
 		LOG_DBG("MQTT client connected!");
 
-		mqtt_ep_subscribe();	
+		mqtt_ep_subscribe();
 
 		cloud_evt.type = CLOUD_EVT_CONNECTED;
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
@@ -302,12 +317,21 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			break;
 		}
 
+		if (p->message.topic.qos == MQTT_QOS_1_AT_LEAST_ONCE) {
+			const struct mqtt_puback_param ack = {
+				.message_id = p->message_id
+			};
+		
+			mqtt_publish_qos1_ack(c, &ack);
+		}
+
 		cloud_evt.type = CLOUD_EVT_DATA_RECEIVED;
 		cloud_evt.data.msg.buf = payload_buf;
 		cloud_evt.data.msg.len = p->message.payload.len;
 
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
-				   config->user_data);
+				config->user_data);
+
 	} break;
 
 	case MQTT_EVT_PUBACK:
@@ -393,7 +417,7 @@ static int mqtt_broker_init(void)
 			broker6->sin6_family = AF_INET6;
 			broker6->sin6_port = htons(CONFIG_BIFRAVST_CLOUD_PORT);
 
-			inet_ntop(AF_INET, &broker6->sin6_addr.s6_addr, ipv6_addr,
+			inet_ntop(AF_INET6, &broker6->sin6_addr.s6_addr, ipv6_addr,
 				  sizeof(ipv6_addr));
 			LOG_DBG("IPv4 Address found %s", ipv6_addr);
 			break;

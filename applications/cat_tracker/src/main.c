@@ -34,10 +34,10 @@ enum error_type {
 
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
-struct cloud_data cloud_data = { .gps_timeout = 1000,
+struct cloud_data cloud_data = { .gps_timeout = 60,
 				 .active = true,
-				 .active_wait = 30,
-				 .passive_wait = 300,
+				 .active_wait = 60,
+				 .passive_wait = 60,
 				 .movement_timeout = 3600,
 				 .accel_threshold = 100,
 				 .gps_found = false };
@@ -49,12 +49,8 @@ struct cloud_data_time cloud_data_time;
 struct modem_param_info modem_param;
 
 static struct cloud_backend *cloud_backend;
-static struct pollfd fds;
-
 static bool queued_entries;
-static bool cloud_connected;
 
-static int nfds;
 static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
@@ -63,6 +59,9 @@ static struct k_work cloud_ack_config_change_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
+
+#define CLOUD_POLL_STACKSIZE 4096
+#define CLOUD_POLL_PRIORITY 7
 
 void error_handler(enum error_type err_type, int err_code)
 {
@@ -166,84 +165,6 @@ static void parse_modem_time_data(void)
 }
 #endif
 
-static void cloud_wait(int timeout)
-{
-	if (nfds > 0) {
-		if (poll(&fds, nfds, timeout) < 0) {
-			printk("poll error: %d\n", errno);
-		}
-	}
-}
-
-static int cloud_process_and_sleep(int timeout)
-{
-	s64_t remaining = timeout;
-	s64_t start_time = k_uptime_get();
-	int err;
-
-	while (remaining > 0 && cloud_connected) {
-		cloud_wait(remaining);
-
-		err = cloud_ping(cloud_backend);
-		if (err != 0) {
-			printk("cloud_ping error: %d\n", err);
-			return err;
-		}
-
-		err = cloud_input(cloud_backend);
-		if (err != 0) {
-			printk("cloud_ping error: %d\n", err);
-			return err;
-		}		
-
-		remaining = timeout + start_time - k_uptime_get();
-	}
-
-	return 0;
-}
-
-static int cloud_connect_process(void)
-{
-	int err;
-
-	if (!cloud_connected) {
-		err = cloud_connect(cloud_backend);
-		if (err != 0) {
-			return err;
-		}
-
-		fds.fd = cloud_backend->config->socket;
-		fds.fd = POLLIN;
-
-		nfds = 1;
-		cloud_wait(CONFIG_CLOUD_POLL_WAIT);
-		err = cloud_input(cloud_backend);
-		if (err != 0) {
-			return err;
-		}
-	}
-
-	return 0;
-}
-
-static int cloud_disconnect_process(void)
-{
-	int err;
-
-	err = cloud_disconnect(cloud_backend);
-	if (err != 0) {
-		return err;
-	}
-
-	cloud_wait(CONFIG_CLOUD_POLL_WAIT);
-	err = cloud_input(cloud_backend);
-	if (err != 0) {
-		return err;
-	}
-
-	return 0;
-}
-
 static void set_current_time(struct gps_data gps_data)
 {
 	struct tm info;
@@ -326,12 +247,6 @@ static void cloud_pair(void)
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 	}
-
-	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
-	if (err != 0) {
-		printk("cloud_process_and_sleep error: %d\n", err);
-		cloud_disconnect_process();
-	}
 }
 
 static void cloud_ack_config_change(void)
@@ -353,12 +268,6 @@ static void cloud_ack_config_change(void)
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
-	}
-
-	err = cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
-	if (err != 0) {
-		printk("cloud_process_and_sleep error: %d\n", err);
-		cloud_disconnect_process();
 	}
 }
 
@@ -391,12 +300,6 @@ static void cloud_send_sensor_data(void)
 		return;
 	}
 
-	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
-	if (err != 0) {
-		printk("cloud_process_and_sleep error: %d\n", err);
-		cloud_disconnect_process();
-	}
-
 	cloud_data.gps_found = false;
 }
 
@@ -427,12 +330,6 @@ static void cloud_send_modem_data(int inc_dyn_data)
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
-	}
-
-	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
-	if (err != 0) {
-		printk("cloud_process_and_sleep error: %d\n", err);
-		cloud_disconnect_process();
 	}	
 }
 #endif
@@ -470,11 +367,6 @@ static void cloud_send_buffered_data(void)
 		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 	}
 
-	cloud_process_and_sleep(CONFIG_CLOUD_POLL_WAIT);
-	if (err != 0) {
-		printk("cloud_process_and_sleep error: %d\n", err);
-		cloud_disconnect_process();
-	}
 end:
 	num_queued_entries = 0;
 	queued_entries = false;
@@ -484,20 +376,16 @@ static void cloud_pairing(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 
-	cloud_connect_process();
-
 	cloud_pair();
 
 #if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(false);
+	cloud_send_modem_data(true);
 #endif
 }
 
 static void cloud_process_cycle(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
-
-	cloud_connect_process();
 
 #if defined(CONFIG_SENSOR_DATA_SEND)
 	cloud_send_sensor_data();
@@ -610,30 +498,33 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
-		cloud_connected = true;
+		boot_write_img_confirmed();
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
 		break;
 	case CLOUD_EVT_DISCONNECTED:
 		printk("CLOUD_EVT_DISCONNECTED\n");
-		cloud_connected = false;
-		nfds = false;
 		break;
 	case CLOUD_EVT_ERROR:
 		printk("CLOUD_EVT_ERROR\n");
+		cloud_disconnect(cloud_backend);
+		break;
+	case CLOUD_EVT_FOTA_REBOOT:
+		cloud_disconnect(cloud_backend);
+		sys_reboot(0);
 		break;
 	case CLOUD_EVT_DATA_SENT:
 		printk("CLOUD_EVT_DATA_SENT\n");
 		break;
 	case CLOUD_EVT_DATA_RECEIVED:
 		printk("CLOUD_EVT_DATA_RECEIVED\n");
-		if (evt->data.msg.len > 2) {
-			err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
-			if (err != 0) {
-				printk("Could not decode response %d\n", err);
-			}
+
+		err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
+		if (err != 0) {
+			printk("Could not decode response %d\n", err);
 		}
+
 		k_work_submit(&cloud_ack_config_change_work);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
@@ -647,6 +538,68 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		break;
 	}
 }
+
+void cloud_poll(void)
+{
+	int err;
+
+connect:
+	err = cloud_connect(cloud_backend);
+	if (err) {
+		printk("cloud_connect failed: %d\n", err);
+	} 
+
+	struct pollfd fds[] = {
+		{
+			.fd = cloud_backend->config->socket,
+			.events = POLLIN
+		}
+	};
+
+	while (true) {
+		err = poll(fds, ARRAY_SIZE(fds),
+			K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+
+		if (err < 0) {
+			printk("poll() returned an error: %d\n", err);
+			error_handler(ERROR_CLOUD, err);
+			continue;
+		}
+
+		if (err == 0) {
+			cloud_ping(cloud_backend);
+			continue;
+		}
+
+		if ((fds[0].revents & POLLIN) == POLLIN) {
+			cloud_input(cloud_backend);
+		}
+
+		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
+			printk("Socket error: POLLNVAL\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+
+		if ((fds[0].revents & POLLHUP) == POLLHUP) {
+			printk("Socket error: POLLHUP\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+
+		if ((fds[0].revents & POLLERR) == POLLERR) {
+			printk("Socket error: POLLERR\n");
+			error_handler(ERROR_CLOUD, -EIO);
+			return;
+		}
+	}
+
+	cloud_disconnect(cloud_backend);
+	goto connect;	
+}
+
+K_THREAD_DEFINE(cloud_poll_thread, CLOUD_POLL_STACKSIZE, cloud_poll, NULL, NULL, NULL,
+		CLOUD_POLL_PRIORITY, 0, K_FOREVER);
 
 static void lte_connect(enum lte_conn_actions action)
 {
@@ -710,10 +663,23 @@ static void lte_connect(enum lte_conn_actions action)
 	parse_modem_time_data();
 #endif
 	ui_led_set_pattern(UI_LTE_CONNECTED);
+
+	k_thread_start(cloud_poll_thread);
+
+	/* Main thread sleeps here and gives the cloud poll thread
+	   the opportunity to connect before pairing is carried out */
+	k_sleep(30000);
+
 	cloud_pairing();
 	return;
 
 gps_mode:
+
+	/*Cloud should be handled in case of no mobile network */
+	/*Aborting the "cloud_poll_thread" is a possible fix here but must be tested,
+	occupied memory by the thread may be an issue */
+	k_thread_abort(cloud_poll_thread);
+
 	lte_lc_gps_nw_mode();
 	return;
 }
@@ -722,7 +688,7 @@ gps_mode:
 static void modem_rsrp_handler(char rsrp_value)
 {
 	printk("Incoming rsrp event");
-	/*RSRP getting currently not working */
+	/*RSRP getting currently not working, atoi is probably not the best solution */
 	rsrp = atoi(&rsrp_value);
 }
 
@@ -780,7 +746,7 @@ check_mode:
 	if (!cloud_data.active)
 	{
 		if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
-			printk("Woops, the cat is moving!\n");
+			printk("Wooow, the cat is moving!\n");
 		}
 	}
 
