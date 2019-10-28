@@ -20,9 +20,13 @@
 #include <net/socket.h>
 #include "version.h"
 
+#if defined(CONFIG_BOOTLOADER_MCUBOOT)
+#include <dfu/mcuboot.h>
+#endif
+
 enum lte_conn_actions {
 	LTE_INIT,
-	LTE_CYCLE,
+	LTE_UPDATE,
 };
 
 enum error_type {
@@ -56,6 +60,8 @@ static int head_cir_buf;
 static int num_queued_entries;
 
 static struct k_work cloud_ack_config_change_work;
+static struct k_work cloud_pairing_routine_work;
+static struct k_work cloud_update_routine_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -300,6 +306,8 @@ static void cloud_send_sensor_data(void)
 		return;
 	}
 
+	/* Set GPS fix to false only if the fix has 
+	   sucessfully been sent to cloud */
 	cloud_data.gps_found = false;
 }
 
@@ -372,18 +380,20 @@ end:
 	queued_entries = false;
 }
 
-static void cloud_pairing(void)
+static void cloud_pairing_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 
+#if defined(CONFIG_CLOUD_PAIR)
 	cloud_pair();
+#endif
 
 #if defined(CONFIG_MODEM_INFO)
 	cloud_send_modem_data(true);
 #endif
 }
 
-static void cloud_process_cycle(void)
+static void cloud_update_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 
@@ -405,9 +415,21 @@ static void cloud_ack_config_change_work_fn(struct k_work *work)
 	cloud_ack_config_change();
 }
 
+static void cloud_pairing_routine_work_fn(struct k_work *work)
+{
+	cloud_pairing_routine();
+}
+
+static void cloud_update_routine_work_fn(struct k_work *work)
+{
+	cloud_update_routine();
+}
+
 static void work_init(void)
 {
 	k_work_init(&cloud_ack_config_change_work, cloud_ack_config_change_work_fn);
+	k_work_init(&cloud_pairing_routine_work, cloud_pairing_routine_work_fn);
+	k_work_init(&cloud_update_routine_work, cloud_update_routine_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -498,6 +520,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
+
+		k_work_submit(&cloud_pairing_routine_work);
 		boot_write_img_confirmed();
 		break;
 	case CLOUD_EVT_READY:
@@ -511,6 +535,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		cloud_disconnect(cloud_backend);
 		break;
 	case CLOUD_EVT_FOTA_REBOOT:
+		printk("CLOUD_EVT_FOTA_REBOOT");
 		cloud_disconnect(cloud_backend);
 		sys_reboot(0);
 		break;
@@ -526,6 +551,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		}
 
 		k_work_submit(&cloud_ack_config_change_work);
+
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		printk("CLOUD_EVT_PAIR_REQUEST\n");
@@ -623,7 +649,7 @@ static void lte_connect(enum lte_conn_actions action)
 				goto gps_mode;
 			}
 		}
-	} else if (action == LTE_CYCLE) {
+	} else if (action == LTE_UPDATE) {
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
 		if (err != 0) {
 			printk("lte_lc_nw_reg_status error: %d\n", err);
@@ -666,11 +692,6 @@ static void lte_connect(enum lte_conn_actions action)
 
 	k_thread_start(cloud_poll_thread);
 
-	/* Main thread sleeps here and gives the cloud poll thread
-	   the opportunity to connect before pairing is carried out */
-	k_sleep(30000);
-
-	cloud_pairing();
 	return;
 
 gps_mode:
@@ -757,8 +778,8 @@ check_mode:
 
 	k_sleep(K_SECONDS(check_active_wait()));
 
-	lte_connect(LTE_CYCLE);
-	cloud_process_cycle();
+	lte_connect(LTE_UPDATE);
+	cloud_update_routine();
 
 goto check_mode;
 
