@@ -535,7 +535,6 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		break;
 	case CLOUD_EVT_ERROR:
 		printk("CLOUD_EVT_ERROR\n");
-		cloud_disconnect(cloud_backend);
 		break;
 	case CLOUD_EVT_FOTA_REBOOT:
 		printk("CLOUD_EVT_FOTA_REBOOT");
@@ -709,12 +708,12 @@ gps_mode:
 }
 
 #if defined(CONFIG_MODEM_INFO)
-static void modem_rsrp_handler(char rsrp_value)
-{
-	printk("Incoming rsrp event");
-	/*RSRP getting currently not working, atoi is probably not the best solution */
-	rsrp = atoi(&rsrp_value);
-}
+// static void modem_rsrp_handler(char rsrp_value)
+// {
+// 	printk("Incoming rsrp event");
+// 	/*RSRP getting currently not working, atoi is probably not the best solution */
+// 	rsrp = atoi(&rsrp_value);
+// }
 
 static int modem_data_init(void)
 {
@@ -730,7 +729,7 @@ static int modem_data_init(void)
 		return err;
 	}
 
-	modem_info_rsrp_register(modem_rsrp_handler);
+	// modem_info_rsrp_register(modem_rsrp_handler);
 
 	return 0;
 }
