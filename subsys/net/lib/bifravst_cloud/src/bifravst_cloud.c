@@ -257,10 +257,10 @@ static int mqtt_ep_subscribe(void)
 
 static int mqtt_publish_get_payload(struct mqtt_client *c, size_t length)
 {
-	/*Check if length is greater than the size of tx buffer */
-	// if (length > sizeof(c->tx_buf)) {
-	// 	return -EMSGSIZE;
-	// }
+
+	if (length > sizeof(payload_buf)) {
+		return -EMSGSIZE;
+	}
 
 	return mqtt_readall_publish_payload(c, payload_buf, length);
 }

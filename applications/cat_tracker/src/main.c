@@ -522,7 +522,10 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		printk("CLOUD_EVT_CONNECTED\n");
 
 		k_work_submit(&cloud_pairing_routine_work);
+
+#if defined(CONFIG_BOOTLOADER_MCUBOOT)		
 		boot_write_img_confirmed();
+#endif
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
