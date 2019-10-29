@@ -536,8 +536,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_ERROR:
 		printk("CLOUD_EVT_ERROR\n");
 		break;
-	case CLOUD_EVT_FOTA_REBOOT:
-		printk("CLOUD_EVT_FOTA_REBOOT");
+	case CLOUD_EVT_FOTA_DONE:
+		printk("CLOUD_EVT_FOTA_DONE");
 		cloud_disconnect(cloud_backend);
 		sys_reboot(0);
 		break;

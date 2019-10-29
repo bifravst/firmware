@@ -184,7 +184,7 @@ static void aws_fota_cb_handler(enum aws_fota_evt_id evt)
 	switch (evt) {
 	case AWS_FOTA_EVT_DONE:
 		LOG_DBG("AWS_FOTA_EVT_DONE");
-		cloud_evt.type = CLOUD_EVT_FOTA_REBOOT;
+		cloud_evt.type = CLOUD_EVT_FOTA_DONE;
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
 		break;
