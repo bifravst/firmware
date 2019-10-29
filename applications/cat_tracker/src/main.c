@@ -59,7 +59,7 @@ static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
-static struct k_work cloud_ack_config_change_work;
+static struct k_work cloud_send_cfg_work;
 static struct k_work cloud_pairing_routine_work;
 static struct k_work cloud_update_routine_work;
 
@@ -223,14 +223,6 @@ static void populate_gps_buffer(struct gps_data gps_data)
 #if defined(CONFIG_MODEM_INFO)
 static int get_voltage_level(void)
 {
-	// int err;
-	//
-	/* This funtion should fetch battery voltage level from modem */
-	// err = modem_info_params_get(&modem_param);
-	// if (err != 0) {
-	// 	printk("Error getting modem_info: %d\n", err);
-	// 	return err;
-	// }
 
 	cloud_data.bat_voltage = modem_param.device.battery.value;
 	cloud_data.bat_timestamp = k_uptime_get();
@@ -243,7 +235,7 @@ static void cloud_pair(void)
 {
 	int err;
 
-	struct cloud_msg msg = { 
+	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_PAIR,
 		.buf = "",
@@ -255,7 +247,7 @@ static void cloud_pair(void)
 	}
 }
 
-static void cloud_ack_config_change(void)
+static void cloud_send_cfg(void)
 {
 	int err;
 
@@ -306,8 +298,6 @@ static void cloud_send_sensor_data(void)
 		return;
 	}
 
-	/* Set GPS fix to false only if the fix has 
-	   sucessfully been sent to cloud */
 	cloud_data.gps_found = false;
 }
 
@@ -338,14 +328,14 @@ static void cloud_send_modem_data(int inc_dyn_data)
 	if (err != 0) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
-	}	
+	}
 }
 #endif
 
 static void cloud_send_buffered_data(void)
 {
 	int err;
-	
+
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_BATCH,
@@ -410,9 +400,9 @@ static void cloud_update_routine(void)
 #endif
 }
 
-static void cloud_ack_config_change_work_fn(struct k_work *work)
+static void cloud_send_cfg_work_fn(struct k_work *work)
 {
-	cloud_ack_config_change();
+	cloud_send_cfg();
 }
 
 static void cloud_pairing_routine_work_fn(struct k_work *work)
@@ -427,7 +417,7 @@ static void cloud_update_routine_work_fn(struct k_work *work)
 
 static void work_init(void)
 {
-	k_work_init(&cloud_ack_config_change_work, cloud_ack_config_change_work_fn);
+	k_work_init(&cloud_send_cfg_work, cloud_send_cfg_work_fn);
 	k_work_init(&cloud_pairing_routine_work, cloud_pairing_routine_work_fn);
 	k_work_init(&cloud_update_routine_work, cloud_update_routine_work_fn);
 }
@@ -523,7 +513,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 
 		k_work_submit(&cloud_pairing_routine_work);
 
-#if defined(CONFIG_BOOTLOADER_MCUBOOT)		
+#if defined(CONFIG_BOOTLOADER_MCUBOOT)
 		boot_write_img_confirmed();
 #endif
 		break;
@@ -552,7 +542,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 			printk("Could not decode response %d\n", err);
 		}
 
-		k_work_submit(&cloud_ack_config_change_work);
+		k_work_submit(&cloud_send_cfg_work);
 
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
@@ -575,7 +565,7 @@ connect:
 	err = cloud_connect(cloud_backend);
 	if (err) {
 		printk("cloud_connect failed: %d\n", err);
-	} 
+	}
 
 	struct pollfd fds[] = {
 		{
@@ -623,10 +613,11 @@ connect:
 	}
 
 	cloud_disconnect(cloud_backend);
-	goto connect;	
+	goto connect;
 }
 
-K_THREAD_DEFINE(cloud_poll_thread, CLOUD_POLL_STACKSIZE, cloud_poll, NULL, NULL, NULL,
+K_THREAD_DEFINE(cloud_poll_thread, CLOUD_POLL_STACKSIZE,
+		cloud_poll, NULL, NULL, NULL,
 		CLOUD_POLL_PRIORITY, 0, K_FOREVER);
 
 static void lte_connect(enum lte_conn_actions action)
@@ -658,23 +649,23 @@ static void lte_connect(enum lte_conn_actions action)
 			goto gps_mode;
 		}
 
-		switch(nw_reg_status) {
-			case LTE_LC_NW_REG_REGISTERED_HOME:
-				printk("REGISTERED TO HOME NETWORK\n");
-				return;
-			case LTE_LC_NW_REG_REGISTERED_ROAMING:
-				printk("REGISTERED TO ROAMING NETWORK\n");
-				return;
-			default:
-				printk("LTE not connected.\n");
-				printk("Connecting to LTE network. ");
-				printk("This may take several minutes.\n");
-				err = lte_lc_init_and_connect();
-				if (err != 0) {
-					printk("LTE link could not be established.\n");
-					goto gps_mode;
-				}
-				break;
+		switch (nw_reg_status) {
+		case LTE_LC_NW_REG_REGISTERED_HOME:
+			printk("REGISTERED TO HOME NETWORK\n");
+			return;
+		case LTE_LC_NW_REG_REGISTERED_ROAMING:
+			printk("REGISTERED TO ROAMING NETWORK\n");
+			return;
+		default:
+			printk("LTE not connected.\n");
+			printk("Connecting to LTE network. ");
+			printk("This may take several minutes.\n");
+			err = lte_lc_init_and_connect();
+			if (err != 0) {
+				printk("LTE link could not be established.\n");
+				goto gps_mode;
+			}
+			break;
 		}
 	}
 
@@ -698,23 +689,13 @@ static void lte_connect(enum lte_conn_actions action)
 
 gps_mode:
 
-	/*Cloud should be handled in case of no mobile network */
-	/*Aborting the "cloud_poll_thread" is a possible fix here but must be tested,
-	occupied memory by the thread may be an issue */
 	k_thread_abort(cloud_poll_thread);
 
 	lte_lc_gps_nw_mode();
-	return;
+
 }
 
 #if defined(CONFIG_MODEM_INFO)
-// static void modem_rsrp_handler(char rsrp_value)
-// {
-// 	printk("Incoming rsrp event");
-// 	/*RSRP getting currently not working, atoi is probably not the best solution */
-// 	rsrp = atoi(&rsrp_value);
-// }
-
 static int modem_data_init(void)
 {
 	int err;
@@ -728,8 +709,6 @@ static int modem_data_init(void)
 	if (err != 0) {
 		return err;
 	}
-
-	// modem_info_rsrp_register(modem_rsrp_handler);
 
 	return 0;
 }
@@ -766,8 +745,7 @@ void main(void)
 
 check_mode:
 
-	if (!cloud_data.active)
-	{
+	if (!cloud_data.active) {
 		if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 			printk("Wooow, the cat is moving!\n");
 		}

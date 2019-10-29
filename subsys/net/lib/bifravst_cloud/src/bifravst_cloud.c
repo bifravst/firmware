@@ -65,12 +65,15 @@ static char get_topic[SHADOW_GET_LEN + 1];
 static char batch_topic[BATCH_TOPIC_LEN + 1];
 
 static const struct mqtt_topic cc_rx_list[] = {
-	{ .topic = { .utf8 = rejected_topic, .size = REJECTED_TOPIC_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
-	{ .topic = { .utf8 = cfg_topic, .size = CFG_TOPIC_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE },
-	{ .topic = { .utf8 = update_delta_topic, .size = UPDATE_DELTA_TOPIC_LEN },
-	  .qos = MQTT_QOS_1_AT_LEAST_ONCE }
+	{ .topic = {
+		.utf8 = rejected_topic, .size = REJECTED_TOPIC_LEN },
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = {
+		.utf8 = cfg_topic, .size = CFG_TOPIC_LEN },
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE },
+	{ .topic = {
+		.utf8 = update_delta_topic, .size = UPDATE_DELTA_TOPIC_LEN },
+		.qos = MQTT_QOS_1_AT_LEAST_ONCE },
 };
 
 struct bifravst_cloud_tx_data {
@@ -80,9 +83,9 @@ struct bifravst_cloud_tx_data {
 	enum mqtt_qos qos;
 };
 
-static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
-static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_BUFFER_SIZE];
-static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_PAYLOAD_SIZE];
+static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN];
+static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN];
+static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_MQTT_PAYLOAD_BUFFER_LEN];
 
 static struct mqtt_client client;
 
@@ -217,11 +220,14 @@ static int bifravst_init(const struct cloud_backend *const backend,
 		return err;
 	}
 #endif
-	return err;	
+	return err;
 }
 
-static int mqtt_data_publish(struct mqtt_client *c, enum mqtt_qos qos, u8_t *data,
-			size_t len, u8_t *topic)
+static int mqtt_data_publish(struct mqtt_client *c,
+			enum mqtt_qos qos,
+			u8_t *data,
+			size_t len,
+			u8_t *topic)
 {
 	struct mqtt_publish_param param;
 
@@ -310,7 +316,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		LOG_DBG("MQTT_EVT_PUBLISH: id=%d len=%d ",
 			p->message_id,
 			p->message.payload.len);
-		
+
 		err = mqtt_publish_get_payload(c, p->message.payload.len);
 		if (err) {
 			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
@@ -321,7 +327,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			const struct mqtt_puback_param ack = {
 				.message_id = p->message_id
 			};
-		
+
 			mqtt_publish_qos1_ack(c, &ack);
 		}
 
@@ -346,7 +352,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 			mqtt_evt->result);
 		break;
 
-	default:	
+	default:
 		break;
 	}
 }
@@ -379,7 +385,8 @@ static int mqtt_broker_init(void)
 		.ai_socktype = SOCK_STREAM
 	};
 
-	err = getaddrinfo(CONFIG_BIFRAVST_CLOUD_HOST_NAME, NULL, &hints, &result);
+	err = getaddrinfo(CONFIG_BIFRAVST_CLOUD_HOST_NAME,
+				NULL, &hints, &result);
 	if (err) {
 		LOG_ERR("getaddrinfo failed %d", err);
 		return err;
@@ -402,13 +409,13 @@ static int mqtt_broker_init(void)
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
-			LOG_DBG("IPv4 Address found %s", ipv4_addr);	
+			LOG_DBG("IPv4 Address found %s", ipv4_addr);
 			break;
 		} else if ((addr->ai_addrlen == sizeof(struct sockaddr_in6)) &&
 			   (BIFRAVST_CLOUD_AF_FAMILY == AF_INET6)) {
 			struct sockaddr_in6 *broker6 =
 				((struct sockaddr_in6 *)&broker);
-			char ipv6_addr[NET_IPV6_ADDR_LEN];				
+			char ipv6_addr[NET_IPV6_ADDR_LEN];
 
 			memcpy(broker6->sin6_addr.s6_addr,
 				((struct sockaddr_in6 *)addr->ai_addr)
@@ -417,16 +424,17 @@ static int mqtt_broker_init(void)
 			broker6->sin6_family = AF_INET6;
 			broker6->sin6_port = htons(CONFIG_BIFRAVST_CLOUD_PORT);
 
-			inet_ntop(AF_INET6, &broker6->sin6_addr.s6_addr, ipv6_addr,
-				  sizeof(ipv6_addr));
+			inet_ntop(AF_INET6, &broker6->sin6_addr.s6_addr,
+				ipv6_addr,
+				sizeof(ipv6_addr));
 			LOG_DBG("IPv4 Address found %s", ipv6_addr);
 			break;
-		} else {
-			LOG_DBG("ai_addrlen = %u should be %u or %u",
-				(unsigned int)addr->ai_addrlen,
-				(unsigned int)sizeof(struct sockaddr_in),
-				(unsigned int)sizeof(struct sockaddr_in6));
 		}
+
+		LOG_DBG("ai_addrlen = %u should be %u or %u",
+			(unsigned int)addr->ai_addrlen,
+			(unsigned int)sizeof(struct sockaddr_in),
+			(unsigned int)sizeof(struct sockaddr_in6));
 
 		addr = addr->ai_next;
 		break;
@@ -505,8 +513,8 @@ static int bifravst_send(const struct cloud_backend *const backend,
 			 const struct cloud_msg *const msg)
 {
 	struct bifravst_cloud_tx_data cloud_tx_data = {
-		.buf 	= msg->buf,
-		.len 	= msg->len,
+		.buf	= msg->buf,
+		.len	= msg->len,
 		.qos	= msg->qos,
 	};
 

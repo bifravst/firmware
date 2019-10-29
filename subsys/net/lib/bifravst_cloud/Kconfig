@@ -18,7 +18,7 @@ config BIFRAVST_CLOUD_STATIC_IPV4
 config BIFRAVST_CLOUD_STATIC_IPV4_ADDR
 	string "Static IPv4 address"
 	depends on BIFRAVST_CLOUD_STATIC_IPV4
-	default "192.168.2.2"	
+	default "192.168.2.2"
 
 config BIFRAVST_CLOUD_SEC_TAG
 	int "Security tag to use for Bifravst Cloud connection"
@@ -32,16 +32,15 @@ config BIFRAVST_CLOUD_PORT
 	int "Bifravst Cloud server port"
 	default 8883
 
-config BIFRAVST_CLOUD_CONNECTION_TRIES
-    int "Number of times the mqtt client will try to connect to host"
-    default 5
-
-config BIFRAVST_CLOUD_BUFFER_SIZE
-	int ""
+config BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN
+	int "Size of the buffer for MQTT library."
 	default 2048
+	help
+		Specifies maximum message size can be transmitted/received through
+		MQTT (exluding MQTT PUBLISH payload).
 
-config BIFRAVST_CLOUD_PAYLOAD_SIZE
-	int ""
+config BIFRAVST_CLOUD_MQTT_PAYLOAD_BUFFER_LEN
+	int "Size of the buffer for MQTT PUBLISH payload."
 	default 2048
 
 config BIFRAVST_CLOUD_IPV6

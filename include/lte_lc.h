@@ -150,7 +150,7 @@ int lte_lc_system_mode_get(enum lte_lc_system_mode *mode);
 int lte_lc_func_mode_get(enum lte_lc_func_mode *mode);
 
 /**@brief Set network to GPS mode.
- * 
+ *
  * @return Zero on success or (negative) error code otherwise.
  */
 int lte_lc_gps_nw_mode(void);

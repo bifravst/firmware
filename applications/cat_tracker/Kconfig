@@ -80,7 +80,7 @@ config CIRCULAR_SENSOR_BUFFER_MAX
 
 config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
-	default 7	
+	default 7
 
 endmenu # Cloud
 
