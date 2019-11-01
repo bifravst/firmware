@@ -239,7 +239,7 @@ static int topic_subscribe(void)
 		.message_id = SUBSCRIBE_ID
 	};
 
-	for (int i = 0; i < subscription_list.list_count; i++) {
+	for (size_t i = 0; i < subscription_list.list_count; i++) {
 		LOG_DBG("Subscribing to: %s",
 		       log_strdup(subscription_list.list[i].topic.utf8));
 	}
