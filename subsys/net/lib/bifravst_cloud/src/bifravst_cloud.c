@@ -95,11 +95,14 @@ static int client_id_get(char *const id)
 	err = at_cmd_write("AT+CGSN", imei_buf,
 		(AWS_CLOUD_CLIENT_ID_LEN + 5), NULL);
 	if (err) {
-		LOG_ERR("at_cmd_write, error: %d", err);
+		LOG_ERR("Could not get device IMEI, error: %d", err);
 		return err;
 	}
 
-	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
+	err = snprintf(id, sizeof(client_id_buf), "%s", imei_buf);
+	if (err != AWS_CLOUD_CLIENT_ID_LEN + 2) {
+		return -ENOMEM;
+	}
 
 	return 0;
 }
