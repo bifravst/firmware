@@ -1,18 +1,15 @@
-#include <bifravst_cloud.h>
 #include <net/mqtt.h>
 #include <net/socket.h>
 #include <net/cloud.h>
 #include <net/cloud_backend.h>
-#include <nrf_socket.h>
+#include <at_cmd.h>
 #include <stdio.h>
-
-#include <logging/log.h>
 
 #if defined(CONFIG_AWS_FOTA)
 #include <net/aws_fota.h>
-#include <dfu/mcuboot.h>
-#include <misc/reboot.h>
 #endif
+
+#include <logging/log.h>
 
 LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 
@@ -22,8 +19,7 @@ LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 #define BIFRAVST_CLOUD_AF_FAMILY AF_INET
 #endif
 
-#define IMEI_LEN 15
-#define AWS_CLOUD_CLIENT_ID_LEN (IMEI_LEN)
+#define AWS_CLOUD_CLIENT_ID_LEN 15
 
 #define AWS "$aws/things/"
 #define AWS_LEN (sizeof(AWS) - 1)
@@ -52,7 +48,7 @@ LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 #define BATCH_TOPIC AWS "%s/batch"
 #define BATCH_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 6)
 
-#define CC_SUBSCRIBE_ID 1234
+#define SUBSCRIBE_ID 1234
 
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 static char shadow_base_topic[SHADOW_BASE_TOPIC_LEN + 1];
@@ -79,52 +75,41 @@ static const struct mqtt_topic cc_rx_list[] = {
 struct bifravst_cloud_tx_data {
 	char *buf;
 	size_t len;
-	u8_t *topic;
+	char *topic;
 	enum mqtt_qos qos;
 };
 
-static u8_t rx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN];
-static u8_t tx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN];
-static u8_t payload_buf[CONFIG_BIFRAVST_CLOUD_MQTT_PAYLOAD_BUFFER_LEN];
+static char rx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_RX_TX_BUFFER_LEN];
+static char tx_buffer[CONFIG_BIFRAVST_CLOUD_MQTT_RX_TX_BUFFER_LEN];
+static char payload_buf[CONFIG_BIFRAVST_CLOUD_MQTT_PAYLOAD_BUFFER_LEN];
 
 static struct mqtt_client client;
-
 static struct sockaddr_storage broker;
-
 static struct cloud_backend *bifravst_cloud_backend;
 
-static int mqtt_client_id_get(char *id)
+static int client_id_get(char *const id)
 {
 	int err;
-	int at_socket_fd;
-	int bytes_written;
-	int bytes_read;
-	char imei_buf[IMEI_LEN + 1];
+	char imei_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 
-	at_socket_fd = nrf_socket(NRF_AF_LTE, 0, NRF_PROTO_AT);
-	__ASSERT_NO_MSG(at_socket_fd >= 0);
-
-	bytes_written = nrf_write(at_socket_fd, "AT+CGSN", 7);
-	__ASSERT_NO_MSG(bytes_written == 7);
-
-	bytes_read = nrf_read(at_socket_fd, imei_buf, IMEI_LEN);
-	__ASSERT_NO_MSG(bytes_read == IMEI_LEN);
-	imei_buf[IMEI_LEN] = 0;
+	err = at_cmd_write("AT+CGSN", imei_buf,
+		(AWS_CLOUD_CLIENT_ID_LEN + 5), NULL);
+	if (err) {
+		LOG_ERR("at_cmd_write, error: %d", err);
+		return err;
+	}
 
 	snprintf(id, AWS_CLOUD_CLIENT_ID_LEN + 1, "%s", imei_buf);
-
-	err = nrf_close(at_socket_fd);
-	__ASSERT_NO_MSG(err == 0);
 
 	return 0;
 }
 
-static int mqtt_topics_populate(void)
+static int topics_populate(void)
 {
 	int err;
 
-	err = mqtt_client_id_get(client_id_buf);
-	if (err != 0) {
+	err = client_id_get(client_id_buf);
+	if (err) {
 		return err;
 	}
 
@@ -191,9 +176,11 @@ static void aws_fota_cb_handler(enum aws_fota_evt_id evt)
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
 		break;
-
 	case AWS_FOTA_EVT_ERROR:
 		LOG_ERR("AWS_FOTA_EVT_ERROR");
+		cloud_evt.type = CLOUD_EVT_ERROR;
+		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
+				   config->user_data);
 		break;
 	}
 }
@@ -207,27 +194,25 @@ static int bifravst_init(const struct cloud_backend *const backend,
 	backend->config->handler = handler;
 	bifravst_cloud_backend = (struct cloud_backend *)backend;
 
-	err = mqtt_topics_populate();
-	if (err != 0) {
-		LOG_DBG("Topics not populated, error: %d", err);
+	err = topics_populate();
+	if (err) {
+		LOG_ERR("topics_populate, error: %d", err);
 		return err;
 	}
 
 #if defined(CONFIG_AWS_FOTA)
-	err = aws_fota_init(&client, CONFIG_APP_VERSION, aws_fota_cb_handler);
-	if (err != 0) {
-		LOG_ERR("ERROR: aws_fota_init %d", err);
+	err = aws_fota_init(&client, "v0.0.0",
+		aws_fota_cb_handler);
+	if (err) {
+		LOG_ERR("aws_fota_init, error: %d", err);
 		return err;
 	}
 #endif
 	return err;
 }
 
-static int mqtt_data_publish(struct mqtt_client *c,
-			enum mqtt_qos qos,
-			u8_t *data,
-			size_t len,
-			u8_t *topic)
+static int data_publish(struct mqtt_client *const c, enum mqtt_qos qos,
+			char *data, size_t len, char *topic)
 {
 	struct mqtt_publish_param param;
 
@@ -240,30 +225,30 @@ static int mqtt_data_publish(struct mqtt_client *c,
 	param.dup_flag = 0;
 	param.retain_flag = 0;
 
-	LOG_DBG("Publishing to topic: %s", param.message.topic.topic.utf8);
+	LOG_DBG("Publishing to topic: %s",
+		log_strdup(param.message.topic.topic.utf8));
 
 	return mqtt_publish(c, &param);
 }
 
-static int mqtt_ep_subscribe(void)
+static int topic_subscribe(void)
 {
 	const struct mqtt_subscription_list subscription_list = {
 		.list = (struct mqtt_topic *)&cc_rx_list,
 		.list_count = ARRAY_SIZE(cc_rx_list),
-		.message_id = CC_SUBSCRIBE_ID
+		.message_id = SUBSCRIBE_ID
 	};
 
 	for (int i = 0; i < subscription_list.list_count; i++) {
 		LOG_DBG("Subscribing to: %s",
-		       subscription_list.list[i].topic.utf8);
+		       log_strdup(subscription_list.list[i].topic.utf8));
 	}
 
 	return mqtt_subscribe(&client, &subscription_list);
 }
 
-static int mqtt_publish_get_payload(struct mqtt_client *c, size_t length)
+static int publish_get_payload(struct mqtt_client *const c, size_t length)
 {
-
 	if (length > sizeof(payload_buf)) {
 		return -EMSGSIZE;
 	}
@@ -284,7 +269,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		/* Event handled by FOTA library so we can skip it */
 		return;
 	} else if (err < 0) {
-		LOG_ERR("aws_fota_mqtt_evt_handler: Failed! %d", err);
+		LOG_ERR("aws_fota_mqtt_evt_handler, error: %d", err);
 		cloud_evt.type = CLOUD_EVT_ERROR;
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
 				   config->user_data);
@@ -295,7 +280,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	case MQTT_EVT_CONNACK:
 		LOG_DBG("MQTT client connected!");
 
-		mqtt_ep_subscribe();
+		topic_subscribe();
 
 		cloud_evt.type = CLOUD_EVT_CONNECTED;
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
@@ -303,7 +288,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 		break;
 
 	case MQTT_EVT_DISCONNECT:
-		LOG_DBG("MQTT_EVT_DISCONNECT: result=%d", mqtt_evt->result);
+		LOG_DBG("MQTT_EVT_DISCONNECT: result = %d", mqtt_evt->result);
 
 		cloud_evt.type = CLOUD_EVT_DISCONNECTED;
 		cloud_notify_event(bifravst_cloud_backend, &cloud_evt,
@@ -313,13 +298,13 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	case MQTT_EVT_PUBLISH: {
 		const struct mqtt_publish_param *p = &mqtt_evt->param.publish;
 
-		LOG_DBG("MQTT_EVT_PUBLISH: id=%d len=%d ",
+		LOG_DBG("MQTT_EVT_PUBLISH: id = %d len = %d ",
 			p->message_id,
 			p->message.payload.len);
 
-		err = mqtt_publish_get_payload(c, p->message.payload.len);
+		err = publish_get_payload(c, p->message.payload.len);
 		if (err) {
-			LOG_ERR("mqtt_read_publish_payload: Failed! %d", err);
+			LOG_ERR("publish_get_payload, error: %d", err);
 			break;
 		}
 
@@ -341,13 +326,13 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 	} break;
 
 	case MQTT_EVT_PUBACK:
-		LOG_DBG("MQTT_EVT_PUBACK: id=%d result=%d",
+		LOG_DBG("MQTT_EVT_PUBACK: id = %d result = %d",
 			mqtt_evt->param.puback.message_id,
 			mqtt_evt->result);
 		break;
 
 	case MQTT_EVT_SUBACK:
-		LOG_DBG("MQTT_EVT_SUBACK: id=%d result=%d",
+		LOG_DBG("MQTT_EVT_SUBACK: id = %d result = %d",
 			mqtt_evt->param.suback.message_id,
 			mqtt_evt->result);
 		break;
@@ -358,7 +343,7 @@ static void mqtt_evt_handler(struct mqtt_client *const c,
 }
 
 #if defined(CONFIG_BIFRAVST_CLOUD_STATIC_IPV4)
-static int mqtt_broker_init(void)
+static int broker_init(void)
 {
 	int err;
 
@@ -375,7 +360,7 @@ static int mqtt_broker_init(void)
 	return err;
 }
 #else
-static int mqtt_broker_init(void)
+static int broker_init(void)
 {
 	int err;
 	struct addrinfo *result;
@@ -388,7 +373,7 @@ static int mqtt_broker_init(void)
 	err = getaddrinfo(CONFIG_BIFRAVST_CLOUD_HOST_NAME,
 				NULL, &hints, &result);
 	if (err) {
-		LOG_ERR("getaddrinfo failed %d", err);
+		LOG_ERR("getaddrinfo, error %d", err);
 		return err;
 	}
 
@@ -409,7 +394,7 @@ static int mqtt_broker_init(void)
 
 			inet_ntop(AF_INET, &broker4->sin_addr.s_addr, ipv4_addr,
 				  sizeof(ipv4_addr));
-			LOG_DBG("IPv4 Address found %s", ipv4_addr);
+			LOG_DBG("IPv4 Address found %s", log_strdup(ipv4_addr));
 			break;
 		} else if ((addr->ai_addrlen == sizeof(struct sockaddr_in6)) &&
 			   (BIFRAVST_CLOUD_AF_FAMILY == AF_INET6)) {
@@ -427,7 +412,7 @@ static int mqtt_broker_init(void)
 			inet_ntop(AF_INET6, &broker6->sin6_addr.s6_addr,
 				ipv6_addr,
 				sizeof(ipv6_addr));
-			LOG_DBG("IPv4 Address found %s", ipv6_addr);
+			LOG_DBG("IPv4 Address found %s", log_strdup(ipv6_addr));
 			break;
 		}
 
@@ -446,20 +431,20 @@ static int mqtt_broker_init(void)
 }
 #endif
 
-static int mqtt_client_broker_init(struct mqtt_client *client)
+static int client_broker_init(struct mqtt_client *const client)
 {
 	int err;
 
 	mqtt_client_init(client);
 
-	err = mqtt_broker_init();
-	if (err != 0) {
+	err = broker_init();
+	if (err) {
 		return err;
 	}
 
 	client->broker			= &broker;
 	client->evt_cb			= mqtt_evt_handler;
-	client->client_id.utf8		= (u8_t *)client_id_buf;
+	client->client_id.utf8		= (char *)client_id_buf;
 	client->client_id.size		= strlen(client_id_buf);
 	client->password		= NULL;
 	client->user_name		= NULL;
@@ -487,15 +472,15 @@ static int bifravst_connect(const struct cloud_backend *const backend)
 {
 	int err;
 
-	err = mqtt_client_broker_init(&client);
-	if (err != 0) {
-		LOG_ERR("Client not initialized, error: %d", err);
+	err = client_broker_init(&client);
+	if (err) {
+		LOG_ERR("client_broker_init, error: %d", err);
 		return err;
 	}
 
 	err = mqtt_connect(&client);
-	if (err != 0) {
-		LOG_ERR("MQTT not connected, error: %d", err);
+	if (err) {
+		LOG_ERR("mqtt_connect, error: %d", err);
 		return err;
 	}
 
@@ -532,7 +517,7 @@ static int bifravst_send(const struct cloud_backend *const backend,
 		break;
 	}
 
-	return mqtt_data_publish(&client, cloud_tx_data.qos, cloud_tx_data.buf,
+	return data_publish(&client, cloud_tx_data.qos, cloud_tx_data.buf,
 				cloud_tx_data.len, cloud_tx_data.topic);
 }
 

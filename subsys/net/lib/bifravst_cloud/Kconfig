@@ -1,4 +1,4 @@
-# Copyright (c) 2018 Nordic Semiconductor
+# Copyright (c) 2019 Nordic Semiconductor
 #
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
@@ -6,19 +6,18 @@
 menuconfig BIFRAVST_CLOUD
 	bool "BIFRAVST Cloud library"
 	select CJSON_LIB
-	select MQTT_LIB
-	select MQTT_LIB_TLS
+	imply MQTT_LIB
+	imply MQTT_LIB_TLS
+	imply AT_CMD
 
 if BIFRAVST_CLOUD
 
 config BIFRAVST_CLOUD_STATIC_IPV4
 	bool "Enable use of static IPv4"
-	default n
 
 config BIFRAVST_CLOUD_STATIC_IPV4_ADDR
 	string "Static IPv4 address"
 	depends on BIFRAVST_CLOUD_STATIC_IPV4
-	default "192.168.2.2"
 
 config BIFRAVST_CLOUD_SEC_TAG
 	int "Security tag to use for Bifravst Cloud connection"
@@ -32,12 +31,12 @@ config BIFRAVST_CLOUD_PORT
 	int "Bifravst Cloud server port"
 	default 8883
 
-config BIFRAVST_CLOUD_MQTT_MESSAGE_BUFFER_LEN
-	int "Size of the buffer for MQTT library."
+config BIFRAVST_CLOUD_MQTT_RX_TX_BUFFER_LEN
+	int "Buffer sizes for the MQTT library."
 	default 2048
 	help
-		Specifies maximum message size can be transmitted/received through
-		MQTT (exluding MQTT PUBLISH payload).
+	  Specifies maximum message size can be transmitted/received through
+	  MQTT (exluding MQTT PUBLISH payload).
 
 config BIFRAVST_CLOUD_MQTT_PAYLOAD_BUFFER_LEN
 	int "Size of the buffer for MQTT PUBLISH payload."
@@ -48,8 +47,7 @@ config BIFRAVST_CLOUD_IPV6
 
 module=BIFRAVST_CLOUD
 module-dep=LOG
-module-str=Log level for BIFRAVST Cloud
-module-help=Enables BIFRAVST Cloud log messages.
+module-str=Bifravst Cloud
 source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
 
 endif # BIFRAVST_CLOUD

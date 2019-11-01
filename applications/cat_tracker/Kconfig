@@ -84,14 +84,6 @@ config MAX_PER_ENCODED_ENTRIES
 
 endmenu # Cloud
 
-menu "FOTA"
-
-config APP_VERSION
-	string "Application version"
-	default "v1.0.0"
-
-endmenu # FOTA
-
 endmenu
 
 menu "Zephyr Kernel"

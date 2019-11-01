@@ -7,4 +7,3 @@ zephyr_library()
 zephyr_library_sources(
 	src/bifravst_cloud.c
 )
-zephyr_include_directories(./include)
