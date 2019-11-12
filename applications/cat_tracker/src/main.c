@@ -62,6 +62,7 @@ static int num_queued_entries;
 static struct k_work cloud_send_cfg_work;
 static struct k_work cloud_pairing_routine_work;
 static struct k_work cloud_update_routine_work;
+static struct k_work fetch_modem_data_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -415,11 +416,17 @@ static void cloud_update_routine_work_fn(struct k_work *work)
 	cloud_update_routine();
 }
 
+static void fetch_modem_data_work_fn(struct k_work *work)
+{
+	modem_info_params_get(&modem_param);
+}
+
 static void work_init(void)
 {
 	k_work_init(&cloud_send_cfg_work, cloud_send_cfg_work_fn);
 	k_work_init(&cloud_pairing_routine_work, cloud_pairing_routine_work_fn);
 	k_work_init(&cloud_update_routine_work, cloud_update_routine_work_fn);
+	k_work_init(&fetch_modem_data_work, fetch_modem_data_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -477,7 +484,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 	gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 	set_current_time(gps_data);
 	populate_gps_buffer(gps_data);
-	gps_control_stop(1);
+	gps_control_stop(K_NO_WAIT);
 }
 
 static void adxl362_init(void)
@@ -696,6 +703,17 @@ gps_mode:
 }
 
 #if defined(CONFIG_MODEM_INFO)
+static void modem_rsrp_handler(char rsrp_value)
+{
+	if (rsrp_value == 255) {
+		return;
+	}
+
+	rsrp = rsrp_value;
+
+	printk("rsrp value is %d\n", rsrp);
+}
+
 static int modem_data_init(void)
 {
 	int err;
@@ -706,6 +724,11 @@ static int modem_data_init(void)
 	}
 
 	err = modem_info_params_init(&modem_param);
+	if (err != 0) {
+		return err;
+	}
+
+	err = modem_info_rsrp_register(modem_rsrp_handler);
 	if (err != 0) {
 		return err;
 	}
@@ -751,9 +774,9 @@ check_mode:
 		}
 	}
 
-	gps_control_start(1);
+	gps_control_start(K_NO_WAIT);
 	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
-		gps_control_stop(1);
+		gps_control_stop(K_NO_WAIT);
 	}
 
 	k_sleep(K_SECONDS(check_active_wait()));
