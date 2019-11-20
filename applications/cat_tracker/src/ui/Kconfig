@@ -24,19 +24,22 @@ if UI_LED_USE_PWM
 
 config UI_LED_PWM_DEV_NAME
 	string "PWM device name for RGB LED"
-	default "$(dt_str_val,DT_NORDIC_NRF_PWM_PWM_0_LABEL)" if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+	default "PWM_0" if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
 
 config UI_LED_RED_PIN
 	int "Red LED pin number"
-	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH0_PIN)
+	default 29 if BOARD_NRF9160_PCA20035NS
+	default 13 if BOARD_NRF9160_PCA10015NS
 
 config UI_LED_GREEN_PIN
 	int "Green LED pin number"
-	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH1_PIN)
+	default 30 if BOARD_NRF9160_PCA20035NS
+	default 14 if BOARD_NRF9160_PCA10015NS
 
 config UI_LED_BLUE_PIN
 	int "Blue LED pin number"
-	default $(dt_int_val,DT_NORDIC_NRF_PWM_PWM_0_CH2_PIN)
+	default 31 if BOARD_NRF9160_PCA20035NS
+	default 15 if BOARD_NRF9160_PCA10015NS
 
 endif # UI_LED_USE_PWM
 
