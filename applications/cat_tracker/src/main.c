@@ -766,6 +766,10 @@ void main(void)
 	adxl362_init();
 	gps_control_init(gps_trigger_handler);
 
+	/*Sleep so that the device manages to adapt
+	  to its new configuration before gps search*/
+	k_sleep(K_SECONDS(10));
+
 check_mode:
 
 	if (!cloud_data.active) {
@@ -774,15 +778,16 @@ check_mode:
 		}
 	}
 
-	gps_control_start(K_SECONDS(1));
+	gps_control_start(K_NO_WAIT);
+
 	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
 		gps_control_stop(K_NO_WAIT);
 	}
 
-	k_sleep(K_SECONDS(check_active_wait()));
-
 	lte_connect(LTE_UPDATE);
 	cloud_update_routine();
+
+	k_sleep(K_SECONDS(check_active_wait()));
 
 goto check_mode;
 
