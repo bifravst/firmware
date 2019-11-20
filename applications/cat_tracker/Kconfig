@@ -59,7 +59,7 @@ menu "Cloud"
 
 config MQTT_KEEPALIVE
 	int "MQTT KEEPALIVE"
-	default 3600 if POWER_OPTIMIZATION_ENABLE
+	default 1200 if POWER_OPTIMIZATION_ENABLE
 	default 120
 
 config CLOUD_PAIR
