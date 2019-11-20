@@ -321,7 +321,7 @@ static void cloud_send_modem_data(int inc_dyn_data)
 	err = cloud_encode_modem_data(&msg, &modem_param, inc_dyn_data, rsrp,
 				      &cloud_data_time);
 	if (err != 0) {
-		printk("Error encoding modem data");
+		printk("Error encoding modem data, error: %d\n", err);
 		return;
 	}
 
@@ -774,7 +774,7 @@ check_mode:
 		}
 	}
 
-	gps_control_start(K_NO_WAIT);
+	gps_control_start(K_SECONDS(1));
 	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
 		gps_control_stop(K_NO_WAIT);
 	}
