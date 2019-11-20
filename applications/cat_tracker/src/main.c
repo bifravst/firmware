@@ -59,10 +59,12 @@ static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
-static struct k_work cloud_send_cfg_work;
-static struct k_work cloud_pairing_routine_work;
-static struct k_work cloud_update_routine_work;
-static struct k_work fetch_modem_data_work;
+static struct k_delayed_work cloud_pair_work;
+static struct k_delayed_work cloud_send_sensor_data_work;
+static struct k_delayed_work cloud_send_modem_data_work;
+static struct k_delayed_work cloud_send_modem_data_dyn_work;
+static struct k_delayed_work cloud_send_cfg_work;
+static struct k_delayed_work cloud_send_buffered_data_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -145,7 +147,6 @@ static int parse_time_entries(char *datetime_string, int min, int max)
 	return atoi(buf);
 }
 
-#if defined(CONFIG_MODEM_INFO)
 static void parse_modem_time_data(void)
 {
 	struct tm info;
@@ -170,7 +171,6 @@ static void parse_modem_time_data(void)
 	cloud_data_time.update_time = k_uptime_get();
 
 }
-#endif
 
 static void set_current_time(struct gps_data gps_data)
 {
@@ -221,7 +221,6 @@ static void populate_gps_buffer(struct gps_data gps_data)
 	printk("Entry: %d in gps_buffer filled", head_cir_buf);
 }
 
-#if defined(CONFIG_MODEM_INFO)
 static int get_voltage_level(void)
 {
 
@@ -230,7 +229,6 @@ static int get_voltage_level(void)
 
 	return 0;
 }
-#endif
 
 static void cloud_pair(void)
 {
@@ -302,8 +300,7 @@ static void cloud_send_sensor_data(void)
 	cloud_data.gps_found = false;
 }
 
-#if defined(CONFIG_MODEM_INFO)
-static void cloud_send_modem_data(int inc_dyn_data)
+static void cloud_send_modem_data(bool include_dev_data)
 {
 	int err;
 
@@ -312,13 +309,7 @@ static void cloud_send_modem_data(int inc_dyn_data)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
-	err = modem_info_params_get(&modem_param);
-	if (err != 0) {
-		printk("Error getting modem_info: %d\n", err);
-		return;
-	}
-
-	err = cloud_encode_modem_data(&msg, &modem_param, inc_dyn_data, rsrp,
+	err = cloud_encode_modem_data(&msg, &modem_param, include_dev_data, rsrp,
 				      &cloud_data_time);
 	if (err != 0) {
 		printk("Error encoding modem data, error: %d\n", err);
@@ -331,7 +322,6 @@ static void cloud_send_modem_data(int inc_dyn_data)
 		return;
 	}
 }
-#endif
 
 static void cloud_send_buffered_data(void)
 {
@@ -375,30 +365,37 @@ static void cloud_pairing_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 
-#if defined(CONFIG_CLOUD_PAIR)
-	cloud_pair();
-#endif
+	k_delayed_work_cancel(&cloud_pair_work);
+	k_delayed_work_cancel(&cloud_send_cfg_work);
+	k_delayed_work_cancel(&cloud_send_modem_data_work);
 
-#if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(true);
-#endif
+	k_delayed_work_submit(&cloud_pair_work, K_NO_WAIT);
+	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
+	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(10));
 }
 
 static void cloud_update_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
+	k_delayed_work_cancel(&cloud_send_sensor_data_work);
+	k_delayed_work_cancel(&cloud_send_cfg_work);
+	k_delayed_work_cancel(&cloud_send_modem_data_dyn_work);
+	k_delayed_work_cancel(&cloud_send_buffered_data_work);
 
-#if defined(CONFIG_SENSOR_DATA_SEND)
+	k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
+	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
+	k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(10));
+	k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(10));
+}
+
+static void cloud_pair_work_fn(struct k_work *work)
+{
+	cloud_pair();
+}
+
+static void cloud_send_sensor_data_work_fn(struct k_work *work)
+{
 	cloud_send_sensor_data();
-#endif
-
-#if defined(CONFIG_MODEM_INFO)
-	cloud_send_modem_data(false);
-#endif
-
-#if defined(CONFIG_BUFFERED_DATA_SEND)
-	cloud_send_buffered_data();
-#endif
 }
 
 static void cloud_send_cfg_work_fn(struct k_work *work)
@@ -406,27 +403,29 @@ static void cloud_send_cfg_work_fn(struct k_work *work)
 	cloud_send_cfg();
 }
 
-static void cloud_pairing_routine_work_fn(struct k_work *work)
+static void cloud_send_modem_data_work_fn(struct k_work *work)
 {
-	cloud_pairing_routine();
+	cloud_send_modem_data(true);
 }
 
-static void cloud_update_routine_work_fn(struct k_work *work)
+static void cloud_send_modem_data_dyn_work_fn(struct k_work *work)
 {
-	cloud_update_routine();
+	cloud_send_modem_data(false);
 }
 
-static void fetch_modem_data_work_fn(struct k_work *work)
+static void cloud_send_buffered_data_work_fn(struct k_work *work)
 {
-	modem_info_params_get(&modem_param);
+	cloud_send_buffered_data();
 }
 
 static void work_init(void)
 {
-	k_work_init(&cloud_send_cfg_work, cloud_send_cfg_work_fn);
-	k_work_init(&cloud_pairing_routine_work, cloud_pairing_routine_work_fn);
-	k_work_init(&cloud_update_routine_work, cloud_update_routine_work_fn);
-	k_work_init(&fetch_modem_data_work, fetch_modem_data_work_fn);
+	k_delayed_work_init(&cloud_pair_work, cloud_pair_work_fn);
+	k_delayed_work_init(&cloud_send_sensor_data_work, cloud_send_sensor_data_work_fn);
+	k_delayed_work_init(&cloud_send_cfg_work, cloud_send_cfg_work_fn);
+	k_delayed_work_init(&cloud_send_modem_data_work, cloud_send_modem_data_work_fn);
+	k_delayed_work_init(&cloud_send_modem_data_dyn_work, cloud_send_modem_data_dyn_work_fn);	
+	k_delayed_work_init(&cloud_send_buffered_data_work, cloud_send_buffered_data_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -518,7 +517,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
 
-		k_work_submit(&cloud_pairing_routine_work);
+		cloud_pairing_routine();
 
 #if defined(CONFIG_BOOTLOADER_MCUBOOT)
 		boot_write_img_confirmed();
@@ -543,14 +542,10 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		break;
 	case CLOUD_EVT_DATA_RECEIVED:
 		printk("CLOUD_EVT_DATA_RECEIVED\n");
-
 		err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
 		if (err != 0) {
 			printk("Could not decode response %d\n", err);
 		}
-
-		k_work_submit(&cloud_send_cfg_work);
-
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		printk("CLOUD_EVT_PAIR_REQUEST\n");
@@ -583,7 +578,7 @@ connect:
 
 	while (true) {
 		err = poll(fds, ARRAY_SIZE(fds),
-			K_SECONDS(CONFIG_MQTT_KEEPALIVE));
+			K_SECONDS(CONFIG_MQTT_KEEPALIVE / 3));
 
 		if (err < 0) {
 			printk("poll() returned an error: %d\n", err);
@@ -656,6 +651,11 @@ static void lte_connect(enum lte_conn_actions action)
 			goto gps_mode;
 		}
 
+		err = modem_info_params_get(&modem_param);
+		if (err != 0) {
+			printk("Error getting modem_info: %d", err);
+		}
+
 		switch (nw_reg_status) {
 		case LTE_LC_NW_REG_REGISTERED_HOME:
 			printk("REGISTERED TO HOME NETWORK\n");
@@ -678,16 +678,16 @@ static void lte_connect(enum lte_conn_actions action)
 
 	printk("LTE connected!\nFetching modem time...\n");
 
-#if defined(CONFIG_MODEM_INFO)
 	k_sleep(1000);
 
+	/* Modem data should be timestamped here*/
 	err = modem_info_params_get(&modem_param);
 	if (err != 0) {
 		printk("Error getting modem_info: %d", err);
 	}
 
 	parse_modem_time_data();
-#endif
+
 	ui_led_set_pattern(UI_LTE_CONNECTED);
 
 	k_thread_start(cloud_poll_thread);
@@ -697,10 +697,8 @@ static void lte_connect(enum lte_conn_actions action)
 gps_mode:
 
 	lte_lc_gps_nw_mode();
-
 }
 
-#if defined(CONFIG_MODEM_INFO)
 static void modem_rsrp_handler(char rsrp_value)
 {
 	if (rsrp_value == 255) {
@@ -733,7 +731,6 @@ static int modem_data_init(void)
 
 	return 0;
 }
-#endif
 
 void main(void)
 {
@@ -777,7 +774,6 @@ check_mode:
 	}
 
 	gps_control_start(K_NO_WAIT);
-
 	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
 		gps_control_stop(K_NO_WAIT);
 	}
