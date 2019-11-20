@@ -696,8 +696,6 @@ static void lte_connect(enum lte_conn_actions action)
 
 gps_mode:
 
-	k_thread_abort(cloud_poll_thread);
-
 	lte_lc_gps_nw_mode();
 
 }
@@ -784,10 +782,10 @@ check_mode:
 		gps_control_stop(K_NO_WAIT);
 	}
 
+	k_sleep(K_SECONDS(check_active_wait()));
+
 	lte_connect(LTE_UPDATE);
 	cloud_update_routine();
-
-	k_sleep(K_SECONDS(check_active_wait()));
 
 goto check_mode;
 
