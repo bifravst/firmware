@@ -240,7 +240,7 @@ static void cloud_pair(void)
 		.len = 0 };
 
 	err = cloud_send(cloud_backend, &msg);
-	if (err != 0) {
+	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 	}
 }
@@ -255,13 +255,16 @@ static void cloud_send_cfg(void)
 	};
 
 	err = cloud_encode_cfg_data(&msg, &cloud_data);
-	if (err != 0) {
-		printk("Error encoding configurations %d\n", err);
+	if (err == -EAGAIN) {
+		printk("No change in device configuration\n");
+		return;
+	} else if (err) {
+		printk("Device configuration not encoded, error: %d\n", err);
 		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	if (err != 0) {
+	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
 	}
@@ -277,7 +280,7 @@ static void cloud_send_sensor_data(void)
 	};
 
 	err = get_voltage_level();
-	if (err != 0) {
+	if (err) {
 		printk("Error requesting voltage level %d\n", err);
 		return;
 	}
@@ -285,13 +288,13 @@ static void cloud_send_sensor_data(void)
 	err = cloud_encode_sensor_data(&msg, &cloud_data,
 				       &cir_buf_gps[head_cir_buf],
 				       &cloud_data_time);
-	if (err != 0) {
+	if (err) {
 		printk("Error enconding message %d\n", err);
 		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	if (err != 0) {
+	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
 	}
@@ -310,13 +313,13 @@ static void cloud_send_modem_data(bool include_dev_data)
 
 	err = cloud_encode_modem_data(&msg, &modem_param, include_dev_data, rsrp,
 				      &cloud_data_time);
-	if (err != 0) {
+	if (err) {
 		printk("Error encoding modem data, error: %d\n", err);
 		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	if (err != 0) {
+	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
 	}
@@ -341,13 +344,13 @@ static void cloud_send_buffered_data(void)
 	while (num_queued_entries > 0 && queued_entries) {
 		err = cloud_encode_gps_buffer(&msg, cir_buf_gps,
 						&cloud_data_time);
-		if (err != 0) {
+		if (err) {
 			printk("Error encoding circular buffer: %d\n", err);
 			goto end;
 		}
 
 		err = cloud_send(cloud_backend, &msg);
-		if (err != 0) {
+		if (err) {
 			printk("Cloud send failed, err: %d\n", err);
 			goto end;
 		}
@@ -364,17 +367,17 @@ static void cloud_pairing_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 	k_delayed_work_submit(&cloud_pair_work, K_NO_WAIT);
-	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
-	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(10));
+	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(5));
 }
 
 static void cloud_update_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 	k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
-	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
-	k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(10));
-	k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(10));
+	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(5));
 }
 
 static void cloud_pair_work_fn(struct k_work *work)
@@ -532,7 +535,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_DATA_RECEIVED:
 		printk("CLOUD_EVT_DATA_RECEIVED\n");
 		err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
-		if (err != 0) {
+		if (err) {
 			printk("Could not decode response %d\n", err);
 		}
 		break;
@@ -635,13 +638,13 @@ static void lte_connect(enum lte_conn_actions action)
 		}
 	} else if (action == LTE_UPDATE) {
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
-		if (err != 0) {
+		if (err) {
 			printk("lte_lc_nw_reg_status error: %d\n", err);
 			goto gps_mode;
 		}
 
 		err = modem_info_params_get(&modem_param);
-		if (err != 0) {
+		if (err) {
 			printk("Error getting modem_info: %d", err);
 		}
 
@@ -657,7 +660,7 @@ static void lte_connect(enum lte_conn_actions action)
 			printk("Connecting to LTE network. ");
 			printk("This may take several minutes.\n");
 			err = lte_lc_init_and_connect();
-			if (err != 0) {
+			if (err) {
 				printk("LTE link could not be established.\n");
 				goto gps_mode;
 			}
@@ -671,7 +674,7 @@ static void lte_connect(enum lte_conn_actions action)
 
 	/* Modem data should be timestamped here*/
 	err = modem_info_params_get(&modem_param);
-	if (err != 0) {
+	if (err) {
 		printk("Error getting modem_info: %d", err);
 	}
 
@@ -704,17 +707,17 @@ static int modem_data_init(void)
 	int err;
 
 	err = modem_info_init();
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
 	err = modem_info_params_init(&modem_param);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
 	err = modem_info_rsrp_register(modem_rsrp_handler);
-	if (err != 0) {
+	if (err) {
 		return err;
 	}
 
