@@ -475,7 +475,6 @@ static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 	gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
 	set_current_time(gps_data);
 	populate_gps_buffer(gps_data);
-	gps_control_stop(K_NO_WAIT);
 	k_sem_give(&gps_timeout_sem);
 }
 
@@ -649,6 +648,7 @@ static void lte_connect(enum lte_conn_actions action)
 			printk("Error getting modem_info: %d", err);
 		}
 
+		printk("Checking LTE connection...\n");
 		switch (nw_reg_status) {
 		case LTE_LC_NW_REG_REGISTERED_HOME:
 			printk("REGISTERED TO HOME NETWORK\n");
@@ -760,21 +760,30 @@ void main(void)
 
 check_mode:
 
+	/*Check current device mode*/
 	if (!cloud_data.active) {
 		if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 			printk("Wooow, the cat is moving!\n");
 		}
 	}
 
+	/*Start GPS search*/
 	gps_control_start(K_NO_WAIT);
-	if (k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout))) {
-		gps_control_stop(K_NO_WAIT);
-	}
 
-	k_sleep(K_SECONDS(check_active_wait()));
+	/*Wait for GPS search timeout*/
+	k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout));
 
+	/*Stop GPS search*/
+	gps_control_stop(K_NO_WAIT);
+
+	/*Check lte connection*/
 	lte_connect(LTE_UPDATE);
+
+	/*Send update to cloud*/
 	cloud_update_routine();
+
+	/*Sleep*/
+	k_sleep(K_SECONDS(check_active_wait()));
 
 goto check_mode;
 
