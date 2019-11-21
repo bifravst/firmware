@@ -257,7 +257,7 @@ static void cloud_send_cfg(void)
 
 	err = cloud_encode_cfg_data(&msg, &cloud_data);
 	if (err != 0) {
-		printk("Error enconding configurations %d\n", err);
+		printk("Error encoding configurations %d\n", err);
 		return;
 	}
 
@@ -364,11 +364,6 @@ end:
 static void cloud_pairing_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
-
-	k_delayed_work_cancel(&cloud_pair_work);
-	k_delayed_work_cancel(&cloud_send_cfg_work);
-	k_delayed_work_cancel(&cloud_send_modem_data_work);
-
 	k_delayed_work_submit(&cloud_pair_work, K_NO_WAIT);
 	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
 	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(10));
@@ -377,11 +372,6 @@ static void cloud_pairing_routine(void)
 static void cloud_update_routine(void)
 {
 	ui_led_set_pattern(UI_CLOUD_CONNECTED);
-	k_delayed_work_cancel(&cloud_send_sensor_data_work);
-	k_delayed_work_cancel(&cloud_send_cfg_work);
-	k_delayed_work_cancel(&cloud_send_modem_data_dyn_work);
-	k_delayed_work_cancel(&cloud_send_buffered_data_work);
-
 	k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
 	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(10));
 	k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(10));
