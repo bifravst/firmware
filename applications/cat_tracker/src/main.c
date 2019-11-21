@@ -476,6 +476,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
 	set_current_time(gps_data);
 	populate_gps_buffer(gps_data);
 	gps_control_stop(K_NO_WAIT);
+	k_sem_give(&gps_timeout_sem);
 }
 
 static void adxl362_init(void)
