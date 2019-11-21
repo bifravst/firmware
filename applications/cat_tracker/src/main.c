@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <modem_info.h>
 #include <time.h>
-#include <nrf_socket.h>
 #include <net/socket.h>
 #include "version.h"
 
