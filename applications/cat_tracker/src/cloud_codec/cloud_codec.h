@@ -1,5 +1,5 @@
-#ifndef BIFRAVST_CLOUD_CODEC_H__
-#define BIFRAVST_CLOUD_CODEC_H__
+#ifndef CLOUD_CODEC_H__
+#define CLOUD_CODEC_H__
 
 #include <zephyr.h>
 #include <stdbool.h>
@@ -58,7 +58,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 
 int cloud_encode_modem_data(struct cloud_msg *output,
 			    struct modem_param_info *modem_info,
-			    bool syncronization, int rsrp,
+			    bool include_dev_data, int rsrp,
 			    struct cloud_data_time *cloud_data_time);
 
 int cloud_encode_cfg_data(struct cloud_msg *output,

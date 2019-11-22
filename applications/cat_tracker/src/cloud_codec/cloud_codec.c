@@ -273,7 +273,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 
 	encoded_counter = 0;
 
-	if (err != 0) {
+	if (err) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
@@ -298,7 +298,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 
 int cloud_encode_modem_data(struct cloud_msg *output,
 			    struct modem_param_info *modem_info,
-			    bool dynamic_modem_data, int rsrp,
+			    bool include_dev_data, int rsrp,
 			    struct cloud_data_time *cloud_data_time)
 {
 	int err = 0;
@@ -308,8 +308,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	static const char nbiot_string[] = "NB-IoT";
 	static const char gps_string[] = " GPS";
 
-	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -
-				     cloud_data_time->update_time;
+	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 - cloud_data_time->update_time;
 
 	s64_t dyn_ts = cloud_data_time->delta_time + k_uptime_get();
 	s64_t stat_ts = cloud_data_time->delta_time + k_uptime_get();
@@ -345,83 +344,68 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 		strcat(modem_info->network.network_mode, gps_string);
 	}
 
-	err += json_add_number(static_m_data_v, "band",
-			       modem_info->network.current_band.value);
-
-	err += json_add_str(static_m_data_v, "nw",
-			    modem_info->network.network_mode);
-
-	err += json_add_str(static_m_data_v, "iccid",
-			    modem_info->sim.iccid.value_string);
-
-	err += json_add_str(static_m_data_v, "modV",
-			    modem_info->device.modem_fw.value_string);
-
+	err += json_add_number(static_m_data_v, "band", modem_info->network.current_band.value);
+	err += json_add_str(static_m_data_v, "nw", modem_info->network.network_mode);
+	err += json_add_str(static_m_data_v, "iccid", modem_info->sim.iccid.value_string);
+	err += json_add_str(static_m_data_v, "modV", modem_info->device.modem_fw.value_string);
 	err += json_add_str(static_m_data_v, "brdV", modem_info->device.board);
-
 	err += json_add_str(static_m_data_v, "appV", DEVICE_APP_VERSION);
-
 	err += json_add_number(dynamic_m_data_v, "rsrp", rsrp);
+	err += json_add_number(dynamic_m_data_v, "area", modem_info->network.area_code.value);
+	err += json_add_number(dynamic_m_data_v, "mccmnc", atoi(modem_info->network.current_operator.value_string));
+	err += json_add_number(dynamic_m_data_v, "cell", modem_info->network.cellid_dec);
+	err += json_add_str(dynamic_m_data_v, "ip", modem_info->network.ip_address.value_string);
 
-	err += json_add_number(dynamic_m_data_v, "area",
-			       modem_info->network.area_code.value);
+	if (include_dev_data) {
+		err += json_add_obj(static_m_data, "v", static_m_data_v);
+		err += json_add_number(static_m_data, "ts", stat_ts);
 
-	err += json_add_number(
-		dynamic_m_data_v, "mccmnc",
-		atoi(modem_info->network.current_operator.value_string));
+		err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
+		err += json_add_number(dynamic_m_data, "ts", dyn_ts);
 
-	err += json_add_number(dynamic_m_data_v, "cell",
-			       modem_info->network.cellid_dec);
-
-	err += json_add_str(dynamic_m_data_v, "ip",
-			    modem_info->network.ip_address.value_string);
-
-	err += json_add_obj(static_m_data, "v", static_m_data_v);
-	err += json_add_number(static_m_data, "ts", stat_ts);
-
-	err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
-	err += json_add_number(dynamic_m_data, "ts", dyn_ts);
-
-	if (dynamic_modem_data) {
 		err += json_add_obj(reported_obj, "dev", static_m_data);
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	} else {
+		err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
+		err += json_add_number(dynamic_m_data, "ts", dyn_ts);
+
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	}
 
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(static_m_data);
-		cJSON_Delete(static_m_data_v);
-		cJSON_Delete(dynamic_m_data);
-		cJSON_Delete(dynamic_m_data_v);
-		return -EAGAIN;
+	if (err) {
+		goto cleanup;
 	}
 
 	buffer = cJSON_Print(root_obj);
-	cJSON_Delete(root_obj);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
 	printk("Encoded message: %s\n", buffer);
 
+cleanup:
+
 	/* Clear network mode string */
 	strcpy(modem_info->network.network_mode, "");
+	cJSON_Delete(root_obj);
 
-	return 0;
+	/*Delete objects which are not associated*/
+	if (!include_dev_data) {
+		cJSON_Delete(static_m_data);
+		cJSON_Delete(static_m_data_v);
+	}
+
+	return err;;
 }
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data)
 {
 	int err = 0;
-	int cnt = 0;
+	int change_cnt = 0;
 	char *buffer;
 
 	cJSON *root_obj = cJSON_CreateObject();
@@ -443,49 +427,55 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	if (change_gpst) {
 		err += json_add_number(cfg_obj, "gpst",
 				       cloud_data->gps_timeout);
-		cnt++;
+		change_cnt++;
 	}
 
 	if (change_active) {
 		err += json_add_bool(cfg_obj, "act", cloud_data->active);
-		cnt++;
+		change_cnt++;
 	}
 
 	if (change_active_wait) {
 		err += json_add_number(cfg_obj, "actwt",
 				       cloud_data->active_wait);
-		cnt++;
+		change_cnt++;
 	}
 
 	if (change_passive_wait) {
 		err += json_add_number(cfg_obj, "mvres",
 				       cloud_data->passive_wait);
-		cnt++;
+		change_cnt++;
 	}
 
 	if (change_movement_timeout) {
 		err += json_add_number(cfg_obj, "mvt",
 				       cloud_data->movement_timeout);
-		cnt++;
+		change_cnt++;
 	}
 
 	if (change_accel_threshold) {
 		err += json_add_number(cfg_obj, "acct",
 				       cloud_data->accel_threshold);
-		cnt++;
+		change_cnt++;
+	}
+
+	if (change_cnt > 0) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(state_obj);
+		cJSON_Delete(reported_obj);
+		cJSON_Delete(cfg_obj);
+		return -EAGAIN;
 	}
 
 	err += json_add_obj(reported_obj, "cfg", cfg_obj);
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	if (err != 0 || cnt == 0) {
-		cJSON_Delete(root_obj);
-		return -EAGAIN;
+	if (err) {
+		goto cleanup;
 	}
 
 	buffer = cJSON_Print(root_obj);
-	cJSON_Delete(root_obj);
 
 	printk("Encoded message: %s\n", buffer);
 
@@ -499,7 +489,9 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	change_movement_timeout		= false;
 	change_accel_threshold		= false;
 
-	return 0;
+cleanup:
+	cJSON_Delete(root_obj);
+	return err;
 }
 
 int cloud_encode_sensor_data(struct cloud_msg *output,
@@ -510,8 +502,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	int err = 0;
 	char *buffer;
 
-	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 -
-				     cloud_data_time->update_time;
+	cloud_data_time->delta_time = cloud_data_time->epoch * (time_t)1000 - cloud_data_time->update_time;
 
 	s64_t bat_ts = cloud_data_time->delta_time + cloud_data->bat_timestamp;
 	s64_t acc_ts = cloud_data_time->delta_time + cloud_data->acc_timestamp;
@@ -539,10 +530,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	}
 
 	/*BAT*/
-#if defined(CONFIG_MODEM_INFO)
 	err += json_add_number(bat_obj, "v", cloud_data->bat_voltage);
 	err += json_add_number(bat_obj, "ts", bat_ts);
-#endif
 
 	/*ACC*/
 	err += json_add_DoubleArray(acc_obj, "v", cloud_data->acc);
@@ -557,17 +546,12 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	err += json_add_number(gps_val_obj, "hdg", cir_buf_gps->heading);
 
 	/*Parameters included depending on mode and obtained gps fix*/
-
-#if defined(CONFIG_MODEM_INFO)
 	if (cloud_data->active && !cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
 	}
-#endif
 
 	if (cloud_data->active && cloud_data->gps_found) {
-#if defined(CONFIG_MODEM_INFO)
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-#endif
 		err += json_add_obj(gps_obj, "v", gps_val_obj);
 		err += json_add_number(gps_obj, "ts", gps_ts);
 		err += json_add_obj(reported_obj, "gps", gps_obj);
@@ -589,24 +573,39 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	err += json_add_obj(state_obj, "reported", reported_obj);
 	err += json_add_obj(root_obj, "state", state_obj);
 
-	if (err != 0) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(state_obj);
-		cJSON_Delete(reported_obj);
-		cJSON_Delete(bat_obj);
-		cJSON_Delete(acc_obj);
-		cJSON_Delete(gps_obj);
-		cJSON_Delete(gps_val_obj);
-		return -EAGAIN;
+	if (err) {
+		goto cleanup;
 	}
 
 	buffer = cJSON_Print(root_obj);
-	cJSON_Delete(root_obj);
 
 	printk("Encoded message: %s\n", buffer);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-	return 0;
+cleanup:
+	cJSON_Delete(root_obj);
+
+	/*Delete objects which are not associated*/
+	if (cloud_data->active && !cloud_data->gps_found) {
+		cJSON_Delete(acc_obj);
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(gps_val_obj);
+	}
+
+	if (cloud_data->active && cloud_data->gps_found) {
+		cJSON_Delete(acc_obj);
+	}
+
+	if (!cloud_data->active && !cloud_data->gps_found) {
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(gps_val_obj);
+	}
+
+	if (!cloud_data->active && cloud_data->gps_found) {
+		/*All objects associated*/
+	}
+
+	return err;
 }
