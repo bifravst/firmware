@@ -311,6 +311,11 @@ static void cloud_send_modem_data(bool include_dev_data)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
+	err = modem_info_params_get(&modem_param);
+	if (err) {
+		printk("Error getting modem_info: %d", err);
+	}
+
 	err = cloud_encode_modem_data(&msg, &modem_param, include_dev_data, rsrp,
 				      &cloud_data_time);
 	if (err) {
@@ -641,11 +646,6 @@ static void lte_connect(enum lte_conn_actions action)
 		if (err) {
 			printk("lte_lc_nw_reg_status error: %d\n", err);
 			goto gps_mode;
-		}
-
-		err = modem_info_params_get(&modem_param);
-		if (err) {
-			printk("Error getting modem_info: %d", err);
 		}
 
 		printk("Checking LTE connection...\n");
