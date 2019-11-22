@@ -758,33 +758,34 @@ void main(void)
 	  to its new configuration before gps search*/
 	k_sleep(K_SECONDS(10));
 
-check_mode:
-
-	/*Check current device mode*/
-	if (!cloud_data.active) {
-		if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
-			printk("Wooow, the cat is moving!\n");
+	while(true) {
+		/*Check current device mode*/
+		if (!cloud_data.active) {
+			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
+				printk("Wooow, the cat is moving!\n");
+			}
 		}
+
+		/*Start GPS search*/
+		gps_control_start(K_NO_WAIT);
+
+		/*Wait for GPS search timeout*/
+		k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout));
+
+		/*Stop GPS search*/
+		gps_control_stop(K_NO_WAIT);
+
+		/*Sleep in order to ensure that the
+		  GPS is stopped*/
+		k_sleep(1000);
+
+		/*Check lte connection*/
+		lte_connect(LTE_UPDATE);
+
+		/*Send update to cloud*/
+		cloud_update_routine();
+
+		/*Sleep*/
+		k_sleep(K_SECONDS(check_active_wait()));
 	}
-
-	/*Start GPS search*/
-	gps_control_start(K_NO_WAIT);
-
-	/*Wait for GPS search timeout*/
-	k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout));
-
-	/*Stop GPS search*/
-	gps_control_stop(K_NO_WAIT);
-
-	/*Check lte connection*/
-	lte_connect(LTE_UPDATE);
-
-	/*Send update to cloud*/
-	cloud_update_routine();
-
-	/*Sleep*/
-	k_sleep(K_SECONDS(check_active_wait()));
-
-goto check_mode;
-
 }
