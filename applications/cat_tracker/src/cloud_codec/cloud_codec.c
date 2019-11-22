@@ -459,7 +459,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 		change_cnt++;
 	}
 
-	if (change_cnt > 0) {
+	if (change_cnt == 0) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
