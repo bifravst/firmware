@@ -16,15 +16,8 @@ jobs:
         id: cache-pip
         uses: actions/cache@v1
         with:
-          path: ~/.cache/pip
+          path: ~/.cache/pip.cache/pip
           key: ${{ runner.OS }}-pip
-
-      - name: Cache Python dist-packages
-        id: cache-python-dist-packages
-        uses: actions/cache@v1
-        with:
-          path: /usr/local/lib/python3.6/dist-packages
-          key: ${{ runner.OS }}-python-dist-packages
 
       - name: Cache GCC ARM Embed binary
         id: cache-gcc-arm
@@ -98,7 +91,7 @@ jobs:
 
       - name: Patch West to enable nrf9160_pca10015ns
         if: success()
-        run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
+        run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/.github/workflows/zephyr.patch
 
       - name: Determine next release version
         run: |
