@@ -12,10 +12,26 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Cache GCC ARM Embed binary
+        uses: actions/cache@v1
+        with:
+          path: ${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
+          key: ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
+          restore-keys: |
+            ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
+
       - name: GCC ARM Embed
         run: |
-          wget 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
+          wget -nc 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
           tar xjf ${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
+
+      - name: Cache Device Tree Compile binary
+        uses: actions/cache@v1
+        with:
+          path: ${GITHUB_WORKSPACE}/device-tree-compiler_1.4.7-1_amd64.deb
+          key: ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
+          restore-keys: |
+            ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
 
       - name: Device Tree Compile 1.4.7
         run: |
