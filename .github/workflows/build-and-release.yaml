@@ -93,11 +93,10 @@ jobs:
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:$PATH
           cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
-          mkdir -p -v ${GITHUB_WORKSPACE}/.cache
-          export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
+          # mkdir -p -v ${GITHUB_WORKSPACE}/.cache
+          # export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
-          cat /home/runner/.cache/some_file
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
