@@ -78,6 +78,8 @@ jobs:
           patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/extensions.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir.patch
           patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir2.patch
           touch ~/.cache/test || echo 'Failed to write to cache dir'
+          touch ~/write-test-file || echo 'Failed to write to home dir'
+          ls -la ~/.cache
 
       - name: Determine next release version
         run: |
