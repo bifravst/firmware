@@ -97,6 +97,7 @@ jobs:
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
+          cat /home/runner/.cache/some_file
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
