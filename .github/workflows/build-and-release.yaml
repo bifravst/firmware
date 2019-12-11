@@ -77,7 +77,6 @@ jobs:
           cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
-          printenv
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
