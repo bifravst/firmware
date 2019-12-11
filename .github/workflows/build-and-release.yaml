@@ -73,14 +73,6 @@ jobs:
       - name: Patch West to enable nrf9160_pca10015ns
         run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
-      - name: Patch West to debug cache dir write detection
-        run: |
-          patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/extensions.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir.patch
-          patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir2.patch
-          touch ~/.cache/test || echo 'Failed to write to cache dir'
-          touch ~/write-test-file || echo 'Failed to write to home dir'
-          ls -la ~/.cache
-
       - name: Determine next release version
         run: |
           npm ci
@@ -95,8 +87,8 @@ jobs:
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:$PATH
           cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
-          # mkdir -p -v ${GITHUB_WORKSPACE}/.cache
-          # export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
+          mkdir -p -v ${GITHUB_WORKSPACE}/.cache
+          export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
           mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
