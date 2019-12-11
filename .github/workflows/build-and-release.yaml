@@ -26,6 +26,8 @@ jobs:
       - name: Install latest PIP
         run: |
           sudo python3 -m pip install -U pip
+          # Newer PIP will not overwrite distutils, so upgrade PyYAML manually
+          sudo python3 -m pip install --ignore-installed -U PyYAML
 
       - name: Install Zephyr dependencies
         run: |
