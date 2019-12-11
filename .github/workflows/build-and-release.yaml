@@ -13,33 +13,37 @@ jobs:
       - uses: actions/checkout@v1
 
       - name: Cache GCC ARM Embed binary
+        id: cache-gcc-arm
         uses: actions/cache@v1
         with:
           path: gcc-arm/
           key: ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
 
-      - name: GCC ARM Embed
+      - name: Download GCC ARM Embed
+        if: steps.cache-gcc-arm.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/gcc-arm/
-          if [ \! -f ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2 ];
-          then
-            wget 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2;
-          fi
+          wget 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
+
+      - name: Install GCC ARM Embed
+        run: |
           tar xjf ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
 
       - name: Cache Device Tree Compile binary
         uses: actions/cache@v1
+        id: cache-dtc
         with:
           path: device-tree-compiler/
           key: ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
 
-      - name: Device Tree Compile 1.4.7
+      - name: Download Device Tree Compile 1.4.7
+        if: steps.cache-dtc.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/device-tree-compiler/
-          if [ \! -f ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb ];
-          then
-            wget 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb;
-          fi
+          wget 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
+
+      - name: Install Device Tree Compile 1.4.7
+        run: |
           sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
 
       # Workaround for https://github.com/NordicSemiconductor/pc-nrfutil/issues/288
