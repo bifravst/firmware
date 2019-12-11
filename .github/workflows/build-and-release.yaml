@@ -76,9 +76,7 @@ jobs:
           export PATH=~/.local/bin:$PATH
           cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
-          export USER_CACHE_DIR=${GITHUB_WORKSPACE}/.cache
-          export ZEPHYR_TOOLCHAIN_CAPABILITY_CACHE_DIR=${GITHUB_WORKSPACE}/.cache
-          export USER_CACHE_DIR=${GITHUB_WORKSPACE}/.cache
+          export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           printenv
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
