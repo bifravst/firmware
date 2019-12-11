@@ -21,7 +21,7 @@ jobs:
       - name: GCC ARM Embed
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/gcc-arm/
-          if [ -f ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2 ];
+          if [ \! -f ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2 ];
           then
             wget 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2;
           fi
@@ -36,7 +36,7 @@ jobs:
       - name: Device Tree Compile 1.4.7
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/device-tree-compiler/
-          if [ -f ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb ];
+          if [ \! -f ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb ];
           then
             wget 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb;
           fi
