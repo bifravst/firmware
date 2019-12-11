@@ -71,7 +71,7 @@ jobs:
         id: cache-west
         with:
           path: ~/nrf
-          key: ${{ runner.OS }}-west-${{ hashFiles('**/west.yml') }}
+          key: ${{ runner.OS }}-west-${{ hashFiles('west.yml') }}-${{ hashFiles('west.yml') }}-${{ hashFiles('.github/workflows/zephyr.patch') }}
           restore-keys: |
             ${{ runner.OS }}-west-${{ env.cache-name }}-
             ${{ runner.OS }}-west-
@@ -88,10 +88,8 @@ jobs:
           sudo pip3 install -r nrf/scripts/requirements.txt
           sudo apt-get -y remove python-cryptography python3-cryptography
           sudo pip3 install -r mcuboot/scripts/requirements.txt
-
-      - name: Patch West to enable nrf9160_pca10015ns
-        if: success()
-        run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/.github/workflows/zephyr.patch
+          # Patch West to enable nrf9160_pca10015ns
+          patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
       - name: Determine next release version
         run: |
