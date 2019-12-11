@@ -25,7 +25,6 @@ config BIFRAVST_CLOUD_SEC_TAG
 
 config BIFRAVST_CLOUD_HOST_NAME
 	string "Bifravst Cloud server hostname"
-	default "a34x44yyrk96tg-ats.iot.eu-central-1.amazonaws.com"
 
 config BIFRAVST_CLOUD_PORT
 	int "Bifravst Cloud server port"
