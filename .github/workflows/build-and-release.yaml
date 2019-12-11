@@ -15,7 +15,7 @@ jobs:
       - name: Cache GCC ARM Embed binary
         uses: actions/cache@v1
         with:
-          path: gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
+          path: gcc-arm/
           key: ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
 
       - name: GCC ARM Embed
@@ -27,7 +27,7 @@ jobs:
       - name: Cache Device Tree Compile binary
         uses: actions/cache@v1
         with:
-          path: device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
+          path: device-tree-compiler/
           key: ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
 
       - name: Device Tree Compile 1.4.7
