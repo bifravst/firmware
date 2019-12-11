@@ -1,4 +1,4 @@
-name: CI
+name: Assign triage label for new issues
 
 on:
   issues:
