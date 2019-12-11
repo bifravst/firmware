@@ -17,8 +17,6 @@ jobs:
         with:
           path: ${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
           key: ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
-          restore-keys: |
-            ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
 
       - name: GCC ARM Embed
         run: |
@@ -30,8 +28,6 @@ jobs:
         with:
           path: ${GITHUB_WORKSPACE}/device-tree-compiler_1.4.7-1_amd64.deb
           key: ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
-          restore-keys: |
-            ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
 
       - name: Device Tree Compile 1.4.7
         run: |
