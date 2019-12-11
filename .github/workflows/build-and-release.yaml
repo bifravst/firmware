@@ -66,19 +66,7 @@ jobs:
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
           sudo pip3 install cmake west wheel
 
-      - name: Cache west
-        uses: actions/cache@v1
-        id: cache-west
-        with:
-          path: ~/nrf
-          key: ${{ runner.OS }}-west-${{ hashFiles('west.yml') }}-${{ hashFiles('west.yml') }}-${{ hashFiles('.github/workflows/zephyr.patch') }}
-          restore-keys: |
-            ${{ runner.OS }}-west-${{ env.cache-name }}-
-            ${{ runner.OS }}-west-
-            ${{ runner.OS }}-
-
       - name: West init
-        if: steps.cache-west.outputs.cache-hit != 'true'
         run: |
           export PATH=~/.local/bin:$PATH
           west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
@@ -88,7 +76,9 @@ jobs:
           sudo pip3 install -r nrf/scripts/requirements.txt
           sudo apt-get -y remove python-cryptography python3-cryptography
           sudo pip3 install -r mcuboot/scripts/requirements.txt
-          # Patch West to enable nrf9160_pca10015ns
+
+      - name: Patch West to enable nrf9160_pca10015ns
+        run: |
           patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
       - name: Determine next release version
