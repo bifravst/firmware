@@ -63,6 +63,12 @@ jobs:
       - name: Patch West to enable nrf9160_pca10015ns
         run: patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/zephyr.patch
 
+      - name: Patch West to debug cache dir write detection
+        run: |
+          patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/extensions.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir.patch
+          patch -b ${GITHUB_WORKSPACE}/zephyr/cmake/app/boilerplate.cmake < ${GITHUB_WORKSPACE}/nrf/.github/workflows/cachedir2.patch
+          touch ~/.cache/test || echo 'Failed to write to cache dir'
+
       - name: Determine next release version
         run: |
           npm ci
