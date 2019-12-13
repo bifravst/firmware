@@ -17,11 +17,7 @@
 #include <modem_info.h>
 #include <time.h>
 #include <net/socket.h>
-#include "version.h"
-
-#if defined(CONFIG_BOOTLOADER_MCUBOOT)
 #include <dfu/mcuboot.h>
-#endif
 
 enum lte_conn_actions {
 	LTE_INIT,
@@ -111,6 +107,11 @@ void error_handler(enum error_type err_type, int err_code)
 #endif
 }
 
+void bsd_recoverable_error_handler(uint32_t err)
+{
+	error_handler(ERROR_BSD_RECOVERABLE, (int)err);
+}
+
 void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 {
 	ARG_UNUSED(esf);
@@ -119,11 +120,6 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	printk("Running main.c error handler");
 	error_handler(ERROR_SYSTEM_FAULT, reason);
 	CODE_UNREACHABLE;
-}
-
-void cloud_error_handler(int err)
-{
-	error_handler(ERROR_CLOUD, err);
 }
 
 static int check_active_wait(void)
@@ -513,12 +509,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		printk("CLOUD_EVT_CONNECTED\n");
-
 		cloud_pairing_routine();
-
-#if defined(CONFIG_BOOTLOADER_MCUBOOT)
 		boot_write_img_confirmed();
-#endif
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
@@ -673,7 +665,6 @@ static void lte_connect(enum lte_conn_actions action)
 
 	k_sleep(1000);
 
-	/* Modem data should be timestamped here*/
 	err = modem_info_params_get(&modem_param);
 	if (err) {
 		printk("Error getting modem_info: %d", err);
@@ -700,7 +691,7 @@ static void modem_rsrp_handler(char rsrp_value)
 
 	rsrp = rsrp_value;
 
-	printk("rsrp value is %d\n", rsrp);
+	printk("Incoming RSRP status message, RSRP value is %d\n", rsrp);
 }
 
 static int modem_data_init(void)
@@ -730,7 +721,7 @@ void main(void)
 	int err;
 
 	printk("The cat tracker has started\n");
-	printk("Version: %s\n", DEVICE_APP_VERSION);
+	printk("Version: %s\n", CONFIG_CAT_TRACKER_APP_VERSION);
 
 	cloud_backend = cloud_get_binding("BIFRAVST_CLOUD");
 	__ASSERT(cloud_backend != NULL, "Bifravst Cloud backend not found");
@@ -739,23 +730,18 @@ void main(void)
 	if (err) {
 		printk("Cloud backend could not be initialized, error: %d\n ",
 		       err);
-		cloud_error_handler(err);
+		error_handler(ERROR_CLOUD, err);
 	}
 
-#if defined(CONFIG_USE_UI_MODULE)
 	ui_init();
-#endif
-
-#if defined(CONFIG_MODEM_INFO)
 	modem_data_init();
-#endif
 	work_init();
 	lte_connect(LTE_INIT);
 	adxl362_init();
 	gps_control_init(gps_trigger_handler);
 
 	/*Sleep so that the device manages to adapt
-	  to its new configuration before gps search*/
+	  to its new configuration before gps a search*/
 	k_sleep(K_SECONDS(10));
 
 	while(true) {
@@ -776,7 +762,7 @@ void main(void)
 		gps_control_stop(K_NO_WAIT);
 
 		/*Sleep in order to ensure that the
-		  GPS is stopped*/
+		  GPS is stopped properly*/
 		k_sleep(1000);
 
 		/*Check lte connection*/
@@ -786,6 +772,7 @@ void main(void)
 		cloud_update_routine();
 
 		/*Sleep*/
+		printk("Going to sleep for: %d seconds\n", check_active_wait());
 		k_sleep(K_SECONDS(check_active_wait()));
 	}
 }

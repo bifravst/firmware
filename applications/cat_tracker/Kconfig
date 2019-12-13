@@ -51,28 +51,28 @@ config GPS_SIM_TRIGGER_TIMER_MSEC
 
 endmenu	# GPS
 
+menu "Firmware versioning"
+
+config CAT_TRACKER_APP_VERSION
+	string "The version of the cat tracker firmware"
+	default "0.0.0-development"
+
+endmenu # Firmware versioning
+
 config POWER_OPTIMIZATION_ENABLE
 	bool "Enable power optimization"
 	default y
 
-menu "Cloud"
+menu "MQTT socket poll"
 
 config MQTT_KEEPALIVE
 	int "MQTT KEEPALIVE"
 	default 1200 if POWER_OPTIMIZATION_ENABLE
 	default 120
 
-config CLOUD_PAIR
-	bool "Option to pair desired configurations from cloud upon start"
-	default y
+endmenu # MQTT socket poll
 
-config SENSOR_DATA_SEND
-	bool "Enable sending of sensor data"
-	default y
-
-config BUFFERED_DATA_SEND
-	bool "Option to send buffered sensor data"
-	default y
+menu "Buffered data"
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
@@ -82,7 +82,7 @@ config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
-endmenu # Cloud
+endmenu # Buffered data
 
 endmenu
 

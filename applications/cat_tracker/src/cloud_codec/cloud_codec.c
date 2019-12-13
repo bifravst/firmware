@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include "cJSON.h"
 #include "cJSON_os.h"
-#include "../version.h"
 #include <net/cloud.h>
 
 static bool change_gpst = true;
@@ -349,7 +348,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	err += json_add_str(static_m_data_v, "iccid", modem_info->sim.iccid.value_string);
 	err += json_add_str(static_m_data_v, "modV", modem_info->device.modem_fw.value_string);
 	err += json_add_str(static_m_data_v, "brdV", modem_info->device.board);
-	err += json_add_str(static_m_data_v, "appV", DEVICE_APP_VERSION);
+	err += json_add_str(static_m_data_v, "appV", CONFIG_CAT_TRACKER_APP_VERSION);
 	err += json_add_number(dynamic_m_data_v, "rsrp", rsrp);
 	err += json_add_number(dynamic_m_data_v, "area", modem_info->network.area_code.value);
 	err += json_add_number(dynamic_m_data_v, "mccmnc", atoi(modem_info->network.current_operator.value_string));
