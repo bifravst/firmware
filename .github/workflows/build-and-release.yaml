@@ -4,6 +4,7 @@ on: push
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
 
 jobs:
   build:
@@ -88,6 +89,10 @@ jobs:
           echo -n $NEXT_VERSION > .version
           echo "#define DEVICE_APP_VERSION \"$NEXT_VERSION\"" > ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
           cat ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
+
+      - name: Configure the AWS IoT broker hostname
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
 
       - name: Build
         run: |

@@ -19,7 +19,7 @@ In order to build the `cat_tracker` appliction, the AWS IoT Core broker hostname
 **must** to be configured:
 
 ```
-    echo CONFIG_AWS_IOT_BROKER_HOST_NAME="<your broker hostname>" > applications/cat_tracker/prj.conf
+    echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"<your broker hostname>\"" >> applications/cat_tracker/prj.conf
 ```
 
 ### Setting the applicaton version
@@ -28,7 +28,7 @@ You **may** configure the application version that is sent as part of the device
 information.
 
 ```
-    echo CONFIG_CAT_TRACKER_APP_VERSION="<your version string>" > applications/cat_tracker/prj.conf
+    echo "CONFIG_CAT_TRACKER_APP_VERSION=\"<your version string>\"" >> applications/cat_tracker/prj.conf
 ```
 
 ## Automated releases
