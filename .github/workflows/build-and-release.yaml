@@ -87,8 +87,6 @@ jobs:
           npm ci
           export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
           echo -n $NEXT_VERSION > .version
-          echo "#define DEVICE_APP_VERSION \"$NEXT_VERSION\"" > ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
-          cat ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
 
       - name: Configure the AWS IoT broker hostname
