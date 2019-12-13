@@ -23,7 +23,7 @@ config BIFRAVST_CLOUD_SEC_TAG
 	int "Security tag to use for Bifravst Cloud connection"
 	default 42
 
-config BIFRAVST_CLOUD_HOST_NAME
+config AWS_IOT_BROKER_HOST_NAME
 	string "Bifravst Cloud server hostname"
 
 config BIFRAVST_CLOUD_PORT

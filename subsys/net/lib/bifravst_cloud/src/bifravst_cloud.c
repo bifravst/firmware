@@ -13,7 +13,7 @@
 
 LOG_MODULE_REGISTER(bifravst_cloud, CONFIG_BIFRAVST_CLOUD_LOG_LEVEL);
 
-BUILD_ASSERT_MSG(sizeof(CONFIG_BIFRAVST_CLOUD_HOST_NAME) > 1,
+BUILD_ASSERT_MSG(sizeof(CONFIG_AWS_IOT_BROKER_HOST_NAME) > 1,
 		 "Bifravst Cloud hostname not set");
 
 #if defined(CONFIG_BIFRAVST_CLOUD_IPV6)
@@ -376,7 +376,7 @@ static int broker_init(void)
 		.ai_socktype = SOCK_STREAM
 	};
 
-	err = getaddrinfo(CONFIG_BIFRAVST_CLOUD_HOST_NAME,
+	err = getaddrinfo(CONFIG_AWS_IOT_BROKER_HOST_NAME,
 				NULL, &hints, &result);
 	if (err) {
 		LOG_ERR("getaddrinfo, error %d", err);
@@ -469,7 +469,7 @@ static int client_broker_init(struct mqtt_client *const client)
 	tls_cfg->cipher_list		= NULL;
 	tls_cfg->sec_tag_count		= ARRAY_SIZE(sec_tag_list);
 	tls_cfg->sec_tag_list		= sec_tag_list;
-	tls_cfg->hostname		= CONFIG_BIFRAVST_CLOUD_HOST_NAME;
+	tls_cfg->hostname		= CONFIG_AWS_IOT_BROKER_HOST_NAME;
 
 	return 0;
 }
