@@ -196,6 +196,8 @@ static void cloud_pair(void)
 {
 	int err;
 
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_PAIR,
@@ -211,6 +213,8 @@ static void cloud_pair(void)
 static void cloud_send_cfg(void)
 {
 	int err;
+
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -236,6 +240,8 @@ static void cloud_send_cfg(void)
 static void cloud_send_sensor_data(void)
 {
 	int err;
+
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -268,6 +274,8 @@ static void cloud_send_modem_data(bool include_dev_data)
 {
 	int err;
 
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
@@ -299,6 +307,8 @@ static void cloud_send_modem_data(bool include_dev_data)
 static void cloud_send_buffered_data(void)
 {
 	int err;
+
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -335,7 +345,6 @@ end:
 
 static void cloud_pairing_routine(void)
 {
-	ui_led_set_pattern(UI_CLOUD_CONNECTED);
 	k_delayed_work_submit(&cloud_pair_work, K_NO_WAIT);
 	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
 	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(5));
@@ -344,7 +353,6 @@ static void cloud_pairing_routine(void)
 static void cloud_update_routine(void)
 {
 	if(k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
-		ui_led_set_pattern(UI_CLOUD_CONNECTED);
 		k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
 		k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
 		k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(5));
@@ -629,8 +637,6 @@ static void lte_connect(enum lte_conn_actions action)
 
 	printk("Connected to LTE network\n");
 
-	ui_led_set_pattern(UI_LTE_CONNECTED);
-
 	k_sem_give(&cloud_conn_sem);
 
 	return;
@@ -673,6 +679,15 @@ static int modem_data_init(void)
 	}
 
 	return 0;
+}
+
+static void set_led_device_mode(void)
+{
+	if (!cloud_data.active) {
+		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+	} else {
+		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+	}
 }
 
 void main(void)
@@ -733,6 +748,7 @@ void main(void)
 
 		/*Sleep*/
 		printk("Going to sleep for: %d seconds\n", check_active_wait());
+		set_led_device_mode();
 		k_sleep(K_SECONDS(check_active_wait()));
 	}
 }
