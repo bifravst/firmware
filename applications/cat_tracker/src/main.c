@@ -185,6 +185,15 @@ static void populate_gps_buffer(struct gps_data gps_data)
 
 static int get_voltage_level(void)
 {
+	int err;
+
+	/* This solution of requesting all modem parameters should
+	   be replaced with only requesting battery */
+	err = modem_info_params_get(&modem_param);
+	if (err) {
+		printk("modem_info_params_get, error: %d\n", err);
+		return err;
+	}
 
 	cloud_data.bat_voltage = modem_param.device.battery.value;
 	cloud_data.bat_timestamp = k_uptime_get();
