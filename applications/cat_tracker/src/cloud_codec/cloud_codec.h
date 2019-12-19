@@ -37,6 +37,9 @@ struct cloud_data {
 	int accel_threshold;
 
 	bool gps_found;
+
+	s64_t roam_modem_data_ts;
+	s64_t dev_modem_data_ts;
 };
 
 struct cloud_data_time {
@@ -49,17 +52,15 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data);
 
 int cloud_encode_sensor_data(struct cloud_msg *output,
 			     struct cloud_data *cloud_data,
-			     struct cloud_data_gps *cir_buf_gps,
-			     struct cloud_data_time *cloud_data_time);
+			     struct cloud_data_gps *cir_buf_gps);
 
 int cloud_encode_gps_buffer(struct cloud_msg *output,
-			    struct cloud_data_gps *cir_buf_gps,
-			    struct cloud_data_time *cloud_data_time);
+			    struct cloud_data_gps *cir_buf_gps);
 
 int cloud_encode_modem_data(struct cloud_msg *output,
+			    struct cloud_data *cloud_data,
 			    struct modem_param_info *modem_info,
-			    bool include_dev_data, int rsrp,
-			    struct cloud_data_time *cloud_data_time);
+			    bool include_dev_data, int rsrp);
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data);

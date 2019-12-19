@@ -72,7 +72,7 @@ config MQTT_KEEPALIVE
 
 endmenu # MQTT socket poll
 
-menu "Buffered data"
+menu "Cloud codec"
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
@@ -82,7 +82,7 @@ config MAX_PER_ENCODED_ENTRIES
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
-endmenu # Buffered data
+endmenu # Cloud codec
 
 endmenu
 

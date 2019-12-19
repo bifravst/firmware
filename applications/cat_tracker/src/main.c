@@ -18,6 +18,7 @@
 #include <time.h>
 #include <net/socket.h>
 #include <dfu/mcuboot.h>
+#include <nrf9160_timestamp.h>
 
 enum lte_conn_actions {
 	LTE_INIT,
@@ -54,6 +55,8 @@ static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
+static bool cloud_connected;
+
 static struct k_delayed_work cloud_pair_work;
 static struct k_delayed_work cloud_send_sensor_data_work;
 static struct k_delayed_work cloud_send_modem_data_work;
@@ -63,6 +66,7 @@ static struct k_delayed_work cloud_send_buffered_data_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
+K_SEM_DEFINE(cloud_conn_sem, 0, 1);
 
 #define CLOUD_POLL_STACKSIZE 4096
 #define CLOUD_POLL_PRIORITY 7
@@ -131,55 +135,18 @@ static int check_active_wait(void)
 	return cloud_data.active_wait;
 }
 
-static int parse_time_entries(char *datetime_string, int min, int max)
-{
-	char buf[50];
-
-	for (int i = min; i < max + 1; i++) {
-		buf[i - min] = datetime_string[i];
-	}
-
-	return atoi(buf);
-}
-
-static void parse_modem_time_data(void)
-{
-	struct tm info;
-
-	info.tm_year = parse_time_entries(
-		modem_param.network.date_time.value_string, 0, 1) + 2000 - 1900;
-	info.tm_mon  = parse_time_entries(
-		modem_param.network.date_time.value_string, 3, 4) - 1;
-	info.tm_mday = parse_time_entries(
-		modem_param.network.date_time.value_string, 6, 7);
-	info.tm_hour = parse_time_entries(
-		modem_param.network.date_time.value_string, 9, 10);
-	info.tm_min  = parse_time_entries(
-		modem_param.network.date_time.value_string, 12, 13);
-	info.tm_sec  = parse_time_entries(
-		modem_param.network.date_time.value_string, 15, 16);
-
-	printk("%d/%d/%d,%d:%d:%d\n", info.tm_mday, info.tm_mon,
-	       (info.tm_year - 100), info.tm_hour, info.tm_min, info.tm_sec);
-
-	cloud_data_time.epoch = mktime(&info);
-	cloud_data_time.update_time = k_uptime_get();
-
-}
-
 static void set_current_time(struct gps_data gps_data)
 {
-	struct tm info;
+	struct tm gps_time;
 
-	info.tm_year = gps_data.pvt.datetime.year - 1900;
-	info.tm_mon = gps_data.pvt.datetime.month - 1;
-	info.tm_mday = gps_data.pvt.datetime.day;
-	info.tm_hour = gps_data.pvt.datetime.hour;
-	info.tm_min = gps_data.pvt.datetime.minute;
-	info.tm_sec = gps_data.pvt.datetime.seconds;
+	gps_time.tm_year = gps_data.pvt.datetime.year;
+	gps_time.tm_mon = gps_data.pvt.datetime.month;
+	gps_time.tm_mday = gps_data.pvt.datetime.day;
+	gps_time.tm_hour = gps_data.pvt.datetime.hour;
+	gps_time.tm_min = gps_data.pvt.datetime.minute;
+	gps_time.tm_sec = gps_data.pvt.datetime.seconds;
 
-	cloud_data_time.epoch = mktime(&info);
-	cloud_data_time.update_time = k_uptime_get();
+	date_time_set(&gps_time);
 }
 
 static double get_accel_thres(void)
@@ -282,8 +249,7 @@ static void cloud_send_sensor_data(void)
 	}
 
 	err = cloud_encode_sensor_data(&msg, &cloud_data,
-				       &cir_buf_gps[head_cir_buf],
-				       &cloud_data_time);
+				       &cir_buf_gps[head_cir_buf]);
 	if (err) {
 		printk("Error enconding message %d\n", err);
 		return;
@@ -307,13 +273,17 @@ static void cloud_send_modem_data(bool include_dev_data)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
+	/** Timestamp modem data from the time it is fetched. */
+	cloud_data.roam_modem_data_ts = k_uptime_get();
+	cloud_data.dev_modem_data_ts = k_uptime_get();
+
 	err = modem_info_params_get(&modem_param);
 	if (err) {
-		printk("Error getting modem_info: %d", err);
+		printk("Error getting modem_info: %d\n", err);
 	}
 
-	err = cloud_encode_modem_data(&msg, &modem_param, include_dev_data, rsrp,
-				      &cloud_data_time);
+	err = cloud_encode_modem_data(&msg, &cloud_data,
+				      &modem_param, include_dev_data, rsrp);
 	if (err) {
 		printk("Error encoding modem data, error: %d\n", err);
 		return;
@@ -343,8 +313,7 @@ static void cloud_send_buffered_data(void)
 	}
 
 	while (num_queued_entries > 0 && queued_entries) {
-		err = cloud_encode_gps_buffer(&msg, cir_buf_gps,
-						&cloud_data_time);
+		err = cloud_encode_gps_buffer(&msg, cir_buf_gps);
 		if (err) {
 			printk("Error encoding circular buffer: %d\n", err);
 			goto end;
@@ -374,11 +343,13 @@ static void cloud_pairing_routine(void)
 
 static void cloud_update_routine(void)
 {
-	ui_led_set_pattern(UI_CLOUD_CONNECTED);
-	k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
-	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
-	k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(5));
-	k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(5));
+	if(k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+		ui_led_set_pattern(UI_CLOUD_CONNECTED);
+		k_delayed_work_submit(&cloud_send_sensor_data_work, K_NO_WAIT);
+		k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
+		k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(5));
+		k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(5));
+	}
 }
 
 static void cloud_pair_work_fn(struct k_work *work)
@@ -511,12 +482,14 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		printk("CLOUD_EVT_CONNECTED\n");
 		cloud_pairing_routine();
 		boot_write_img_confirmed();
+		cloud_connected = true;
 		break;
 	case CLOUD_EVT_READY:
 		printk("CLOUD_EVT_READY\n");
 		break;
 	case CLOUD_EVT_DISCONNECTED:
 		printk("CLOUD_EVT_DISCONNECTED\n");
+		cloud_connected = false;
 		break;
 	case CLOUD_EVT_ERROR:
 		printk("CLOUD_EVT_ERROR\n");
@@ -553,6 +526,9 @@ void cloud_poll(void)
 	int err;
 
 connect:
+
+	k_sem_take(&cloud_conn_sem, K_FOREVER);
+
 	err = cloud_connect(cloud_backend);
 	if (err) {
 		printk("cloud_connect failed: %d\n", err);
@@ -586,20 +562,20 @@ connect:
 
 		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
 			printk("Socket error: POLLNVAL\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
+			printk("The cloud socket was unexpectedly closed.\n");
+			break;
 		}
 
 		if ((fds[0].revents & POLLHUP) == POLLHUP) {
 			printk("Socket error: POLLHUP\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
+			printk("Connection was closed by the cloud.\n");
+			break;
 		}
 
 		if ((fds[0].revents & POLLERR) == POLLERR) {
 			printk("Socket error: POLLERR\n");
-			error_handler(ERROR_CLOUD, -EIO);
-			return;
+			printk("Cloud connection was unexpectedly closed.\n");
+			break;
 		}
 	}
 
@@ -609,7 +585,7 @@ connect:
 
 K_THREAD_DEFINE(cloud_poll_thread, CLOUD_POLL_STACKSIZE,
 		cloud_poll, NULL, NULL, NULL,
-		CLOUD_POLL_PRIORITY, 0, K_FOREVER);
+		CLOUD_POLL_PRIORITY, 0, K_NO_WAIT);
 
 static void lte_connect(enum lte_conn_actions action)
 {
@@ -628,59 +604,42 @@ static void lte_connect(enum lte_conn_actions action)
 			printk("Connecting to LTE network. ");
 			printk("This may take several minutes.\n");
 			err = lte_lc_init_and_connect();
-			if (err == -ETIMEDOUT) {
-				printk("LTE link could not be established.\n");
-				goto gps_mode;
+			if (err) {
+				goto exit;
 			}
 		}
 	} else if (action == LTE_UPDATE) {
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
 		if (err) {
 			printk("lte_lc_nw_reg_status error: %d\n", err);
-			goto gps_mode;
+			goto exit;
 		}
 
 		printk("Checking LTE connection...\n");
+
 		switch (nw_reg_status) {
 		case LTE_LC_NW_REG_REGISTERED_HOME:
-			printk("REGISTERED TO HOME NETWORK\n");
-			return;
-		case LTE_LC_NW_REG_REGISTERED_ROAMING:
-			printk("REGISTERED TO ROAMING NETWORK\n");
-			return;
-		default:
-			printk("LTE not connected.\n");
-			printk("Connecting to LTE network. ");
-			printk("This may take several minutes.\n");
-			err = lte_lc_init_and_connect();
-			if (err) {
-				printk("LTE link could not be established.\n");
-				goto gps_mode;
-			}
 			break;
+		case LTE_LC_NW_REG_REGISTERED_ROAMING:
+			break;
+		default:
+			goto exit;
 		}
 	}
 
-	printk("LTE connected!\nFetching modem time...\n");
-
-	k_sleep(1000);
-
-	err = modem_info_params_get(&modem_param);
-	if (err) {
-		printk("Error getting modem_info: %d", err);
-	}
-
-	parse_modem_time_data();
+	printk("Connected to LTE network\n");
 
 	ui_led_set_pattern(UI_LTE_CONNECTED);
 
-	k_thread_start(cloud_poll_thread);
+	k_sem_give(&cloud_conn_sem);
 
 	return;
 
-gps_mode:
+exit:
 
-	lte_lc_gps_nw_mode();
+	printk("LTE link could not be established, or maintained.\n");
+
+	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
 }
 
 static void modem_rsrp_handler(char rsrp_value)
@@ -733,16 +692,17 @@ void main(void)
 		error_handler(ERROR_CLOUD, err);
 	}
 
+	work_init();
+	adxl362_init();
 	ui_init();
 	modem_data_init();
-	work_init();
-	lte_connect(LTE_INIT);
-	adxl362_init();
 	gps_control_init(gps_trigger_handler);
+	lte_connect(LTE_INIT);
+	nrf9160_time_init();
 
 	/*Sleep so that the device manages to adapt
 	  to its new configuration before gps a search*/
-	k_sleep(K_SECONDS(10));
+	k_sleep(K_SECONDS(20));
 
 	while(true) {
 		/*Check current device mode*/
@@ -768,7 +728,7 @@ void main(void)
 		/*Check lte connection*/
 		lte_connect(LTE_UPDATE);
 
-		/*Send update to cloud*/
+		/*Send update to cloud if a connection has been established*/
 		cloud_update_routine();
 
 		/*Sleep*/
