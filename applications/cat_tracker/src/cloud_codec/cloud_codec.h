@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <net/cloud.h>
 #include <modem_info.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +66,11 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data);
+
+static inline void cloud_release_data(struct cloud_msg *data)
+{
+	free(data->buf);
+}
 
 #ifdef __cplusplus
 }

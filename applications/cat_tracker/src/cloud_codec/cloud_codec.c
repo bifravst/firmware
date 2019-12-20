@@ -115,6 +115,7 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 	string = cJSON_Print(root_obj);
 	if (string == NULL) {
 		printk("Failed to print message.\n");
+		goto exit;
 	}
 
 	printk("Decoded message: %s\n", string);
@@ -146,7 +147,7 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 				cJSON_GetObjectItem(subgroup_obj, "acct");
 		}
 	} else {
-		goto end;
+		goto exit;
 	}
 
 get_data:
@@ -188,7 +189,7 @@ get_data:
 		       accel_threshold->valueint);
 		change_accel_threshold = true;
 	}
-end:
+exit:
 	cJSON_Delete(root_obj);
 	return 0;
 }
@@ -308,8 +309,13 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	static const char nbiot_string[] = "NB-IoT";
 	static const char gps_string[] = " GPS";
 
-	err += date_time_get(&cloud_data->roam_modem_data_ts);
-	err += date_time_get(&cloud_data->dev_modem_data_ts);
+	err = date_time_get(&cloud_data->roam_modem_data_ts);
+	if (err) {
+		printk("date_time_get, error: %d\n", err);
+		return err;
+	}
+
+	err = date_time_get(&cloud_data->dev_modem_data_ts);
 	if (err) {
 		printk("date_time_get, error: %d\n", err);
 		return err;
@@ -354,7 +360,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	err += json_add_str(static_m_data_v, "appV", CONFIG_CAT_TRACKER_APP_VERSION);
 	err += json_add_number(dynamic_m_data_v, "rsrp", rsrp);
 	err += json_add_number(dynamic_m_data_v, "area", modem_info->network.area_code.value);
-	err += json_add_number(dynamic_m_data_v, "mccmnc", atoi(modem_info->network.current_operator.value_string));
+	err += json_add_number(dynamic_m_data_v, "mccmnc", strtol(modem_info->network.current_operator.value_string, NULL, 10));
 	err += json_add_number(dynamic_m_data_v, "cell", modem_info->network.cellid_dec);
 	err += json_add_str(dynamic_m_data_v, "ip", modem_info->network.ip_address.value_string);
 
@@ -378,20 +384,20 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	if (err) {
-		goto cleanup;
+		goto exit;
 	}
 
 	buffer = cJSON_Print(root_obj);
-
+	
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
 	printk("Encoded message: %s\n", buffer);
 
-cleanup:
+exit:
 
 	/* Clear network mode string */
-	strcpy(modem_info->network.network_mode, "");
+	memset(modem_info->network.network_mode, 0, sizeof(modem_info->network.network_mode));
 	cJSON_Delete(root_obj);
 
 	/*Delete objects which are not associated*/
@@ -474,7 +480,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	if (err) {
-		goto cleanup;
+		goto exit;
 	}
 
 	buffer = cJSON_Print(root_obj);
@@ -491,7 +497,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	change_movement_timeout		= false;
 	change_accel_threshold		= false;
 
-cleanup:
+exit:
 	cJSON_Delete(root_obj);
 	return err;
 }
@@ -503,9 +509,19 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	int err = 0;
 	char *buffer;
 
-	err += date_time_get(&cloud_data->bat_timestamp);
-	err += date_time_get(&cloud_data->acc_timestamp);
-	err += date_time_get(&cir_buf_gps->gps_timestamp);
+	err = date_time_get(&cloud_data->bat_timestamp);
+	if (err) {
+		printk("date_time_get, error: %d\n", err);
+		return err;
+	}
+
+	err = date_time_get(&cloud_data->acc_timestamp);
+	if (err) {
+		printk("date_time_get, error: %d\n", err);
+		return err;
+	}
+
+	err = date_time_get(&cir_buf_gps->gps_timestamp);
 	if (err) {
 		printk("date_time_get, error: %d\n", err);
 		return err;
@@ -577,7 +593,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	err += json_add_obj(root_obj, "state", state_obj);
 
 	if (err) {
-		goto cleanup;
+		goto exit;
 	}
 
 	buffer = cJSON_Print(root_obj);
@@ -587,7 +603,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-cleanup:
+exit:
 	cJSON_Delete(root_obj);
 
 	/*Delete objects which are not associated*/

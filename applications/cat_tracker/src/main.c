@@ -211,6 +211,22 @@ static int get_voltage_level(void)
 	return 0;
 }
 
+static int modem_data_get(void)
+{
+	int err;
+
+	cloud_data.roam_modem_data_ts = k_uptime_get();
+	cloud_data.dev_modem_data_ts = k_uptime_get();
+
+	err = modem_info_params_get(&modem_param);
+	if (err) {
+		printk("Error getting modem_info: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
 static void cloud_pair(void)
 {
 	int err;
@@ -250,6 +266,7 @@ static void cloud_send_cfg(void)
 	}
 
 	err = cloud_send(cloud_backend, &msg);
+	cloud_release_data(&msg);
 	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
@@ -281,6 +298,7 @@ static void cloud_send_sensor_data(void)
 	}
 
 	err = cloud_send(cloud_backend, &msg);
+	cloud_release_data(&msg);
 	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
@@ -302,13 +320,10 @@ static void cloud_send_modem_data(bool include_dev_data)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
-	/** Timestamp modem data from the time it is fetched. */
-	cloud_data.roam_modem_data_ts = k_uptime_get();
-	cloud_data.dev_modem_data_ts = k_uptime_get();
-
-	err = modem_info_params_get(&modem_param);
+	err = modem_data_get();
 	if (err) {
-		printk("Error getting modem_info: %d\n", err);
+		printk("modem_data_get, error: %d", err);
+		return;
 	}
 
 	err = cloud_encode_modem_data(&msg, &cloud_data,
@@ -319,6 +334,7 @@ static void cloud_send_modem_data(bool include_dev_data)
 	}
 
 	err = cloud_send(cloud_backend, &msg);
+	cloud_release_data(&msg);
 	if (err) {
 		printk("Cloud send failed, err: %d\n", err);
 		return;
@@ -336,6 +352,7 @@ static void cloud_send_buffered_data(void)
 		.endpoint.type = CLOUD_EP_TOPIC_BATCH,
 	};
 
+	/* Check if it exists queued entries in the gps buffer. */
 	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
 		if (cir_buf_gps[i].queued) {
 			queued_entries = true;
@@ -343,23 +360,26 @@ static void cloud_send_buffered_data(void)
 		}
 	}
 
+	/* Encode and send queued entries in batches. */
 	while (num_queued_entries > 0 && queued_entries) {
 		err = cloud_encode_gps_buffer(&msg, cir_buf_gps);
 		if (err) {
 			printk("Error encoding circular buffer: %d\n", err);
-			goto end;
+			goto exit;
 		}
 
 		err = cloud_send(cloud_backend, &msg);
+		cloud_release_data(&msg);
 		if (err) {
 			printk("Cloud send failed, err: %d\n", err);
-			goto end;
+			goto exit;
 		}
+
 
 		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
 	}
 
-end:
+exit:
 	num_queued_entries = 0;
 	queued_entries = false;
 }
