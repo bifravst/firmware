@@ -63,6 +63,7 @@ static struct k_delayed_work cloud_send_modem_data_work;
 static struct k_delayed_work cloud_send_modem_data_dyn_work;
 static struct k_delayed_work cloud_send_cfg_work;
 static struct k_delayed_work cloud_send_buffered_data_work;
+static struct k_delayed_work set_led_device_mode_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -147,6 +148,15 @@ static void set_current_time(struct gps_data gps_data)
 	gps_time.tm_sec = gps_data.pvt.datetime.seconds;
 
 	date_time_set(&gps_time);
+}
+
+static void set_led_device_mode(void)
+{
+	if (!cloud_data.active) {
+		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+	} else {
+		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+	}
 }
 
 static double get_accel_thres(void)
@@ -277,6 +287,8 @@ static void cloud_send_sensor_data(void)
 	}
 
 	cloud_data.gps_found = false;
+	cir_buf_gps[head_cir_buf].queued = false;
+
 }
 
 static void cloud_send_modem_data(bool include_dev_data)
@@ -366,7 +378,13 @@ static void cloud_update_routine(void)
 		k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
 		k_delayed_work_submit(&cloud_send_modem_data_dyn_work, K_SECONDS(5));
 		k_delayed_work_submit(&cloud_send_buffered_data_work, K_SECONDS(5));
+		k_delayed_work_submit(&set_led_device_mode_work, K_SECONDS(5));
 	}
+}
+
+static void set_led_device_mode_work_fn(struct k_work *work)
+{
+	set_led_device_mode();
 }
 
 static void cloud_pair_work_fn(struct k_work *work)
@@ -407,6 +425,7 @@ static void work_init(void)
 	k_delayed_work_init(&cloud_send_modem_data_work, cloud_send_modem_data_work_fn);
 	k_delayed_work_init(&cloud_send_modem_data_dyn_work, cloud_send_modem_data_dyn_work_fn);	
 	k_delayed_work_init(&cloud_send_buffered_data_work, cloud_send_buffered_data_work_fn);
+	k_delayed_work_init(&set_led_device_mode_work, set_led_device_mode_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -690,15 +709,6 @@ static int modem_data_init(void)
 	return 0;
 }
 
-static void set_led_device_mode(void)
-{
-	if (!cloud_data.active) {
-		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
-	} else {
-		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
-	}
-}
-
 void main(void)
 {
 	int err;
@@ -757,7 +767,6 @@ void main(void)
 
 		/*Sleep*/
 		printk("Going to sleep for: %d seconds\n", check_active_wait());
-		set_led_device_mode();
 		k_sleep(K_SECONDS(check_active_wait()));
 	}
 }
