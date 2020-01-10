@@ -13,5 +13,6 @@ rsource "aws_jobs/Kconfig"
 rsource "aws_fota/Kconfig"
 rsource "cloud/Kconfig"
 rsource "zzhc/Kconfig"
+rsource "bifravst_cloud/Kconfig"
 
 endmenu
