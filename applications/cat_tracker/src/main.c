@@ -22,7 +22,7 @@
 
 enum lte_conn_actions {
 	LTE_INIT,
-	LTE_UPDATE,
+	CHECK_LTE_CONNECTION,
 };
 
 enum error_type {
@@ -664,7 +664,7 @@ static void lte_connect(enum lte_conn_actions action)
 				goto exit;
 			}
 		}
-	} else if (action == LTE_UPDATE) {
+	} else if (action == CHECK_LTE_CONNECTION) {
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
 		if (err) {
 			printk("lte_lc_nw_reg_status error: %d\n", err);
@@ -780,7 +780,7 @@ void main(void)
 		k_sleep(1000);
 
 		/*Check lte connection*/
-		lte_connect(LTE_UPDATE);
+		lte_connect(CHECK_LTE_CONNECTION);
 
 		/*Send update to cloud if a connection has been established*/
 		cloud_update_routine();
