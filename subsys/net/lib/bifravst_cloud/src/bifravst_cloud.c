@@ -534,7 +534,7 @@ static int bifravst_input(const struct cloud_backend *const backend)
 
 static int bifravst_ping(const struct cloud_backend *const backend)
 {
-	return mqtt_live(&client);
+	return mqtt_ping(&client);
 }
 
 static const struct cloud_api bifravst_cloud_api = {

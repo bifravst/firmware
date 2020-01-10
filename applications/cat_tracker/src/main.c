@@ -29,7 +29,8 @@ enum error_type {
 	ERROR_BSD_RECOVERABLE,
 	ERROR_BSD_IRRECOVERABLE,
 	ERROR_SYSTEM_FAULT,
-	ERROR_CLOUD
+	ERROR_CLOUD,
+	ERROR_LTE_LC
 };
 
 struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
@@ -74,11 +75,6 @@ K_SEM_DEFINE(cloud_conn_sem, 0, 1);
 
 void error_handler(enum error_type err_type, int err_code)
 {
-#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
-	LOG_PANIC();
-	sys_reboot(0);
-#else
-
 	switch (err_type) {
 	case ERROR_BSD_RECOVERABLE:
 		printk("Error of type ERROR_BSD_RECOVERABLE: %d\n", err_code);
@@ -98,6 +94,10 @@ void error_handler(enum error_type err_type, int err_code)
 		printk("Error of type ERROR_CLOUD: %d\n", err_code);
 		ui_led_set_pattern(UI_LED_ERROR_CLOUD);
 		break;
+	case ERROR_LTE_LC:
+		printk("Error of type ERROR_LTE_LC: %d\n", err_code);
+		ui_led_set_pattern(UI_LED_ERROR_CLOUD);
+		break;
 
 	default:
 		printk("Unknown error type: %d, code: %d\n", err_type,
@@ -106,6 +106,10 @@ void error_handler(enum error_type err_type, int err_code)
 		break;
 	}
 
+#if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
+	LOG_PANIC();
+	sys_reboot(0);
+#else
 	while (true) {
 		k_cpu_idle();
 	}
@@ -660,8 +664,10 @@ static void lte_connect(enum lte_conn_actions action)
 			printk("Connecting to LTE network. ");
 			printk("This may take several minutes.\n");
 			err = lte_lc_init_and_connect();
-			if (err) {
+			if (err == -ETIMEDOUT) {
 				goto exit;
+			} else if (err) {
+				error_handler(ERROR_LTE_LC, err);
 			}
 		}
 	} else if (action == CHECK_LTE_CONNECTION) {
