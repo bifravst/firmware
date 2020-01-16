@@ -113,7 +113,7 @@ static int sntp_request_time(const char *server, u32_t timeout, struct sntp_time
 	err = net_getaddrinfo_addr_str(server, "123", &hints, &addr);
 	if (err) {
                 LOG_ERR("net_getaddrinfo_addr_str, error: %d", err);
-                return err;                
+                return err;
 	}
 
 	err = sntp_init(&sntp_ctx, addr->ai_addr, addr->ai_addrlen);
@@ -136,7 +136,7 @@ static int get_time_NTP_server(void)
 {
         int err;
         int i = 0;
-        
+
         while (i < ARRAY_SIZE(servers)) {
                 err =  sntp_request_time(servers[i].server,
                                          K_SECONDS(5), &sntp_time);
@@ -254,6 +254,9 @@ void date_time_set(struct tm *new_date_time)
 int date_time_get(s64_t *unix_timestamp_ms)
 {
         if(!initial_valid_time || unix_timestamp_ms == 0) {
+                /* If time is not valid, try to get new time. */
+                LOG_ERR("No valid time currently available");
+                k_sem_give(&ntp_sem);
                 return -ENODATA;
         }
 
