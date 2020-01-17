@@ -65,6 +65,7 @@ static struct k_delayed_work cloud_send_modem_data_dyn_work;
 static struct k_delayed_work cloud_send_cfg_work;
 static struct k_delayed_work cloud_send_buffered_data_work;
 static struct k_delayed_work set_led_device_mode_work;
+static struct k_delayed_work movement_timeout_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -129,6 +130,61 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	printk("Running main.c error handler");
 	error_handler(ERROR_SYSTEM_FAULT, reason);
 	CODE_UNREACHABLE;
+}
+
+static void lte_connect(enum lte_conn_actions action)
+{
+	int err;
+
+	enum lte_lc_nw_reg_status nw_reg_status;
+
+	ui_led_set_pattern(UI_LTE_CONNECTING);
+
+	if (action == LTE_INIT) {
+		if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
+			/* Do nothing, modem is already turned on
+			 * and connected.
+			 */
+		} else {
+			printk("Connecting to LTE network. ");
+			printk("This may take several minutes.\n");
+			err = lte_lc_init_and_connect();
+			if (err == -ETIMEDOUT) {
+				goto exit;
+			} else if (err) {
+				error_handler(ERROR_LTE_LC, err);
+			}
+		}
+	} else if (action == CHECK_LTE_CONNECTION) {
+		err = lte_lc_nw_reg_status_get(&nw_reg_status);
+		if (err) {
+			printk("lte_lc_nw_reg_status error: %d\n", err);
+			goto exit;
+		}
+
+		printk("Checking LTE connection...\n");
+
+		switch (nw_reg_status) {
+		case LTE_LC_NW_REG_REGISTERED_HOME:
+			break;
+		case LTE_LC_NW_REG_REGISTERED_ROAMING:
+			break;
+		default:
+			goto exit;
+		}
+	}
+
+	printk("Connected to LTE network\n");
+
+	k_sem_give(&cloud_conn_sem);
+
+	return;
+
+exit:
+
+	printk("LTE link could not be established, or maintained.\n");
+
+	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
 }
 
 static int check_active_wait(void)
@@ -441,6 +497,18 @@ static void cloud_send_buffered_data_work_fn(struct k_work *work)
 	cloud_send_buffered_data();
 }
 
+static void movement_timeout_work_fn(struct k_work *work)
+{
+	if (!cloud_data.active) {
+		printk("Movement timeout triggered\n");
+		lte_connect(CHECK_LTE_CONNECTION);
+		cloud_update_routine();
+	}
+
+	k_delayed_work_submit(&movement_timeout_work,
+			      K_SECONDS(cloud_data.movement_timeout));
+}
+
 static void work_init(void)
 {
 	k_delayed_work_init(&cloud_pair_work, cloud_pair_work_fn);
@@ -450,6 +518,7 @@ static void work_init(void)
 	k_delayed_work_init(&cloud_send_modem_data_dyn_work, cloud_send_modem_data_dyn_work_fn);
 	k_delayed_work_init(&cloud_send_buffered_data_work, cloud_send_buffered_data_work_fn);
 	k_delayed_work_init(&set_led_device_mode_work, set_led_device_mode_work_fn);
+	k_delayed_work_init(&movement_timeout_work, movement_timeout_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -542,6 +611,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		printk("CLOUD_EVT_CONNECTED\n");
 		cloud_pairing_routine();
 		boot_write_img_confirmed();
+		k_delayed_work_submit(&movement_timeout_work,
+				      K_SECONDS(cloud_data.movement_timeout));
 		cloud_connected = true;
 		break;
 	case CLOUD_EVT_READY:
@@ -647,61 +718,6 @@ connect:
 K_THREAD_DEFINE(cloud_poll_thread, CLOUD_POLL_STACKSIZE,
 		cloud_poll, NULL, NULL, NULL,
 		CLOUD_POLL_PRIORITY, 0, K_NO_WAIT);
-
-static void lte_connect(enum lte_conn_actions action)
-{
-	int err;
-
-	enum lte_lc_nw_reg_status nw_reg_status;
-
-	ui_led_set_pattern(UI_LTE_CONNECTING);
-
-	if (action == LTE_INIT) {
-		if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-			/* Do nothing, modem is already turned on
-			 * and connected.
-			 */
-		} else {
-			printk("Connecting to LTE network. ");
-			printk("This may take several minutes.\n");
-			err = lte_lc_init_and_connect();
-			if (err == -ETIMEDOUT) {
-				goto exit;
-			} else if (err) {
-				error_handler(ERROR_LTE_LC, err);
-			}
-		}
-	} else if (action == CHECK_LTE_CONNECTION) {
-		err = lte_lc_nw_reg_status_get(&nw_reg_status);
-		if (err) {
-			printk("lte_lc_nw_reg_status error: %d\n", err);
-			goto exit;
-		}
-
-		printk("Checking LTE connection...\n");
-
-		switch (nw_reg_status) {
-		case LTE_LC_NW_REG_REGISTERED_HOME:
-			break;
-		case LTE_LC_NW_REG_REGISTERED_ROAMING:
-			break;
-		default:
-			goto exit;
-		}
-	}
-
-	printk("Connected to LTE network\n");
-
-	k_sem_give(&cloud_conn_sem);
-
-	return;
-
-exit:
-
-	printk("LTE link could not be established, or maintained.\n");
-
-	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
-}
 
 static void modem_rsrp_handler(char rsrp_value)
 {
