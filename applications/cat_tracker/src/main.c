@@ -4,10 +4,10 @@
 #include <string.h>
 #include <logging/log.h>
 #include <logging/log_ctrl.h>
-#include <misc/reboot.h>
+#include <power/reboot.h>
 #include <device.h>
 #include <sensor.h>
-#include <gps.h>
+#include <drivers/gps.h>
 #include <gps_controller.h>
 #include <ui.h>
 #include <net/cloud.h>
@@ -447,7 +447,7 @@ static void work_init(void)
 	k_delayed_work_init(&cloud_send_sensor_data_work, cloud_send_sensor_data_work_fn);
 	k_delayed_work_init(&cloud_send_cfg_work, cloud_send_cfg_work_fn);
 	k_delayed_work_init(&cloud_send_modem_data_work, cloud_send_modem_data_work_fn);
-	k_delayed_work_init(&cloud_send_modem_data_dyn_work, cloud_send_modem_data_dyn_work_fn);	
+	k_delayed_work_init(&cloud_send_modem_data_dyn_work, cloud_send_modem_data_dyn_work_fn);
 	k_delayed_work_init(&cloud_send_buffered_data_work, cloud_send_buffered_data_work_fn);
 	k_delayed_work_init(&set_led_device_mode_work, set_led_device_mode_work_fn);
 }
@@ -592,6 +592,7 @@ connect:
 	err = cloud_connect(cloud_backend);
 	if (err) {
 		printk("cloud_connect failed: %d\n", err);
+		goto connect;
 	}
 
 	struct pollfd fds[] = {
