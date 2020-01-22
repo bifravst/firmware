@@ -11,6 +11,9 @@
 #include <net/cloud.h>
 #include <nrf9160_timestamp.h>
 
+#include <logging/log.h>
+LOG_MODULE_REGISTER(cloud_codec, CONFIG_CAT_TRACKER_LOG_LEVEL);
+
 static bool change_gpst = true;
 static bool change_active = true;
 static bool change_active_wait = true;
@@ -114,11 +117,11 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 
 	string = cJSON_Print(root_obj);
 	if (string == NULL) {
-		printk("Failed to print message.\n");
+		LOG_ERR("Failed to print message.");
 		goto exit;
 	}
 
-	printk("Decoded message: %s\n", string);
+	LOG_INF("Decoded message: %s", log_strdup(string));
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {
@@ -154,38 +157,38 @@ get_data:
 
 	if (gpst != NULL) {
 		cloud_data->gps_timeout = gpst->valueint;
-		printk("SETTING GPST TO: %d\n", gpst->valueint);
+		LOG_INF("SETTING GPST TO: %d", gpst->valueint);
 		change_gpst = true;
 	}
 
 	if (active != NULL) {
 		cloud_data->active = active->valueint;
-		printk("SETTING ACTIVE TO: %d\n", active->valueint);
+		LOG_INF("SETTING ACTIVE TO: %d", active->valueint);
 		change_active = true;
 	}
 
 	if (active_wait != NULL) {
 		cloud_data->active_wait = active_wait->valueint;
-		printk("SETTING ACTIVE WAIT TO: %d\n", active_wait->valueint);
+		LOG_INF("SETTING ACTIVE WAIT TO: %d", active_wait->valueint);
 		change_active_wait = true;
 	}
 
 	if (passive_wait != NULL) {
 		cloud_data->passive_wait = passive_wait->valueint;
-		printk("SETTING PASSIVE_WAIT TO: %d\n", passive_wait->valueint);
+		LOG_INF("SETTING PASSIVE_WAIT TO: %d", passive_wait->valueint);
 		change_passive_wait = true;
 	}
 
 	if (movement_timeout != NULL) {
 		cloud_data->movement_timeout = movement_timeout->valueint;
-		printk("SETTING MOVEMENT TIMEOUT TO: %d\n",
+		LOG_INF("SETTING MOVEMENT TIMEOUT TO: %d",
 		       movement_timeout->valueint);
 		change_movement_timeout = true;
 	}
 
 	if (accel_threshold != NULL) {
 		cloud_data->accel_threshold = accel_threshold->valueint;
-		printk("SETTING ACCEL THRESHOLD TIMEOUT TO: %d\n",
+		LOG_INF("SETTING ACCEL THRESHOLD TIMEOUT TO: %d",
 		       accel_threshold->valueint);
 		change_accel_threshold = true;
 	}
@@ -205,7 +208,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 
 	err = date_time_get(&cir_buf_gps->gps_timestamp);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
@@ -289,7 +292,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 	buffer = cJSON_Print(root_obj);
 	cJSON_Delete(root_obj);
 
-	printk("Encoded message: %s\n", buffer);
+	LOG_INF("Encoded message: %s", log_strdup(buffer));
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
@@ -311,13 +314,13 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 
 	err = date_time_get(&cloud_data->roam_modem_data_ts);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
 	err = date_time_get(&cloud_data->dev_modem_data_ts);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
@@ -392,7 +395,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-	printk("Encoded message: %s\n", buffer);
+	LOG_INF("Encoded message: %s", log_strdup(buffer));
 
 exit:
 
@@ -485,7 +488,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 
 	buffer = cJSON_Print(root_obj);
 
-	printk("Encoded message: %s\n", buffer);
+	LOG_INF("Encoded message: %s", log_strdup(buffer));
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
@@ -511,19 +514,19 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	err = date_time_get(&cloud_data->bat_timestamp);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
 	err = date_time_get(&cloud_data->acc_timestamp);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
 	err = date_time_get(&cir_buf_gps->gps_timestamp);
 	if (err) {
-		printk("date_time_get, error: %d\n", err);
+		LOG_ERR("date_time_get, error: %d", err);
 		return err;
 	}
 
@@ -598,7 +601,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	buffer = cJSON_Print(root_obj);
 
-	printk("Encoded message: %s\n", buffer);
+	LOG_INF("Encoded message: %s", log_strdup(buffer));
 
 	output->buf = buffer;
 	output->len = strlen(buffer);

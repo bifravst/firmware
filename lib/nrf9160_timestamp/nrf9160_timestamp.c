@@ -78,6 +78,7 @@ static int get_time_cellular_network(void)
                 LOG_DBG("Could not get cellular network time, error: %d", err);
                 return err;
         }
+        buf[AT_CMD_MODEM_DATE_TIME_REPONSE_LEN] = 0;
 
         LOG_DBG("Response from modem: %s", log_strdup(buf));
 

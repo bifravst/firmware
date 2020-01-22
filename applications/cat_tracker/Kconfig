@@ -62,15 +62,23 @@ endmenu # Firmware versioning
 config POWER_OPTIMIZATION_ENABLE
 	bool "Enable power optimization"
 	default y
+	select LTE_EDRX_REQ
 
-menu "MQTT socket poll"
+menu "Cloud socket poll"
 
 config MQTT_KEEPALIVE
-	int "MQTT KEEPALIVE"
-	default 1200 if POWER_OPTIMIZATION_ENABLE
-	default 120
+	int
+	default 1200
 
-endmenu # MQTT socket poll
+config CLOUD_POLL_STACKSIZE
+	int
+	default 4096
+
+config CLOUD_POLL_PRIORITY
+	int
+	default 7
+
+endmenu # Cloud socket poll
 
 menu "Cloud codec"
 
@@ -89,3 +97,7 @@ endmenu
 menu "Zephyr Kernel"
 source "$ZEPHYR_BASE/Kconfig.zephyr"
 endmenu
+
+module = CAT_TRACKER
+module-str = Cat Tracker
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
