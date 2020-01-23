@@ -65,7 +65,7 @@ jobs:
       - name: Install Zephyr dependencies
         run: |
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
-          sudo pip3 install cmake west wheel
+          sudo env "PATH=$PATH" pip3install cmake west wheel
 
       - name: Install Rust+Cargo
         run: |
@@ -78,11 +78,11 @@ jobs:
           cargo
           west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
           west update
-          sudo pip3 install -r zephyr/scripts/requirements.txt
-          sudo pip3 install pc_ble_driver_py
-          sudo pip3 install -r nrf/scripts/requirements.txt
+          sudo env "PATH=$PATH" pip3install -r zephyr/scripts/requirements.txt
+          sudo env "PATH=$PATH" pip3install pc_ble_driver_py
+          sudo env "PATH=$PATH" pip3install -r nrf/scripts/requirements.txt
           sudo apt-get -y remove python-cryptography python3-cryptography
-          sudo pip3 install -r mcuboot/scripts/requirements.txt
+          sudo env "PATH=$PATH" pip3install -r mcuboot/scripts/requirements.txt
 
       - name: Determine next release version
         run: |
