@@ -74,13 +74,9 @@ jobs:
           override: true
           default: true
 
-      - name: Check cargo
-        run: |
-          which cargo
-
       - name: West init
         run: |
-          export PATH=~/.local/bin:$PATH
+          export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
           west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
           west update
           sudo pip3 install -r zephyr/scripts/requirements.txt
