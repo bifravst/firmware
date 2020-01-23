@@ -73,7 +73,7 @@ jobs:
 
       - name: West init
         run: |
-          export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
+          export PATH=~/.local/bin:~/.cargo/bin:$PATH
           west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
           west update
           sudo pip3 install -r zephyr/scripts/requirements.txt
