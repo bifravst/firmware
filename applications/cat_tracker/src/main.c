@@ -144,7 +144,7 @@ static void lte_connect(enum lte_conn_actions action)
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
 		if (err) {
 			LOG_ERR("lte_lc_nw_reg_status error: %d", err);
-			goto exit;
+			error_handler(ERROR_LTE_LC, err);
 		}
 
 		LOG_INF("Checking LTE connection...");
