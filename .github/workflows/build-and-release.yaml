@@ -71,6 +71,12 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          override: true
+          default: true
+
+      - name: Check cargo
+        run: |
+          which cargo
 
       - name: West init
         run: |
