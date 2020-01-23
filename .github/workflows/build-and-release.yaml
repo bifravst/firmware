@@ -67,12 +67,9 @@ jobs:
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
           sudo pip3 install cmake west wheel
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          default: true
+      - name: Install Rust+Cargo
+        run: |
+          curl https://sh.rustup.rs -sSf | sh -s -- -y
 
       - name: West init
         run: |
