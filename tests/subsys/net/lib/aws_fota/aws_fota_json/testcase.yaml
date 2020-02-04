@@ -1,4 +1,0 @@
-tests:
-  net.lib.fota.json:
-    platform_whitelist: native_posix
-    tags: aws fota json

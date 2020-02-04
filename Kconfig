@@ -1,0 +1,114 @@
+#
+# Copyright (c) 2018 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menu "Cat Tracker sample"
+
+rsource "src/ui/Kconfig"
+
+menu "GPS"
+
+choice
+	prompt "GPS device"
+	default GPS_USE_SIM
+	help
+		Select from which device GPS data will be fetched.
+
+config GPS_USE_SIM
+	bool "Use GPS simulator"
+	select GPS_SIM
+	select GPS_SIM_TRIGGER
+	help
+		Use simulated GPS data.
+
+config GPS_USE_EXTERNAL
+	bool "User provided GPS device"
+	help
+		Provide a GPS device that location data will be fetched from and
+		sent to nRF Cloud
+
+endchoice
+
+rsource "src/gps_controller/Kconfig"
+
+rsource "src/nrf9160_timestamp/Kconfig"
+
+config GPS_DEV_NAME
+	string "GPS device name"
+	default GPS_SIM_DEV_NAME if GPS_USE_SIM
+	help
+		GPS device from which location data will be fetched and sent
+		to nRF Cloud.
+
+config GPS_TRIGGER
+	bool
+	default GPS_SIM_TRIGGER if GPS_USE_SIM
+
+config GPS_SIM_TRIGGER_TIMER_MSEC
+	int
+	default 120000 if POWER_OPTIMIZATION_ENABLE
+	default 2000
+
+endmenu	# GPS
+
+menu "Firmware versioning"
+
+config CAT_TRACKER_APP_VERSION
+	string "The version of the cat tracker firmware"
+	default "0.0.0-development"
+
+endmenu # Firmware versioning
+
+config POWER_OPTIMIZATION_ENABLE
+	bool "Enable power optimization"
+	default y
+	select LTE_EDRX_REQ
+
+menu "Cloud socket poll"
+
+config CLOUD_BACKEND
+	string
+	default "AWS_IOT"
+
+config MQTT_KEEPALIVE
+	int
+	default 1200
+
+config CLOUD_POLL_STACKSIZE
+	int
+	default 4096
+
+config CLOUD_POLL_PRIORITY
+	int
+	default 7
+
+endmenu # Cloud socket poll
+
+menu "Cloud codec"
+
+config SERIALIZATION_JSON
+	bool "Cloud communication enconding"
+	default y
+	select CJSON_LIB
+
+config CIRCULAR_SENSOR_BUFFER_MAX
+	int "Maximum amount of buffered sensor entries"
+	default 10
+
+config MAX_PER_ENCODED_ENTRIES
+	int "Maximum amount of encoded and published sensor buffer entries"
+	default 7
+
+endmenu # Cloud codec
+
+endmenu
+
+menu "Zephyr Kernel"
+source "$ZEPHYR_BASE/Kconfig.zephyr"
+endmenu
+
+module = CAT_TRACKER
+module-str = Cat Tracker
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"

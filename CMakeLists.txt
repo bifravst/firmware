@@ -4,16 +4,22 @@
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-# Point to NCS root directory.
-set(NRF_DIR ${CMAKE_CURRENT_LIST_DIR} CACHE PATH "NCS root directory")
+cmake_minimum_required(VERSION 3.8.2)
 
-include(cmake/multi_image.cmake)
+include(../nrf/cmake/boilerplate.cmake)
 
-zephyr_include_directories(include)
+include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
+project(cat_tracker)
 
-add_subdirectory(ext)
-add_subdirectory(lib)
-add_subdirectory(samples)
-add_subdirectory(subsys)
-add_subdirectory(drivers)
-add_subdirectory(tests)
+# NORDIC SDK APP START
+target_sources(app PRIVATE src/main.c)
+# NORDIC SDK APP END
+
+# Include source directory
+zephyr_include_directories(src)
+
+# Application directories
+add_subdirectory(src/gps_controller)
+add_subdirectory(src/ui)
+add_subdirectory(src/cloud_codec)
+add_subdirectory(src/nrf9160_timestamp)

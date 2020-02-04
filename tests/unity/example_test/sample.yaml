@@ -1,7 +1,0 @@
-sample:
-  description: Example Unity/Cmock test
-  name: example_unity_test
-tests:
-  unity.example:
-    platform_whitelist: native_posix
-    tags: example

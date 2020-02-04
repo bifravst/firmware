@@ -65,7 +65,8 @@ jobs:
       - name: Install Zephyr dependencies
         run: |
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
-          sudo env "PATH=$PATH" pip3 install cmake west wheel
+          sudo env "PATH=$PATH" pip3 install cmake wheel
+          sudo env "PATH=$PATH" pip3 install -U --pre west
 
       - name: Install Rust+Cargo
         run: |
@@ -76,8 +77,12 @@ jobs:
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
           which cargo
           cargo
-          west init -m https://github.com/${GITHUB_REPOSITORY} --mr ${GITHUB_SHA}
+          cd ${GITHUB_WORKSPACE}
+          git clone https://github.com/${GITHUB_REPOSITORY}
+          cd cat-tracker-fw
+          west init -l
           west update
+          cd ..
           sudo env "PATH=$PATH" pip3 install -r zephyr/scripts/requirements.txt
           sudo env "PATH=$PATH" pip3 install pc_ble_driver_py
           sudo env "PATH=$PATH" pip3 install -r nrf/scripts/requirements.txt
@@ -87,37 +92,37 @@ jobs:
       - name: Determine next release version
         run: |
           npm ci
-          export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/nrf/.github/workflows/get-next-version.js`
+          export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/cat-tracker-fw/.github/workflows/get-next-version.js`
           echo -n $NEXT_VERSION > .version
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
 
       - name: Configure the AWS IoT broker hostname
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
 
       - name: Build
         run: |
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          cd ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker
+          cd ${GITHUB_WORKSPACE}/cat-tracker-fw
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-app_update.bin
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/ ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/prj.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
           west build -p auto -b nrf9160_pca20035ns
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem.hex
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          mv ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
       - name: Release
         if: startsWith(github.ref, 'refs/heads/saga')
@@ -125,12 +130,12 @@ jobs:
           wget https://github.com/github/hub/releases/download/v2.12.8/hub-linux-amd64-2.12.8.tgz
           tar xzf hub-linux-amd64-2.12.8.tgz
           export NEXT_VERSION=`cat .version`
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-app_update.bin cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-app_update.bin
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-app_update.bin cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-app_update.bin
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem-app_update.bin
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem.hex
-          cp -v ${GITHUB_WORKSPACE}/nrf/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem-app_update.bin
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-app_update.bin
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-app_update.bin
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem.hex
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem-app_update.bin
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem.hex
+          cp -v ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem-app_update.bin
           ./hub-linux-amd64-2.12.8/bin/hub release create -m "$NEXT_VERSION" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION) NB-IoT" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION) NB-IoT" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem.hex#Pre-build HEX file for PCA20035 / Thingy:91 ($NEXT_VERSION) LTE-m" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem.hex#Pre-build HEX file for PCA10090 / nRF9160 DK ($NEXT_VERSION) LTE-m" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-app_update.bin#Pre-build App Update file for PCA20035 / Thingy:91 ($NEXT_VERSION) NB-IoT" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-app_update.bin#Pre-build App Update file for PCA10090 / nRF9160 DK ($NEXT_VERSION) NB-IoT" -a "cat-tracker-PCA20035-Thingy52-$NEXT_VERSION-ltem-app_update.bin#Pre-build App Update file for PCA20035 / Thingy:91 ($NEXT_VERSION) LTE-m" -a "cat-tracker-PCA10090-nRF9160DK-$NEXT_VERSION-ltem-app_update.bin#Pre-build App Update file for PCA10090 / nRF9160 DK ($NEXT_VERSION) LTE-m" $NEXT_VERSION
