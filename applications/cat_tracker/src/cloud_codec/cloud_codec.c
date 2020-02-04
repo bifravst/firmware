@@ -121,7 +121,7 @@ int cloud_decode_response(char *input, struct cloud_data *cloud_data)
 		goto exit;
 	}
 
-	printk("Decoded message: %s", string);
+	printk("Decoded message: %s\n", string);
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {
@@ -292,7 +292,7 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 	buffer = cJSON_Print(root_obj);
 	cJSON_Delete(root_obj);
 
-	printk("Encoded message: %s", buffer);
+	printk("Encoded message: %s\n", buffer);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
@@ -395,7 +395,7 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-	printk("Encoded message: %s", buffer);
+	printk("Encoded message: %s\n", buffer);
 
 exit:
 
@@ -488,7 +488,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 
 	buffer = cJSON_Print(root_obj);
 
-	printk("Encoded message: %s", buffer);
+	printk("Encoded message: %s\n", buffer);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);
@@ -601,7 +601,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	buffer = cJSON_Print(root_obj);
 
-	printk("Encoded message: %s", buffer);
+	printk("Encoded message: %s\n", buffer);
 
 	output->buf = buffer;
 	output->len = strlen(buffer);

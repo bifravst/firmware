@@ -21,16 +21,17 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
+#define AWS_CLOUD_CLIENT_ID_LEN 15
+#define AWS "$aws/things/"
+#define AWS_LEN (sizeof(AWS) - 1)
+#define CFG_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
+#define CFG_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
+#define BATCH_TOPIC "%s/batch"
+#define BATCH_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 6)
+
 enum lte_conn_actions {
 	LTE_INIT,
 	CHECK_LTE_CONNECTION,
-};
-
-enum error_type {
-	ERROR_BSD_RECOVERABLE,
-	ERROR_SYSTEM_FAULT,
-	ERROR_CLOUD,
-	ERROR_LTE_LC
 };
 
 static struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
@@ -43,6 +44,13 @@ static struct cloud_data cloud_data = {
 				.movement_timeout = 3600,
 				.accel_threshold = 100,
 				.gps_found = false };
+
+static struct cloud_endpoint sub_ep_topics_sub[1];
+static struct cloud_endpoint pub_ep_topics_sub[1];
+
+static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
+static char batch_topic[BATCH_TOPIC_LEN + 1];
+static char cfg_topic[CFG_TOPIC_LEN + 1];
 
 static struct modem_param_info modem_param;
 static struct cloud_backend *cloud_backend;
@@ -67,31 +75,10 @@ K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(cloud_conn_sem, 0, 1);
 
-void error_handler(enum error_type err_type, int err_code)
+void error_handler(int err_code)
 {
-	switch (err_type) {
-	case ERROR_BSD_RECOVERABLE:
-		LOG_ERR("Error of type ERROR_BSD_RECOVERABLE: %d", err_code);
-		ui_led_set_pattern(UI_LED_ERROR_BSD_REC);
-		break;
-	case ERROR_SYSTEM_FAULT:
-		LOG_ERR("Error of type ERROR_SYSTEM_FAULT: %d", err_code);
-		ui_led_set_pattern(UI_LED_ERROR_SYSTEM_FAULT);
-		break;
-	case ERROR_CLOUD:
-		LOG_ERR("Error of type ERROR_CLOUD: %d", err_code);
-		ui_led_set_pattern(UI_LED_ERROR_CLOUD);
-		break;
-	case ERROR_LTE_LC:
-		LOG_ERR("Error of type ERROR_LTE_LC: %d", err_code);
-		ui_led_set_pattern(UI_LED_ERROR_LTE_LC);
-		break;
-	default:
-		LOG_ERR("Unknown error type: %d, code: %d", err_type,
-		       err_code);
-		ui_led_set_pattern(UI_LED_ERROR_UNKNOWN);
-		break;
-	}
+	LOG_ERR("err_handler, error code: %d", err_code);
+	ui_led_set_pattern(UI_LED_ERROR_SYSTEM_FAULT);
 
 #if !defined(CONFIG_DEBUG) && defined(CONFIG_REBOOT)
 	LOG_PANIC();
@@ -105,7 +92,7 @@ void error_handler(enum error_type err_type, int err_code)
 
 void bsd_recoverable_error_handler(uint32_t err)
 {
-	error_handler(ERROR_BSD_RECOVERABLE, (int)err);
+	error_handler((int)err);
 }
 
 void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
@@ -113,11 +100,12 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	ARG_UNUSED(esf);
 
 	LOG_PANIC();
-	error_handler(ERROR_SYSTEM_FAULT, reason);
+	LOG_ERR("k_sys_fatal_error_handler, error: %d", reason);
+	error_handler(reason);
 	CODE_UNREACHABLE;
 }
 
-static void lte_connect(enum lte_conn_actions action)
+static int lte_connect(enum lte_conn_actions action)
 {
 	int err;
 
@@ -137,14 +125,14 @@ static void lte_connect(enum lte_conn_actions action)
 			if (err == -ETIMEDOUT) {
 				goto exit;
 			} else if (err) {
-				error_handler(ERROR_LTE_LC, err);
+				return err;
 			}
 		}
 	} else if (action == CHECK_LTE_CONNECTION) {
 		err = lte_lc_nw_reg_status_get(&nw_reg_status);
 		if (err) {
 			LOG_ERR("lte_lc_nw_reg_status error: %d", err);
-			error_handler(ERROR_LTE_LC, err);
+			error_handler(err);
 		}
 
 		LOG_INF("Checking LTE connection...");
@@ -162,13 +150,15 @@ static void lte_connect(enum lte_conn_actions action)
 
 	k_sem_give(&cloud_conn_sem);
 
-	return;
+	return 0;
 
 exit:
 
 	LOG_ERR("LTE link could not be established, or maintained");
 
 	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
+
+	return 0;
 }
 
 static int check_active_wait(void)
@@ -278,7 +268,7 @@ static void cloud_config_get(void)
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_PAIR,
+				 .endpoint.type = CLOUD_EP_TOPIC_STATE,
 				 .buf = "",
 				 .len = 0 };
 
@@ -391,7 +381,7 @@ static void cloud_send_buffered_data(void)
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_BATCH,
+		.endpoint = pub_ep_topics_sub[0],
 	};
 
 	/* Check if it exists queued entries in the gps buffer. */
@@ -669,7 +659,7 @@ connect:
 
 		if (err < 0) {
 			LOG_ERR("poll, error: %d", err);
-			error_handler(ERROR_CLOUD, err);
+			error_handler(err);
 			continue;
 		}
 
@@ -691,14 +681,14 @@ connect:
 		if ((fds[0].revents & POLLHUP) == POLLHUP) {
 			LOG_ERR("Socket error: POLLHUP");
 			LOG_ERR("Connection was closed by the cloud.");
-			error_handler(ERROR_CLOUD, -EIO);
+			error_handler(-EIO);
 			return;
 		}
 
 		if ((fds[0].revents & POLLERR) == POLLERR) {
 			LOG_ERR("Socket error: POLLERR");
 			LOG_ERR("Cloud connection was unexpectedly closed.");
-			error_handler(ERROR_CLOUD, -EIO);
+			error_handler(-EIO);
 			return;
 		}
 	}
@@ -707,8 +697,8 @@ connect:
 	goto connect;
 }
 
-K_THREAD_DEFINE(cloud_poll_thread, CONFIG_CLOUD_POLL_STACKSIZE, cloud_poll, NULL, NULL,
-		NULL, CONFIG_CLOUD_POLL_PRIORITY, 0, K_NO_WAIT);
+K_THREAD_DEFINE(cloud_poll_thread, CONFIG_CLOUD_POLL_STACKSIZE, cloud_poll,
+		NULL, NULL, NULL, CONFIG_CLOUD_POLL_PRIORITY, 0, K_NO_WAIT);
 
 static void modem_rsrp_handler(char rsrp_value)
 {
@@ -727,20 +717,94 @@ static int modem_data_init(void)
 
 	err = modem_info_init();
 	if (err) {
+		LOG_INF("modem_info_init, error: %d", err);
 		return err;
 	}
 
 	err = modem_info_params_init(&modem_param);
 	if (err) {
+		LOG_INF("modem_info_params_init, error: %d", err);
 		return err;
 	}
 
 	err = modem_info_rsrp_register(modem_rsrp_handler);
 	if (err) {
+		LOG_INF("modem_info_rsrp_register, error: %d", err);
 		return err;
 	}
 
 	return 0;
+}
+
+static int populate_app_endpoint_topics()
+{
+	int err;
+
+	err = snprintf(batch_topic, sizeof(batch_topic), BATCH_TOPIC,
+		       client_id_buf);
+	if (err != BATCH_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	pub_ep_topics_sub[0].str = batch_topic;
+	pub_ep_topics_sub[0].len = BATCH_TOPIC_LEN;
+	pub_ep_topics_sub[0].type = CLOUD_EP_TOPIC_BATCH;
+
+	err = snprintf(cfg_topic, sizeof(cfg_topic), CFG_TOPIC,
+		       client_id_buf);
+	if (err != CFG_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	sub_ep_topics_sub[0].str = cfg_topic;
+	sub_ep_topics_sub[0].len = CFG_TOPIC_LEN;
+	sub_ep_topics_sub[0].type = CLOUD_EP_TOPIC_CONFIG;
+
+	err = cloud_ep_subscriptions_add(cloud_backend,
+					 sub_ep_topics_sub,
+					 ARRAY_SIZE(sub_ep_topics_sub));
+	if (err) {
+		LOG_INF("cloud_ep_subscriptions_add, error: %d", err);
+		error_handler(err);
+	}
+
+	return 0;
+}
+
+static int cloud_setup(void)
+{
+	int err;
+
+	cloud_backend = cloud_get_binding(CONFIG_CLOUD_BACKEND);
+	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
+		 CONFIG_CLOUD_BACKEND);
+
+	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf);
+	if (err != AWS_CLOUD_CLIENT_ID_LEN) {
+		LOG_ERR("modem_info_string_get, error: %d", err);
+		return err;
+	}
+
+	LOG_INF("Device IMEI: %s", log_strdup(client_id_buf));
+
+	/* Fetch IMEI from modem data and set IMEI as cloud connection ID **/
+	cloud_backend->config->id = client_id_buf;
+	cloud_backend->config->id_len = sizeof(client_id_buf);
+
+	err = cloud_init(cloud_backend, cloud_event_handler);
+	if (err) {
+		LOG_ERR("cloud_init, error: %d", err);
+		return err;
+	}
+
+	/* Populate cloud spesific endpoint topics */
+	err = populate_app_endpoint_topics();
+	if (err) {
+		LOG_ERR("populate_app_endpoint_topics, error: %d", err);
+		return err;
+	}
+
+	return err;
 }
 
 void main(void)
@@ -750,22 +814,39 @@ void main(void)
 	LOG_INF("The cat tracker has started");
 	LOG_INF("Version: %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
 
-	cloud_backend = cloud_get_binding("BIFRAVST_CLOUD");
-	__ASSERT(cloud_backend != NULL, "Bifravst Cloud backend not found");
-
-	err = cloud_init(cloud_backend, cloud_event_handler);
-	if (err) {
-		LOG_ERR("Cloud backend could not be initialized, error: %d ",
-		        err);
-		error_handler(ERROR_CLOUD, err);
-	}
-
 	work_init();
 	adxl362_init();
-	ui_init();
-	modem_data_init();
-	gps_control_init(gps_trigger_handler);
-	lte_connect(LTE_INIT);
+
+	err = modem_data_init();
+	if (err) {
+		LOG_INF("modem_data_init, error: %d", err);
+		error_handler(err);
+	}
+
+	err = cloud_setup();
+	if (err) {
+		LOG_INF("cloud_setup, error %d", err);
+		error_handler(err);
+	}
+
+	err = ui_init();
+	if (err) {
+		LOG_INF("ui_init, error: %d", err);
+		error_handler(err);
+	}
+
+	err = gps_control_init(gps_trigger_handler);
+	if (err) {
+		LOG_INF("gps_control_init, error %d", err);
+		error_handler(err);
+	}
+
+	err = lte_connect(LTE_INIT);
+	if (err) {
+		LOG_INF("lte_connect, error: %d", err);
+		error_handler(err);
+	}
+
 	nrf9160_time_init();
 
 	/*Sleep so that the device manages to adapt

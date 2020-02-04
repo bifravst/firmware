@@ -66,6 +66,10 @@ config POWER_OPTIMIZATION_ENABLE
 
 menu "Cloud socket poll"
 
+config CLOUD_BACKEND
+	string
+	default "AWS_IOT"
+
 config MQTT_KEEPALIVE
 	int
 	default 1200
@@ -81,6 +85,11 @@ config CLOUD_POLL_PRIORITY
 endmenu # Cloud socket poll
 
 menu "Cloud codec"
+
+config SERIALIZATION_JSON
+	bool "Cloud communication enconding"
+	default y
+	select CJSON_LIB
 
 config CIRCULAR_SENSOR_BUFFER_MAX
 	int "Maximum amount of buffered sensor entries"
