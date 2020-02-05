@@ -79,6 +79,7 @@ jobs:
           cargo
           cd ${GITHUB_WORKSPACE}
           git clone https://github.com/${GITHUB_REPOSITORY}
+          git checkout ${GITHUB_SHA}
           cd cat-tracker-fw
           west init -l
           west update
