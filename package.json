@@ -40,7 +40,7 @@
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
       [
-        "@bifravst/semantic-release-github",
+        "@semantic-release/github",
         {
           "assets": [
             {
