@@ -78,9 +78,9 @@ jobs:
           which cargo
           cargo
           cd ${GITHUB_WORKSPACE}
-          git clone https://github.com/${GITHUB_REPOSITORY}
+          git clone https://github.com/${GITHUB_REPOSITORY} firmware
+          cd firmware
           git checkout ${GITHUB_SHA}
-          cd cat-tracker-fw
           west init -l
           west update
           cd ..
@@ -98,32 +98,32 @@ jobs:
           cat ${GITHUB_WORKSPACE}/nrf/applications/cat_tracker/src/version.h
 
       - name: Configure the AWS IoT broker hostname
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/firmware/prj.conf
 
       - name: Build
         run: |
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          cd ${GITHUB_WORKSPACE}/cat-tracker-fw
+          cd ${GITHUB_WORKSPACE}/firmware
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           # NB-IoT
           west build -p auto -b nrf9160_pca20035ns
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/firmware/prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/firmware/prj.conf
           west build -p auto -b nrf9160_pca20035ns
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
           west build -p auto -b nrf9160_pca10090ns
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          mv ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
 <<<<<<< HEAD
       - name: Release
