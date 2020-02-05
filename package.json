@@ -1,13 +1,13 @@
 {
-  "name": "@bifravst/cat-tracker-fw",
+  "name": "@bifravst/firmware",
   "version": "0.0.0-development",
-  "description": "Cat Tracker Firmware",
+  "description": "Cat Tracker application built using nRF Connect SDK",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bifravst/cat-tracker-fw.git"
+    "url": "https://github.com/bifravst/firmware.git"
   },
   "bugs": {
-    "url": "https://github.com/bifravst/cat-tracker-fw/issues"
+    "url": "https://github.com/bifravst/firmware/issues"
   },
   "homepage": "https://bifravst.github.io/",
   "keywords": [
