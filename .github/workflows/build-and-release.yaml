@@ -115,7 +115,7 @@ jobs:
           mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
           mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/CONFIG_LTE_NETWORK_MODE_LTEM_GPS=y/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
           sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/cat-tracker-fw/prj.conf
           west build -p auto -b nrf9160_pca20035ns
           mv ${GITHUB_WORKSPACE}/cat-tracker-fw/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
