@@ -34,7 +34,9 @@
     }
   },
   "release": {
-    "branch": "saga",
+    "branches": [
+      "saga"
+    ],
     "remoteTags": true,
     "plugins": [
       "@semantic-release/commit-analyzer",
@@ -45,18 +47,18 @@
           "assets": [
             {
               "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca10015ns.hex",
-              "name": "cat-tracker-PCA10015-AssetTracker-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA10015 / Asset Tracker (%RELEASE%)"
+              "name": "cat-tracker-PCA10015-AssetTracker-${nextRelease.gitTag}.hex",
+              "label": "Pre-build HEX file for PCA10015 / Asset Tracker (${nextRelease.gitTag})"
             },
             {
               "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca20035ns.hex",
-              "name": "cat-tracker-PCA20035-Thingy52-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA20035 / Thingy:91 (%RELEASE%)"
+              "name": "cat-tracker-PCA20035-Thingy52-${nextRelease.gitTag}.hex",
+              "label": "Pre-build HEX file for PCA20035 / Thingy:91 (${nextRelease.gitTag})"
             },
             {
               "path": "/home/runner/work/cat-tracker-fw/cat-tracker-fw/nrf/cat-tracker-nrf9160_pca10090ns.hex",
-              "name": "cat-tracker-PCA10090-nRF9160DK-%RELEASE%.hex",
-              "label": "Pre-build HEX file for PCA10090 / nRF9160 DK (%RELEASE%)"
+              "name": "cat-tracker-PCA10090-nRF9160DK-${nextRelease.gitTag}.hex",
+              "label": "Pre-build HEX file for PCA10090 / nRF9160 DK (${nextRelease.gitTag})"
             }
           ]
         }
