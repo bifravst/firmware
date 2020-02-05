@@ -128,5 +128,4 @@ jobs:
       - name: Semantic release
         continue-on-error: true
         run: |
-          npm i --no-save semantic-release@next
           npx semantic-release
