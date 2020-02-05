@@ -129,4 +129,7 @@ jobs:
       - name: Semantic release
         continue-on-error: true
         run: |
+          pwd
+          ls -la
+          git log
           npx semantic-release
