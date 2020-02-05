@@ -80,7 +80,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}
           git clone https://github.com/${GITHUB_REPOSITORY} firmware
           cd firmware
-          git checkout ${GITHUB_SHA}
+          git reset --hard ${GITHUB_SHA}
           west init -l
           west update
           cd ..
