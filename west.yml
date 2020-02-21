@@ -9,4 +9,4 @@ manifest:
       revision: c92f110487f5c444027f8f86f1435ef538df9edd
       import: true
   self:
-    path: cat-tracker-fw
+    path: firmware
