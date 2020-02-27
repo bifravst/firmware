@@ -702,7 +702,11 @@ K_THREAD_DEFINE(cloud_poll_thread, CONFIG_CLOUD_POLL_STACKSIZE, cloud_poll,
 
 static void modem_rsrp_handler(char rsrp_value)
 {
-	if (rsrp_value == 255) {
+	/* RSRP raw values that represent actual signal strength are
+	 * 0 through 97 (per "nRF91 AT Commands" v1.1).
+	 */
+
+	if (rsrp_value > 97) {
 		return;
 	}
 
