@@ -81,11 +81,11 @@ jobs:
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
           mkdir ${GITHUB_WORKSPACE}/ncs
           cd ${GITHUB_WORKSPACE}/ncs
-          git clone https://github.com/${GITHUB_REPOSITORY} firmware
-          cd firmware
+          git clone https://github.com/${GITHUB_REPOSITORY} ${GITHUB_WORKSPACE}/ncs/firmware
+          cd ${GITHUB_WORKSPACE}/ncs/firmware
           git reset --hard ${GITHUB_SHA}
           west init -l
-          cd ..
+          cd ${GITHUB_WORKSPACE}/ncs
           west update
           sudo env "PATH=$PATH" pip3 install -r zephyr/scripts/requirements.txt
           sudo env "PATH=$PATH" pip3 install pc_ble_driver_py
@@ -111,6 +111,7 @@ jobs:
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           cd ${GITHUB_WORKSPACE}/ncs/firmware
           source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
+          west list
           # Print config
           cat prj.conf
           # NB-IoT
