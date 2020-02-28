@@ -113,7 +113,7 @@ jobs:
           # Where are we?
           ls -la
           # Print config
-          cat firmware/prj.conf
+          cat prj.conf
           # NB-IoT
           west build -p always -b nrf9160_pca20035ns
           mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
