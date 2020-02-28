@@ -43,8 +43,8 @@ ADD . /workdir/ncs/nrf
 # Zephyr dependencies
 RUN cd /workdir/ncs/nrf && \
     west init -l && \
-    cd .. && \
     west update && \
+    cd .. && \
     pip3 install pc_ble_driver_py && \
     pip3 install -r zephyr/scripts/requirements.txt && \
     pip3 install -r nrf/scripts/requirements.txt && \

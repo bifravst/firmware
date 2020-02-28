@@ -80,8 +80,8 @@ jobs:
           cd firmware
           git reset --hard ${GITHUB_SHA}
           west init -l
-          cd ..
           west update
+          cd ..
           sudo env "PATH=$PATH" pip3 install -r zephyr/scripts/requirements.txt
           sudo env "PATH=$PATH" pip3 install pc_ble_driver_py
           sudo env "PATH=$PATH" pip3 install -r nrf/scripts/requirements.txt
