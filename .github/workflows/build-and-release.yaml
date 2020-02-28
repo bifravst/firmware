@@ -67,15 +67,15 @@ jobs:
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
           sudo env "PATH=$PATH" pip3 install cmake wheel
 
+      - name: Install Rust+Cargo
+        run: |
+          sudo /bin/sh -c 'curl https://sh.rustup.rs -sSf | sh -s -- -y'
+
       - name: Install West
         run: |
           sudo env "PATH=$PATH" pip3 install -U west
           west -V
           which west
-
-      - name: Install Rust+Cargo
-        run: |
-          sudo /bin/sh -c 'curl https://sh.rustup.rs -sSf | sh -s -- -y'
 
       - name: West init
         run: |
@@ -93,6 +93,14 @@ jobs:
           sudo env "PATH=$PATH" pip3 install -r nrf/scripts/requirements.txt
           sudo apt-get -y remove python-cryptography python3-cryptography
           sudo env "PATH=$PATH" pip3 install -r bootloader/mcuboot/scripts/requirements.txt
+
+      # The previous task will install an older version of west,
+      # as part of the zephyr dependencies
+      - name: Update West (again)
+        run: |
+          sudo env "PATH=$PATH" pip3 install -U west
+          west -V
+          which west
 
       - name: Determine next release version
         run: |
