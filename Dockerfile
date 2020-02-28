@@ -26,7 +26,7 @@ RUN apt-get -y install python3-pip && \
 RUN apt-get -y install ninja-build gperf git python3-setuptools && \
     python3 -m pip install -U setuptools && \
     pip3 install cmake wheel && \
-    pip3 install -U --pre west && \
+    pip3 install -U west && \
     # Newer PIP will not overwrite distutils, so upgrade PyYAML manually \
     python3 -m pip install --ignore-installed -U PyYAML
 ENV LC_ALL=C.UTF-8
@@ -43,11 +43,11 @@ ADD . /workdir/ncs/nrf
 # Zephyr dependencies
 RUN cd /workdir/ncs/nrf && \
     west init -l && \
-    west update && \
     cd .. && \
+    west update && \
     pip3 install pc_ble_driver_py && \
     pip3 install -r zephyr/scripts/requirements.txt && \
     pip3 install -r nrf/scripts/requirements.txt && \
-    pip3 install -r mcuboot/scripts/requirements.txt
+    pip3 install -r bootloader/mcuboot/scripts/requirements.txt
 RUN mkdir /workdir/.cache
 ENV XDG_CACHE_HOME=/workdir/.cache
