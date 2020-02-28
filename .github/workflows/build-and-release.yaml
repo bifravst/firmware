@@ -71,6 +71,7 @@ jobs:
         run: |
           sudo env "PATH=$PATH" pip3 install -U west
           west -V
+          which west
 
       - name: Install Rust+Cargo
         run: |
@@ -114,6 +115,7 @@ jobs:
           cat prj.conf
           # Configure west
           source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
+          which west
           west -V
           west manifest --validate
           west list
