@@ -75,13 +75,14 @@ jobs:
       - name: West init
         run: |
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          cd ${GITHUB_WORKSPACE}
+          mkdir ${GITHUB_WORKSPACE}/ncs
+          cd ${GITHUB_WORKSPACE}/ncs
           git clone https://github.com/${GITHUB_REPOSITORY} firmware
           cd firmware
           git reset --hard ${GITHUB_SHA}
           west init -l
-          west update
           cd ..
+          west update
           sudo env "PATH=$PATH" pip3 install -r zephyr/scripts/requirements.txt
           sudo env "PATH=$PATH" pip3 install pc_ble_driver_py
           sudo env "PATH=$PATH" pip3 install -r nrf/scripts/requirements.txt
@@ -91,11 +92,11 @@ jobs:
       - name: Determine next release version
         run: |
           npm ci
-          export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/firmware/.github/workflows/get-next-version.js`
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/firmware/prj.conf
+          export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/ncs/firmware/.github/workflows/get-next-version.js`
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
 
       - name: Configure the AWS IoT broker hostname
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/firmware/prj.conf
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
 
       - name: Build
         run: |
@@ -104,27 +105,27 @@ jobs:
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
-          cd ${GITHUB_WORKSPACE}
+          cd ${GITHUB_WORKSPACE}/ncs
           # Where are we?
           ls -la
           # Print config
           cat prj.conf
           # NB-IoT
           west build -p always -b nrf9160_pca20035ns
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
           west build -p always -b nrf9160_pca10090ns
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/firmware/prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/firmware/prj.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
           west build -p always -b nrf9160_pca20035ns
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
           west build -p always -b nrf9160_pca10090ns
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
