@@ -66,7 +66,7 @@ jobs:
         run: |
           sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
           sudo env "PATH=$PATH" pip3 install cmake wheel
-          sudo env "PATH=$PATH" pip3 install -U --pre west
+          sudo env "PATH=$PATH" pip3 install -U west
 
       - name: Install Rust+Cargo
         run: |
