@@ -110,19 +110,19 @@ jobs:
           # Print config
           cat prj.conf
           # NB-IoT
-          west build -p auto -b nrf9160_pca20035ns
+          west build -p always -b nrf9160_pca20035ns
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
-          west build -p auto -b nrf9160_pca10090ns
+          west build -p always -b nrf9160_pca10090ns
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/firmware/prj.conf
           sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/firmware/prj.conf
-          west build -p auto -b nrf9160_pca20035ns
+          west build -p always -b nrf9160_pca20035ns
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
-          west build -p auto -b nrf9160_pca10090ns
+          west build -p always -b nrf9160_pca10090ns
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
           mv -v ${GITHUB_WORKSPACE}/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
