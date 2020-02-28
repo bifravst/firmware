@@ -5,7 +5,7 @@
  */
 
 #include <zephyr.h>
-#include <pwm.h>
+#include <drivers/pwm.h>
 #include <string.h>
 
 #include "ui.h"
@@ -110,7 +110,7 @@ static const size_t led_pins[3] = {
 static void pwm_out(struct led *led, struct led_color *color)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(color->c); i++) {
-		pwm_pin_set_usec(led->pwm_dev, led_pins[i], 255, color->c[i]);
+		pwm_pin_set_usec(led->pwm_dev, led_pins[i], 255, color->c[i], 0);
 	}
 }
 

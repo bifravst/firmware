@@ -6,7 +6,7 @@ manifest:
     - name: fw-nrfconnect-nrf
       path: nrf
       remote: nordic
-      revision: c92f110487f5c444027f8f86f1435ef538df9edd
+      revision: ad37f4dec7b442240035db2b78e9d09addce2794
       import: true
   self:
     path: firmware
