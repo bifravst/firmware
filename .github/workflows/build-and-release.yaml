@@ -111,6 +111,7 @@ jobs:
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           cd ${GITHUB_WORKSPACE}/ncs/firmware
           source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
+          west manifest --validate
           west list
           # Print config
           cat prj.conf
