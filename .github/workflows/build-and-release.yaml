@@ -102,9 +102,11 @@ jobs:
           export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
           export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
           export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          cd ${GITHUB_WORKSPACE}/firmware
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
+          cd ${GITHUB_WORKSPACE}
+          # Where are we?
+          ls -la
           # Print config
           cat prj.conf
           # NB-IoT
