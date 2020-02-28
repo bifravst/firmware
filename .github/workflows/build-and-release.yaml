@@ -110,11 +110,13 @@ jobs:
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           cd ${GITHUB_WORKSPACE}/ncs/firmware
-          source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
-          west manifest --validate
-          west list
           # Print config
           cat prj.conf
+          # Configure west
+          source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
+          west -V
+          west manifest --validate
+          west list
           # NB-IoT
           west build -p always -b nrf9160_pca20035ns
           mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
