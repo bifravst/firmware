@@ -110,8 +110,7 @@ jobs:
           mkdir -p -v ${GITHUB_WORKSPACE}/.cache
           export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
           cd ${GITHUB_WORKSPACE}/ncs/firmware
-          # Where are we?
-          ls -la
+          source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
           # Print config
           cat prj.conf
           # NB-IoT
