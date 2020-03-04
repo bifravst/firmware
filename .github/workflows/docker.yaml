@@ -12,11 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Configure the AWS IoT broker hostname
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
-
       - name: Build image
         run: docker build -t ncs .
+
+      - name: Configure the AWS IoT broker hostname
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
 
       - name: Build for Thingy:91
         run: |
