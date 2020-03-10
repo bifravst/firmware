@@ -44,12 +44,6 @@ struct cloud_data {
 	s64_t dev_modem_data_ts;
 };
 
-struct cloud_data_time {
-	s64_t epoch;
-	s64_t update_time;
-	s64_t delta_time;
-};
-
 int cloud_decode_response(char *input, struct cloud_data *cloud_data);
 
 int cloud_encode_sensor_data(struct cloud_msg *output,

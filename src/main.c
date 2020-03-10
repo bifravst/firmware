@@ -110,7 +110,7 @@ static int modem_configure(void)
 	LOG_INF("This may take several minutes.");
 	err = lte_lc_init_and_connect();
 	if (err) {
-		LOG_ERR("lte_lc_init_connect, error: %d");
+		LOG_ERR("lte_lc_init_connect, error: %d", err);
 		return err;
 	}
 
@@ -477,12 +477,11 @@ static void cloud_send_buffered_data_work_fn(struct k_work *work)
 
 static void movement_timeout_work_fn(struct k_work *work)
 {
-	int err;
-
 	if (!cloud_data.active) {
 		LOG_INF("Movement timeout triggered");
+		int err = lte_connection_check();
 		if (err) {
-			LOG_ERR("lte_connection_check, error: %d");
+			LOG_ERR("lte_connection_check, error: %d", err);
 			error_handler(err);
 		}
 		cloud_update();
@@ -515,7 +514,7 @@ static void work_init(void)
 static void adxl362_trigger_handler(struct device *dev,
 				    struct sensor_trigger *trig)
 {
-	static struct sensor_value accel[3];
+	struct sensor_value accel[3];
 
 	switch (trig->type) {
 	case SENSOR_TRIG_THRESHOLD:
@@ -883,7 +882,7 @@ void main(void)
 		/*Check lte connection*/
 		err = lte_connection_check();
 		if (err) {
-			LOG_ERR("lte_connection_check, error: %d");
+			LOG_ERR("lte_connection_check, error: %d", err);
 			error_handler(err);
 		}
 
