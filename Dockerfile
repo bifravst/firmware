@@ -22,15 +22,9 @@ ENV GNUARMEMB_TOOLCHAIN_PATH=/workdir/gcc-arm-none-eabi-7-2018-q2-update
 # Device Tree Compiler 1.4.7
 ARG DEVICE_TREE_COMPILER_VERSION=1.4.7-3
 RUN mkdir -p /data/device-tree-compiler/ && \
-<<<<<<< HEAD
-    wget -q 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-3_amd64.deb' \
-        -O /data/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb && \
-    dpkg -i /data/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
-=======
     wget -q http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb \
         -O /data/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb && \
     dpkg -i /data/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
->>>>>>> 843e6cf47c285ed46aac7d9694538952983cf20e
 # Latest PIP
 RUN apt-get -y install python3-pip && \
     python3 -m pip install -U pip
