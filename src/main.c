@@ -4,7 +4,7 @@
 #include <logging/log_ctrl.h>
 #include <power/reboot.h>
 #include <device.h>
-#include <sensor.h>
+#include <drivers/sensor.h>
 #include <drivers/gps.h>
 #include <gps_controller.h>
 #include <ui.h>
@@ -427,14 +427,12 @@ static void cloud_update(void)
 	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
 		k_delayed_work_submit(&cloud_send_sensor_data_work,
 				      K_NO_WAIT);
-		k_delayed_work_submit(&cloud_send_cfg_work,
-				      K_SECONDS(5));
 		k_delayed_work_submit(&cloud_send_modem_data_dyn_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 		k_delayed_work_submit(&cloud_send_buffered_data_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 		k_delayed_work_submit(&set_led_device_mode_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 	}
 }
 
@@ -623,6 +621,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		if (err) {
 			LOG_ERR("Could not decode response %d", err);
 		}
+		k_delayed_work_submit(&cloud_send_cfg_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
@@ -702,7 +701,11 @@ K_THREAD_DEFINE(cloud_poll_thread, CONFIG_CLOUD_POLL_STACKSIZE, cloud_poll,
 
 static void modem_rsrp_handler(char rsrp_value)
 {
-	if (rsrp_value == 255) {
+	/* RSRP raw values that represent actual signal strength are
+	 * 0 through 97 (per "nRF91 AT Commands" v1.1).
+	 */
+
+	if (rsrp_value > 97) {
 		return;
 	}
 
