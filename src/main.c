@@ -826,6 +826,13 @@ void main(void)
 		error_handler(err);
 	}
 
+	if (at_cmd_write("AT+CGDCONT=0,\"IP\",\"m2m-west.telus.iot\"", NULL, 0, NULL) != 0) {
+                printk("Failed to set APN\n");
+                return -1;
+        }
+
+        printk("APN Set\n");
+
 	err = cloud_setup();
 	if (err) {
 		LOG_INF("cloud_setup, error %d", err);
