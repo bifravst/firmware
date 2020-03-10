@@ -9,7 +9,7 @@
 #include "cJSON.h"
 #include "cJSON_os.h"
 #include <net/cloud.h>
-#include <nrf9160_timestamp.h>
+#include <date_time.h>
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(cloud_codec, CONFIG_CAT_TRACKER_LOG_LEVEL);
@@ -206,9 +206,9 @@ int cloud_encode_gps_buffer(struct cloud_msg *output,
 
 	struct twins_gps_buf twins_gps_buf[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
-	err = date_time_get(&cir_buf_gps->gps_timestamp);
+	err = date_time_uptime_to_unix_time_ms(&cir_buf_gps->gps_timestamp);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 
@@ -312,15 +312,15 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 	static const char nbiot_string[] = "NB-IoT";
 	static const char gps_string[] = " GPS";
 
-	err = date_time_get(&cloud_data->roam_modem_data_ts);
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->roam_modem_data_ts);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 
-	err = date_time_get(&cloud_data->dev_modem_data_ts);
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->dev_modem_data_ts);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 
@@ -512,21 +512,21 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	int err = 0;
 	char *buffer;
 
-	err = date_time_get(&cloud_data->bat_timestamp);
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->bat_timestamp);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 
-	err = date_time_get(&cloud_data->acc_timestamp);
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->acc_timestamp);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 
-	err = date_time_get(&cir_buf_gps->gps_timestamp);
+	err = date_time_uptime_to_unix_time_ms(&cir_buf_gps->gps_timestamp);
 	if (err) {
-		LOG_ERR("date_time_get, error: %d", err);
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
 		return err;
 	}
 

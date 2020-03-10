@@ -16,7 +16,7 @@
 #include <time.h>
 #include <net/socket.h>
 #include <dfu/mcuboot.h>
-#include <nrf9160_timestamp.h>
+#include <date_time.h>
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
@@ -28,11 +28,6 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define CFG_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
 #define BATCH_TOPIC "%s/batch"
 #define BATCH_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 6)
-
-enum lte_conn_actions {
-	LTE_INIT,
-	CHECK_LTE_CONNECTION,
-};
 
 static struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
@@ -105,48 +100,55 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	CODE_UNREACHABLE;
 }
 
-static int lte_connect(enum lte_conn_actions action)
+static int modem_configure(void)
+{
+	int err;
+
+	ui_led_set_pattern(UI_LTE_CONNECTING);
+
+	LOG_INF("Connecting to LTE network. ");
+	LOG_INF("This may take several minutes.");
+	err = lte_lc_init_and_connect();
+	if (err) {
+		LOG_ERR("lte_lc_init_connect, error: %d");
+		return err;
+	}
+
+	LOG_INF("Connected to LTE network");
+
+	/* Update time before any publication. */
+	date_time_update();
+
+	k_sleep(K_SECONDS(10));
+
+	k_sem_give(&cloud_conn_sem);
+
+	return 0;
+}
+
+static int lte_connection_check(void)
 {
 	int err;
 
 	enum lte_lc_nw_reg_status nw_reg_status;
 
-	ui_led_set_pattern(UI_LTE_CONNECTING);
-
-	if (action == LTE_INIT) {
-		if (IS_ENABLED(CONFIG_LTE_AUTO_INIT_AND_CONNECT)) {
-			/* Do nothing, modem is already turned on
-			 * and connected.
-			 */
-		} else {
-			LOG_INF("Connecting to LTE network. ");
-			LOG_INF("This may take several minutes.");
-			err = lte_lc_init_and_connect();
-			if (err == -ETIMEDOUT) {
-				goto exit;
-			} else if (err) {
-				return err;
-			}
-		}
-	} else if (action == CHECK_LTE_CONNECTION) {
-		err = lte_lc_nw_reg_status_get(&nw_reg_status);
-		if (err) {
-			LOG_ERR("lte_lc_nw_reg_status error: %d", err);
-			error_handler(err);
-		}
-
-		LOG_INF("Checking LTE connection...");
-
-		switch (nw_reg_status) {
-		case LTE_LC_NW_REG_REGISTERED_HOME:
-		case LTE_LC_NW_REG_REGISTERED_ROAMING:
-			break;
-		default:
-			goto exit;
-		}
+	err = lte_lc_nw_reg_status_get(&nw_reg_status);
+	if (err) {
+		LOG_ERR("lte_lc_nw_reg_status, error: %d", err);
+		return err;
 	}
 
-	LOG_INF("Connected to LTE network");
+	LOG_INF("Checking LTE connection...");
+
+	switch (nw_reg_status) {
+	case LTE_LC_NW_REG_REGISTERED_HOME:
+	case LTE_LC_NW_REG_REGISTERED_ROAMING:
+		break;
+	default:
+		goto exit;
+	}
+
+	LOG_INF("LTE link maintained");
 
 	k_sem_give(&cloud_conn_sem);
 
@@ -154,7 +156,7 @@ static int lte_connect(enum lte_conn_actions action)
 
 exit:
 
-	LOG_ERR("LTE link could not be established, or maintained");
+	LOG_ERR("LTE link not maintained");
 
 	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
 
@@ -174,8 +176,10 @@ static void set_current_time(struct gps_data gps_data)
 {
 	struct tm gps_time;
 
-	gps_time.tm_year = gps_data.pvt.datetime.year;
-	gps_time.tm_mon = gps_data.pvt.datetime.month;
+	/* Change datetime.year and datetime.month to accomodate the
+	 * correct input format. */
+	gps_time.tm_year = gps_data.pvt.datetime.year + 100;
+	gps_time.tm_mon = gps_data.pvt.datetime.month - 1;
 	gps_time.tm_mday = gps_data.pvt.datetime.day;
 	gps_time.tm_hour = gps_data.pvt.datetime.hour;
 	gps_time.tm_min = gps_data.pvt.datetime.minute;
@@ -473,9 +477,14 @@ static void cloud_send_buffered_data_work_fn(struct k_work *work)
 
 static void movement_timeout_work_fn(struct k_work *work)
 {
+	int err;
+
 	if (!cloud_data.active) {
 		LOG_INF("Movement timeout triggered");
-		lte_connect(CHECK_LTE_CONNECTION);
+		if (err) {
+			LOG_ERR("lte_connection_check, error: %d");
+			error_handler(err);
+		}
 		cloud_update();
 	}
 
@@ -844,13 +853,11 @@ void main(void)
 		error_handler(err);
 	}
 
-	err = lte_connect(LTE_INIT);
+	err = modem_configure();
 	if (err) {
-		LOG_INF("lte_connect, error: %d", err);
+		LOG_INF("modem_configure, error: %d", err);
 		error_handler(err);
 	}
-
-	nrf9160_time_init();
 
 	/*Sleep so that the device manages to adapt
 	  to its new configuration before a GPS search*/
@@ -874,7 +881,11 @@ void main(void)
 		gps_control_stop(K_NO_WAIT);
 
 		/*Check lte connection*/
-		lte_connect(CHECK_LTE_CONNECTION);
+		err = lte_connection_check();
+		if (err) {
+			LOG_ERR("lte_connection_check, error: %d");
+			error_handler(err);
+		}
 
 		/*Send update to cloud if a connection has been established*/
 		cloud_update();

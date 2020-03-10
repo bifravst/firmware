@@ -33,8 +33,6 @@ endchoice
 
 rsource "src/gps_controller/Kconfig"
 
-rsource "src/nrf9160_timestamp/Kconfig"
-
 config GPS_DEV_NAME
 	string "GPS device name"
 	default GPS_SIM_DEV_NAME if GPS_USE_SIM
