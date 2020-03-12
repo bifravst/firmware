@@ -23,7 +23,7 @@ jobs:
           docker run --name ncs --rm -v ${PWD}:/workdir/ncs/firmware ncs /bin/bash -c 'cd ncs/firmware; west build -p auto -b nrf9160_pca20035ns'
           ls -la build/zephyr/merged.hex
 
-#      - name: Build for 9160 DK
-#        run: |
-#          docker run --name ncs --rm -v ${PWD}:/workdir/ncs/firmware ncs /bin/bash -c 'cd ncs/firmware; west build -p auto -b nrf9160_pca10090ns'
-#          ls -la build/zephyr/merged.hex
+      - name: Build for 9160 DK
+        run: |
+          docker run --name ncs --rm -v ${PWD}:/workdir/ncs/firmware ncs /bin/bash -c 'cd ncs/firmware; west build -p auto -b nrf9160_pca10090ns'
+          ls -la build/zephyr/merged.hex
