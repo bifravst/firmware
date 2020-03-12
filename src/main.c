@@ -10,9 +10,9 @@
 #include <ui.h>
 #include <net/cloud.h>
 #include <cloud_codec.h>
-#include <lte_lc.h>
+#include <modem/lte_lc.h>
 #include <stdlib.h>
-#include <modem_info.h>
+#include <modem/modem_info.h>
 #include <time.h>
 #include <net/socket.h>
 #include <dfu/mcuboot.h>

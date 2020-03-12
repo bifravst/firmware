@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <net/cloud.h>
-#include <modem_info.h>
+#include <modem/modem_info.h>
 #include <stdio.h>
 #include <stdlib.h>
 

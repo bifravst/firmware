@@ -3,7 +3,7 @@
 #include <string.h>
 #include <zephyr.h>
 #include <zephyr/types.h>
-#include <modem_info.h>
+#include <modem/modem_info.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "cJSON.h"
