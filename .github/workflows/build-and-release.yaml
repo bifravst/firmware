@@ -48,11 +48,11 @@ jobs:
         if: steps.cache-dtc.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/device-tree-compiler/
-          wget -q 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-3_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-3_amd64.deb
+          wget -q 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
 
       - name: Install Device Tree Compile 1.4.7
         run: |
-          sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-3_amd64.deb
+          sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
 
       # Workaround for https://github.com/NordicSemiconductor/pc-nrfutil/issues/288
       - name: Install latest PIP
@@ -128,21 +128,21 @@ jobs:
           west manifest --validate
           west list
           # NB-IoT
-          #          west build -p always -b nrf9160_pca20035ns
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
-          #          west build -p always -b nrf9160_pca10090ns
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          west build -p always -b nrf9160_pca20035ns
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
+          west build -p always -b nrf9160_pca10090ns
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
           sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
           west build -p always -b nrf9160_pca20035ns
           mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
           mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
-          #          west build -p always -b nrf9160_pca10090ns
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          #          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+          west build -p always -b nrf9160_pca10090ns
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
