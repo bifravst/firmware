@@ -101,6 +101,14 @@ config MAX_PER_ENCODED_ENTRIES
 
 endmenu # Cloud codec
 
+menu "Watchdog"
+
+config CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC
+	int "Watchdog timeout in milliseconds"
+	default 10000
+
+endmenu # Watchdog
+
 endmenu
 
 menu "Zephyr Kernel"

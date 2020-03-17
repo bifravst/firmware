@@ -18,6 +18,7 @@
 #include <dfu/mcuboot.h>
 #include <date_time.h>
 #include <dk_buttons_and_leds.h>
+#include "watchdog.h"
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
@@ -904,6 +905,10 @@ void main(void)
 
 	LOG_INF("The cat tracker has started");
 	LOG_INF("Version: %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
+
+	if (IS_ENABLED(CONFIG_WATCHDOG)) {
+		watchdog_init_and_start();
+	}
 
 	work_init();
 	adxl362_init();
