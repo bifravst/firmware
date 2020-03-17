@@ -305,7 +305,7 @@ static void cloud_button_message_send(void)
 
 	err = cloud_encode_button_message_data(&msg, &cloud_data);
 	if (err) {
-		LOG_ERR("cloud_encode_button_message_data, error: %d\n", err);
+		LOG_ERR("cloud_encode_button_message_data, error: %d", err);
 		return;
 	}
 
@@ -466,11 +466,11 @@ static void cloud_update(void)
 		k_delayed_work_submit(&cloud_sensor_data_send_work,
 				      K_NO_WAIT);
 		k_delayed_work_submit(&cloud_dynamic_modem_data_send_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 		k_delayed_work_submit(&cloud_buffered_data_send_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 		k_delayed_work_submit(&led_device_mode_set_work,
-				      K_SECONDS(5));
+				      K_SECONDS(10));
 	}
 }
 
@@ -555,6 +555,7 @@ static void work_init(void)
 static void adxl362_trigger_handler(struct device *dev,
 				    struct sensor_trigger *trig)
 {
+	int err = 0;
 	struct sensor_value accel[3];
 
 	switch (trig->type) {
@@ -565,9 +566,14 @@ static void adxl362_trigger_handler(struct device *dev,
 			return;
 		}
 
-		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]);
-		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &accel[1]);
-		sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &accel[2]);
+		err = sensor_channel_get(dev, SENSOR_CHAN_ACCEL_X, &accel[0]);
+		err += sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Y, &accel[1]);
+		err += sensor_channel_get(dev, SENSOR_CHAN_ACCEL_Z, &accel[2]);
+
+		if (err) {
+			LOG_ERR("sensor_channel_get, error: %d", err);
+			return;
+		}
 
 		double x = sensor_value_to_double(&accel[0]);
 		double y = sensor_value_to_double(&accel[1]);
@@ -812,8 +818,13 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 
 #if defined(CONFIG_BOARD_NRF9160_PCA10090NS)
 	/* Fake motion. The nRF9160 DK does not have an accelerometer by
-	* default. */
+	 * default. Reset accelerometer data.
+	 */
 	if (has_changed & button_states & DK_BTN2_MSK) {
+		cloud_data.acc_timestamp = k_uptime_get();
+		cloud_data.acc[0] = 0;
+		cloud_data.acc[1] = 0;
+		cloud_data.acc[2] = 0;
 		k_sem_give(&accel_trig_sem);
 	}
 #endif
@@ -917,7 +928,7 @@ void main(void)
 
 	err = dk_buttons_init(button_handler);
 	if (err) {
-		LOG_INF("dk_buttons_init, error: %d\n", err);
+		LOG_INF("dk_buttons_init, error: %d", err);
 		error_handler(err);
 	}
 
