@@ -662,6 +662,15 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_ERROR:
 		LOG_ERR("CLOUD_EVT_ERROR");
 		break;
+	case CLOUD_EVT_FOTA_START:
+		LOG_INF("CLOUD_EVT_FOTA_START");
+		break;
+	case CLOUD_EVT_FOTA_ERASE_PENDING:
+		LOG_INF("CLOUD_EVT_FOTA_ERASE_PENDING");
+		break;
+	case CLOUD_EVT_FOTA_ERASE_DONE:
+		LOG_INF("CLOUD_EVT_FOTA_ERASE_DONE");
+		break;
 	case CLOUD_EVT_FOTA_DONE:
 		LOG_INF("CLOUD_EVT_FOTA_DONE");
 		cloud_disconnect(cloud_backend);
