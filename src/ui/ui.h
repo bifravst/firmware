@@ -15,6 +15,7 @@
 #define UI_H__
 
 #include <zephyr.h>
+#include <dk_buttons_and_leds.h>
 
 #include "led_effect.h"
 
@@ -31,6 +32,8 @@ extern "C" {
 #define UI_LED_BLINK(x)                 ((x) << 8)
 #define UI_LED_GET_ON(x)                ((x) & 0xFF)
 #define UI_LED_GET_BLINK(x)             (((x) >> 8) & 0xFF)
+
+#ifdef CONFIG_UI_LED_USE_PWM
 
 #define UI_LED_ON_PERIOD_NORMAL         500
 #define UI_LED_OFF_PERIOD_NORMAL        3500
@@ -69,8 +72,17 @@ extern "C" {
 #define UI_LED_PASSIVE_MODE_COLOR       UI_LED_COLOR_BLUE
 #define UI_LED_ERROR_SYSTEM_FAULT_COLOR UI_LED_COLOR_RED
 
+#else
+
+#define UI_LED_ON_PERIOD_NORMAL		500
+#define UI_LED_OFF_PERIOD_NORMAL	500
+#define UI_LED_OFF_PERIOD_LONG		3500
+
+#endif /* CONFIG_UI_LED_USE_PWM */
+
 /**@brief UI LED state pattern definitions. */
 enum ui_led_pattern {
+#if defined(CONFIG_UI_LED_USE_PWM)
 	UI_LTE_DISCONNECTED,
 	UI_LTE_CONNECTING,
 	UI_LTE_CONNECTED,
@@ -88,6 +100,15 @@ enum ui_led_pattern {
 	UI_LED_ACTIVE_MODE,
 	UI_LED_PASSIVE_MODE,
 	UI_LED_ERROR_SYSTEM_FAULT,
+#else /* LED patterns without using PWM. */
+	UI_LTE_CONNECTING		= UI_LED_BLINK(DK_LED1_MSK),
+	UI_LED_GPS_SEARCHING		= UI_LED_BLINK(DK_LED2_MSK),
+	UI_CLOUD_PUBLISHING		= UI_LED_BLINK(DK_LED3_MSK),
+	UI_LED_ACTIVE_MODE		= UI_LED_BLINK(DK_LED4_MSK),
+	UI_LED_PASSIVE_MODE		= UI_LED_BLINK(DK_LED4_MSK),
+	UI_LED_ERROR_SYSTEM_FAULT	= UI_LED_BLINK(DK_ALL_LEDS_MSK),
+	UI_LTE_DISCONNECTED		= UI_LED_ON(0),
+#endif /* CONFIG_UI_LED_USE_PWM */
 };
 
 /**

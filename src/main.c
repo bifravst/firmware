@@ -457,6 +457,7 @@ static void cloud_synchronize(void)
 	k_delayed_work_submit(&cloud_configuration_get_work, K_NO_WAIT);
 	k_delayed_work_submit(&cloud_configuration_send_work, K_SECONDS(5));
 	k_delayed_work_submit(&cloud_modem_data_send_work, K_SECONDS(5));
+	k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(5));
 }
 
 static void cloud_update(void)
@@ -804,7 +805,8 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 			cloud_data.button_ts = k_uptime_get();
 			k_delayed_work_submit(&cloud_button_message_send_work,
 					      K_NO_WAIT);
-		
+			k_delayed_work_submit(&led_device_mode_set_work,
+					K_SECONDS(5));
 		}
 	}
 
