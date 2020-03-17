@@ -631,3 +631,45 @@ exit:
 
 	return err;
 }
+
+int cloud_encode_button_message_data(struct cloud_msg *output,
+				     struct cloud_data *cloud_data)
+{
+	int err = 0;
+	char *buffer;
+
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->button_ts);
+	if (err) {
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
+		return err;
+	}
+
+	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *btn_obj = cJSON_CreateObject();
+
+	if (root_obj == NULL || btn_obj == NULL) {
+		cJSON_Delete(root_obj);
+		cJSON_Delete(btn_obj);
+		return -ENOMEM;
+	}
+
+	err += json_add_number(btn_obj, "v", cloud_data->button_number);
+	err += json_add_number(btn_obj, "ts", cloud_data->button_ts);
+	err += json_add_obj(root_obj, "btn", btn_obj);
+
+	if (err) {
+		goto exit;
+	}
+
+	buffer = cJSON_Print(root_obj);
+
+	printk("Encoded message: %s\n", buffer);
+
+	output->buf = buffer;
+	output->len = strlen(buffer);
+
+exit:
+	cJSON_Delete(root_obj);
+
+	return err;
+}

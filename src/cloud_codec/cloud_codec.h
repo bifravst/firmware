@@ -42,6 +42,9 @@ struct cloud_data {
 
 	s64_t roam_modem_data_ts;
 	s64_t dev_modem_data_ts;
+
+	int button_number;
+	s64_t button_ts;
 };
 
 int cloud_decode_response(char *input, struct cloud_data *cloud_data);
@@ -60,6 +63,9 @@ int cloud_encode_modem_data(struct cloud_msg *output,
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data);
+
+int cloud_encode_button_message_data(struct cloud_msg *output,
+				     struct cloud_data *cloud_data);
 
 static inline void cloud_release_data(struct cloud_msg *data)
 {

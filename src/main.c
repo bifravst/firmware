@@ -17,6 +17,7 @@
 #include <net/socket.h>
 #include <dfu/mcuboot.h>
 #include <date_time.h>
+#include <dk_buttons_and_leds.h>
 
 #include <logging/log.h>
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
@@ -28,6 +29,12 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define CFG_TOPIC_LEN (AWS_LEN + AWS_CLOUD_CLIENT_ID_LEN + 32)
 #define BATCH_TOPIC "%s/batch"
 #define BATCH_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 6)
+#define MESSAGES_TOPIC "%s/messages"
+#define MESSAGES_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 9)
+
+enum app_endpoint_type {
+	CLOUD_EP_TOPIC_MESSAGES = CLOUD_EP_PRIV_START
+};
 
 static struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
@@ -41,11 +48,12 @@ static struct cloud_data cloud_data = {
 				.gps_found = false };
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
-static struct cloud_endpoint pub_ep_topics_sub[1];
+static struct cloud_endpoint pub_ep_topics_sub[2];
 
 static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 static char batch_topic[BATCH_TOPIC_LEN + 1];
 static char cfg_topic[CFG_TOPIC_LEN + 1];
+static char messages_topic[MESSAGES_TOPIC_LEN + 1];
 
 static struct modem_param_info modem_param;
 static struct cloud_backend *cloud_backend;
@@ -57,14 +65,15 @@ static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
-static struct k_delayed_work cloud_config_get_work;
-static struct k_delayed_work cloud_send_sensor_data_work;
-static struct k_delayed_work cloud_send_modem_data_work;
-static struct k_delayed_work cloud_send_modem_data_dyn_work;
-static struct k_delayed_work cloud_send_cfg_work;
-static struct k_delayed_work cloud_send_buffered_data_work;
-static struct k_delayed_work set_led_device_mode_work;
+static struct k_delayed_work cloud_configuration_get_work;
+static struct k_delayed_work cloud_sensor_data_send_work;
+static struct k_delayed_work cloud_modem_data_send_work;
+static struct k_delayed_work cloud_dynamic_modem_data_send_work;
+static struct k_delayed_work cloud_configuration_send_work;
+static struct k_delayed_work cloud_buffered_data_send_work;
+static struct k_delayed_work led_device_mode_set_work;
 static struct k_delayed_work movement_timeout_work;
+static struct k_delayed_work cloud_button_message_send_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -188,7 +197,7 @@ static void set_current_time(struct gps_data gps_data)
 	date_time_set(&gps_time);
 }
 
-static void set_led_device_mode(void)
+static void led_device_mode_set(void)
 {
 	if (!cloud_data.active) {
 		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
@@ -231,7 +240,7 @@ static void populate_gps_buffer(struct gps_data gps_data)
 	LOG_INF("Entry: %d in gps_buffer filled", head_cir_buf);
 }
 
-static int get_voltage_level(void)
+static int voltage_level_get(void)
 {
 	int err;
 
@@ -265,7 +274,7 @@ static int modem_data_get(void)
 	return 0;
 }
 
-static void cloud_config_get(void)
+static void cloud_configuration_get(void)
 {
 	int err;
 
@@ -282,7 +291,31 @@ static void cloud_config_get(void)
 	}
 }
 
-static void cloud_send_cfg(void)
+static void cloud_button_message_send(void)
+{
+	int err;
+
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
+	struct cloud_msg msg = {
+		.qos = CLOUD_QOS_AT_MOST_ONCE,
+		.endpoint = pub_ep_topics_sub[1],
+	};
+
+	err = cloud_encode_button_message_data(&msg, &cloud_data);
+	if (err) {
+		LOG_ERR("cloud_encode_button_message_data, error: %d\n", err);
+		return;
+	}
+
+	err = cloud_send(cloud_backend, &msg);
+	cloud_release_data(&msg);
+	if (err) {
+		LOG_ERR("Cloud send failed, err: %d", err);
+	}
+}
+
+static void cloud_configuration_send(void)
 {
 	int err;
 
@@ -306,11 +339,10 @@ static void cloud_send_cfg(void)
 	cloud_release_data(&msg);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
-		return;
 	}
 }
 
-static void cloud_send_sensor_data(void)
+static void cloud_sensor_data_send(void)
 {
 	int err;
 
@@ -321,7 +353,7 @@ static void cloud_send_sensor_data(void)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
-	err = get_voltage_level();
+	err = voltage_level_get();
 	if (err) {
 		LOG_ERR("Error requesting voltage level %d", err);
 		return;
@@ -345,7 +377,7 @@ static void cloud_send_sensor_data(void)
 	cir_buf_gps[head_cir_buf].queued = false;
 }
 
-static void cloud_send_modem_data(bool include_dev_data)
+static void cloud_modem_data_send(bool include_dev_data)
 {
 	int err;
 
@@ -377,7 +409,7 @@ static void cloud_send_modem_data(bool include_dev_data)
 	}
 }
 
-static void cloud_send_buffered_data(void)
+static void cloud_buffered_data_send(void)
 {
 	int err;
 
@@ -421,58 +453,63 @@ exit:
 
 static void cloud_synchronize(void)
 {
-	k_delayed_work_submit(&cloud_config_get_work, K_NO_WAIT);
-	k_delayed_work_submit(&cloud_send_cfg_work, K_SECONDS(5));
-	k_delayed_work_submit(&cloud_send_modem_data_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_configuration_get_work, K_NO_WAIT);
+	k_delayed_work_submit(&cloud_configuration_send_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_modem_data_send_work, K_SECONDS(5));
 }
 
 static void cloud_update(void)
 {
 	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
-		k_delayed_work_submit(&cloud_send_sensor_data_work,
+		k_delayed_work_submit(&cloud_sensor_data_send_work,
 				      K_NO_WAIT);
-		k_delayed_work_submit(&cloud_send_modem_data_dyn_work,
-				      K_SECONDS(10));
-		k_delayed_work_submit(&cloud_send_buffered_data_work,
-				      K_SECONDS(10));
-		k_delayed_work_submit(&set_led_device_mode_work,
-				      K_SECONDS(10));
+		k_delayed_work_submit(&cloud_dynamic_modem_data_send_work,
+				      K_SECONDS(5));
+		k_delayed_work_submit(&cloud_buffered_data_send_work,
+				      K_SECONDS(5));
+		k_delayed_work_submit(&led_device_mode_set_work,
+				      K_SECONDS(5));
 	}
 }
 
-static void set_led_device_mode_work_fn(struct k_work *work)
+static void led_device_mode_set_work_fn(struct k_work *work)
 {
-	set_led_device_mode();
+	led_device_mode_set();
 }
 
-static void cloud_config_get_work_fn(struct k_work *work)
+static void cloud_configuration_get_work_fn(struct k_work *work)
 {
-	cloud_config_get();
+	cloud_configuration_get();
 }
 
-static void cloud_send_sensor_data_work_fn(struct k_work *work)
+static void cloud_sensor_data_send_work_fn(struct k_work *work)
 {
-	cloud_send_sensor_data();
+	cloud_sensor_data_send();
 }
 
-static void cloud_send_cfg_work_fn(struct k_work *work)
+static void cloud_configuration_send_work_fn(struct k_work *work)
 {
-	cloud_send_cfg();
+	cloud_configuration_send();
 }
 
-static void cloud_send_modem_data_work_fn(struct k_work *work)
+static void cloud_modem_data_send_work_fn(struct k_work *work)
 {
-	cloud_send_modem_data(true);
+	cloud_modem_data_send(true);
 }
 
-static void cloud_send_modem_data_dyn_work_fn(struct k_work *work)
+static void cloud_dynamic_modem_data_send_work_fn(struct k_work *work)
 {
-	cloud_send_modem_data(false);
+	cloud_modem_data_send(false);
 }
 
-static void cloud_send_buffered_data_work_fn(struct k_work *work)
+static void cloud_buffered_data_send_work_fn(struct k_work *work)
 {
-	cloud_send_buffered_data();
+	cloud_buffered_data_send();
+}
+
+static void cloud_button_message_send_work_fn(struct k_work *work)
+{
+	cloud_button_message_send();
 }
 
 static void movement_timeout_work_fn(struct k_work *work)
@@ -493,22 +530,24 @@ static void movement_timeout_work_fn(struct k_work *work)
 
 static void work_init(void)
 {
-	k_delayed_work_init(&cloud_config_get_work,
-			    cloud_config_get_work_fn);
-	k_delayed_work_init(&cloud_send_sensor_data_work,
-			    cloud_send_sensor_data_work_fn);
-	k_delayed_work_init(&cloud_send_cfg_work,
-			    cloud_send_cfg_work_fn);
-	k_delayed_work_init(&cloud_send_modem_data_work,
-			    cloud_send_modem_data_work_fn);
-	k_delayed_work_init(&cloud_send_modem_data_dyn_work,
-			    cloud_send_modem_data_dyn_work_fn);
-	k_delayed_work_init(&cloud_send_buffered_data_work,
-			    cloud_send_buffered_data_work_fn);
-	k_delayed_work_init(&set_led_device_mode_work,
-			    set_led_device_mode_work_fn);
+	k_delayed_work_init(&cloud_configuration_get_work,
+			    cloud_configuration_get_work_fn);
+	k_delayed_work_init(&cloud_sensor_data_send_work,
+			    cloud_sensor_data_send_work_fn);
+	k_delayed_work_init(&cloud_configuration_send_work,
+			    cloud_configuration_send_work_fn);
+	k_delayed_work_init(&cloud_modem_data_send_work,
+			    cloud_modem_data_send_work_fn);
+	k_delayed_work_init(&cloud_dynamic_modem_data_send_work,
+			    cloud_dynamic_modem_data_send_work_fn);
+	k_delayed_work_init(&cloud_buffered_data_send_work,
+			    cloud_buffered_data_send_work_fn);
+	k_delayed_work_init(&led_device_mode_set_work,
+			    led_device_mode_set_work_fn);
 	k_delayed_work_init(&movement_timeout_work,
 			    movement_timeout_work_fn);
+	k_delayed_work_init(&cloud_button_message_send_work,
+			    cloud_button_message_send_work_fn);
 }
 
 static void adxl362_trigger_handler(struct device *dev,
@@ -629,7 +668,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		if (err) {
 			LOG_ERR("Could not decode response %d", err);
 		}
-		k_delayed_work_submit(&cloud_send_cfg_work, K_NO_WAIT);
+		k_delayed_work_submit(&cloud_configuration_send_work,
+				      K_NO_WAIT);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
@@ -662,7 +702,7 @@ connect:
 
 	while (true) {
 		err = poll(fds, ARRAY_SIZE(fds),
-			   K_SECONDS(CONFIG_MQTT_KEEPALIVE / 3));
+			   cloud_keepalive_time_left(cloud_backend));
 
 		if (err < 0) {
 			LOG_ERR("poll, error: %d", err);
@@ -747,6 +787,36 @@ static int modem_data_init(void)
 	return 0;
 }
 
+static void button_handler(u32_t button_states, u32_t has_changed)
+{
+
+	if (has_changed & button_states & DK_BTN1_MSK) {
+
+		int err = lte_connection_check();
+		if (err) {
+			LOG_ERR("lte_connection_check, error: %d", err);
+			error_handler(err);
+		}
+
+		if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+			cloud_data.button_number = 1;
+			cloud_data.button_ts = k_uptime_get();
+			k_delayed_work_submit(&cloud_button_message_send_work,
+					      K_NO_WAIT);
+		
+		}
+	}
+
+#if defined(CONFIG_BOARD_NRF9160_PCA10090NS)
+	/* Fake motion. The nRF9160 DK does not have an accelerometer by
+	* default. */
+	if (has_changed & button_states & DK_BTN2_MSK) {
+		k_sem_give(&accel_trig_sem);
+	}
+#endif
+
+}
+
 static int populate_app_endpoint_topics()
 {
 	int err;
@@ -760,6 +830,16 @@ static int populate_app_endpoint_topics()
 	pub_ep_topics_sub[0].str = batch_topic;
 	pub_ep_topics_sub[0].len = BATCH_TOPIC_LEN;
 	pub_ep_topics_sub[0].type = CLOUD_EP_TOPIC_BATCH;
+
+	err = snprintf(messages_topic, sizeof(messages_topic), MESSAGES_TOPIC,
+		       client_id_buf);
+	if (err != MESSAGES_TOPIC_LEN) {
+		return -ENOMEM;
+	}
+
+	pub_ep_topics_sub[1].str = messages_topic;
+	pub_ep_topics_sub[1].len = MESSAGES_TOPIC_LEN;
+	pub_ep_topics_sub[1].type = CLOUD_EP_TOPIC_MESSAGES;
 
 	err = snprintf(cfg_topic, sizeof(cfg_topic), CFG_TOPIC,
 		       client_id_buf);
@@ -827,6 +907,12 @@ void main(void)
 
 	work_init();
 	adxl362_init();
+
+	err = dk_buttons_init(button_handler);
+	if (err) {
+		LOG_INF("dk_buttons_init, error: %d\n", err);
+		error_handler(err);
+	}
 
 	err = modem_data_init();
 	if (err) {
