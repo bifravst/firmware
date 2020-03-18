@@ -456,6 +456,7 @@ static void cloud_synchronize(void)
 {
 	k_delayed_work_submit(&cloud_configuration_get_work, K_NO_WAIT);
 	k_delayed_work_submit(&cloud_configuration_send_work, K_SECONDS(5));
+	k_delayed_work_submit(&cloud_sensor_data_send_work, K_SECONDS(5));
 	k_delayed_work_submit(&cloud_modem_data_send_work, K_SECONDS(5));
 	k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(5));
 }
