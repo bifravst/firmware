@@ -188,7 +188,7 @@ static void set_current_time(struct gps_data gps_data)
 
 	/* Change datetime.year and datetime.month to accomodate the
 	 * correct input format. */
-	gps_time.tm_year = gps_data.pvt.datetime.year + 100;
+	gps_time.tm_year = gps_data.pvt.datetime.year - 1900;
 	gps_time.tm_mon = gps_data.pvt.datetime.month - 1;
 	gps_time.tm_mday = gps_data.pvt.datetime.day;
 	gps_time.tm_hour = gps_data.pvt.datetime.hour;
