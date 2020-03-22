@@ -44,9 +44,11 @@ static struct cloud_data cloud_data = {
 				.active = true,
 				.active_wait = 60,
 				.passive_wait = 60,
-				.movement_timeout = 3600,
-				.accel_threshold = 100,
-				.gps_found = false };
+				.mov_timeout = 3600,
+				.acc_thres = 100,
+				.gps_found = false,
+				.synch = true,
+				.acc_trig = false};
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
 static struct cloud_endpoint pub_ep_topics_sub[2];
@@ -62,19 +64,16 @@ static struct cloud_backend *cloud_backend;
 static bool queued_entries;
 static bool cloud_connected;
 
-static int rsrp;
 static int head_cir_buf;
 static int num_queued_entries;
 
 static struct k_delayed_work cloud_configuration_get_work;
-static struct k_delayed_work cloud_sensor_data_send_work;
-static struct k_delayed_work cloud_modem_data_send_work;
-static struct k_delayed_work cloud_dynamic_modem_data_send_work;
 static struct k_delayed_work cloud_configuration_send_work;
+static struct k_delayed_work cloud_sensor_data_send_work;
 static struct k_delayed_work cloud_buffered_data_send_work;
-static struct k_delayed_work led_device_mode_set_work;
-static struct k_delayed_work movement_timeout_work;
 static struct k_delayed_work cloud_button_message_send_work;
+static struct k_delayed_work led_device_mode_set_work;
+static struct k_delayed_work mov_timeout_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -125,6 +124,9 @@ static int modem_configure(void)
 	}
 
 	LOG_INF("Connected to LTE network");
+
+	/* Sleep to make sure the network has pushed time to modem. */
+	k_sleep(K_SECONDS(5));
 
 	/* Update time before any publication. */
 	date_time_update();
@@ -209,15 +211,15 @@ static void led_device_mode_set(void)
 
 static double get_accel_thres(void)
 {
-	double accel_threshold_double;
+	double acc_thres_double;
 
-	if (cloud_data.accel_threshold == 0) {
-		accel_threshold_double = 0;
+	if (cloud_data.acc_thres == 0) {
+		acc_thres_double = 0;
 	} else {
-		accel_threshold_double = cloud_data.accel_threshold / 10;
+		acc_thres_double = cloud_data.acc_thres / 10;
 	}
 
-	return accel_threshold_double;
+	return acc_thres_double;
 }
 
 static void populate_gps_buffer(struct gps_data gps_data)
@@ -235,44 +237,10 @@ static void populate_gps_buffer(struct gps_data gps_data)
 	cir_buf_gps[head_cir_buf].accuracy = gps_data.pvt.accuracy;
 	cir_buf_gps[head_cir_buf].speed = gps_data.pvt.speed;
 	cir_buf_gps[head_cir_buf].heading = gps_data.pvt.heading;
-	cir_buf_gps[head_cir_buf].gps_timestamp = k_uptime_get();
+	cir_buf_gps[head_cir_buf].gps_ts = k_uptime_get();
 	cir_buf_gps[head_cir_buf].queued = true;
 
 	LOG_INF("Entry: %d in gps_buffer filled", head_cir_buf);
-}
-
-static int voltage_level_get(void)
-{
-	int err;
-
-	/* This solution of requesting all modem parameters should
-	   be replaced with only requesting battery */
-	err = modem_info_params_get(&modem_param);
-	if (err) {
-		LOG_ERR("modem_info_params_get, error: %d", err);
-		return err;
-	}
-
-	cloud_data.bat_voltage = modem_param.device.battery.value;
-	cloud_data.bat_timestamp = k_uptime_get();
-
-	return 0;
-}
-
-static int modem_data_get(void)
-{
-	int err;
-
-	cloud_data.roam_modem_data_ts = k_uptime_get();
-	cloud_data.dev_modem_data_ts = k_uptime_get();
-
-	err = modem_info_params_get(&modem_param);
-	if (err) {
-		LOG_ERR("Error getting modem_info: %d", err);
-		return err;
-	}
-
-	return 0;
 }
 
 static void cloud_configuration_get(void)
@@ -354,14 +322,18 @@ static void cloud_sensor_data_send(void)
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
 	};
 
-	err = voltage_level_get();
+	err = modem_info_params_get(&modem_param);
 	if (err) {
-		LOG_ERR("Error requesting voltage level %d", err);
+		LOG_ERR("modem_info_params_get, error: %d", err);
 		return;
 	}
 
+	/* set modem data sample uptime. */
+	cloud_data.mod_ts = k_uptime_get();
+
 	err = cloud_encode_sensor_data(&msg, &cloud_data,
-				       &cir_buf_gps[head_cir_buf]);
+				       &cir_buf_gps[head_cir_buf],
+				       &modem_param);
 	if (err) {
 		LOG_ERR("Error enconding message %d", err);
 		return;
@@ -375,39 +347,8 @@ static void cloud_sensor_data_send(void)
 	}
 
 	cloud_data.gps_found = false;
+	cloud_data.acc_trig = false;
 	cir_buf_gps[head_cir_buf].queued = false;
-}
-
-static void cloud_modem_data_send(bool include_dev_data)
-{
-	int err;
-
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG,
-	};
-
-	err = modem_data_get();
-	if (err) {
-		LOG_ERR("modem_data_get, error: %d", err);
-		return;
-	}
-
-	err = cloud_encode_modem_data(&msg, &cloud_data, &modem_param,
-				      include_dev_data, rsrp);
-	if (err) {
-		LOG_ERR("Error encoding modem data, error: %d", err);
-		return;
-	}
-
-	err = cloud_send(cloud_backend, &msg);
-	cloud_release_data(&msg);
-	if (err) {
-		LOG_ERR("Cloud send failed, err: %d", err);
-		return;
-	}
 }
 
 static void cloud_buffered_data_send(void)
@@ -452,26 +393,43 @@ exit:
 	queued_entries = false;
 }
 
-static void cloud_synchronize(void)
+static void cloud_synch(void)
 {
-	k_delayed_work_submit(&cloud_configuration_get_work, K_NO_WAIT);
-	k_delayed_work_submit(&cloud_configuration_send_work, K_SECONDS(5));
-	k_delayed_work_submit(&cloud_sensor_data_send_work, K_SECONDS(5));
-	k_delayed_work_submit(&cloud_modem_data_send_work, K_SECONDS(5));
-	k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(5));
+	int err;
+
+	err = lte_connection_check();
+	if (err) {
+		LOG_ERR("lte_connection_check, error: %d", err);
+		error_handler(err);
+	}
+
+	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+		k_delayed_work_submit(&cloud_configuration_get_work,
+					K_NO_WAIT);
+		k_delayed_work_submit(&cloud_configuration_send_work,
+					K_NO_WAIT);
+		k_delayed_work_submit(&cloud_sensor_data_send_work,
+					K_NO_WAIT);
+	}
 }
 
 static void cloud_update(void)
 {
+	int err;
+
+	err = lte_connection_check();
+	if (err) {
+		LOG_ERR("lte_connection_check, error: %d", err);
+		error_handler(err);
+	}
+
+	cloud_data.synch = false;
+
 	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
 		k_delayed_work_submit(&cloud_sensor_data_send_work,
 				      K_NO_WAIT);
-		k_delayed_work_submit(&cloud_dynamic_modem_data_send_work,
-				      K_SECONDS(10));
 		k_delayed_work_submit(&cloud_buffered_data_send_work,
-				      K_SECONDS(10));
-		k_delayed_work_submit(&led_device_mode_set_work,
-				      K_SECONDS(10));
+				      K_NO_WAIT);
 	}
 }
 
@@ -485,24 +443,14 @@ static void cloud_configuration_get_work_fn(struct k_work *work)
 	cloud_configuration_get();
 }
 
-static void cloud_sensor_data_send_work_fn(struct k_work *work)
-{
-	cloud_sensor_data_send();
-}
-
 static void cloud_configuration_send_work_fn(struct k_work *work)
 {
 	cloud_configuration_send();
 }
 
-static void cloud_modem_data_send_work_fn(struct k_work *work)
+static void cloud_sensor_data_send_work_fn(struct k_work *work)
 {
-	cloud_modem_data_send(true);
-}
-
-static void cloud_dynamic_modem_data_send_work_fn(struct k_work *work)
-{
-	cloud_modem_data_send(false);
+	cloud_sensor_data_send();
 }
 
 static void cloud_buffered_data_send_work_fn(struct k_work *work)
@@ -515,20 +463,15 @@ static void cloud_button_message_send_work_fn(struct k_work *work)
 	cloud_button_message_send();
 }
 
-static void movement_timeout_work_fn(struct k_work *work)
+static void mov_timeout_work_fn(struct k_work *work)
 {
 	if (!cloud_data.active) {
 		LOG_INF("Movement timeout triggered");
-		int err = lte_connection_check();
-		if (err) {
-			LOG_ERR("lte_connection_check, error: %d", err);
-			error_handler(err);
-		}
 		cloud_update();
 	}
 
-	k_delayed_work_submit(&movement_timeout_work,
-			      K_SECONDS(cloud_data.movement_timeout));
+	k_delayed_work_submit(&mov_timeout_work,
+			      K_SECONDS(cloud_data.mov_timeout));
 }
 
 static void work_init(void)
@@ -539,16 +482,12 @@ static void work_init(void)
 			    cloud_sensor_data_send_work_fn);
 	k_delayed_work_init(&cloud_configuration_send_work,
 			    cloud_configuration_send_work_fn);
-	k_delayed_work_init(&cloud_modem_data_send_work,
-			    cloud_modem_data_send_work_fn);
-	k_delayed_work_init(&cloud_dynamic_modem_data_send_work,
-			    cloud_dynamic_modem_data_send_work_fn);
 	k_delayed_work_init(&cloud_buffered_data_send_work,
 			    cloud_buffered_data_send_work_fn);
 	k_delayed_work_init(&led_device_mode_set_work,
 			    led_device_mode_set_work_fn);
-	k_delayed_work_init(&movement_timeout_work,
-			    movement_timeout_work_fn);
+	k_delayed_work_init(&mov_timeout_work,
+			    mov_timeout_work_fn);
 	k_delayed_work_init(&cloud_button_message_send_work,
 			    cloud_button_message_send_work_fn);
 }
@@ -586,7 +525,8 @@ static void adxl362_trigger_handler(struct device *dev,
 			cloud_data.acc[0] = x;
 			cloud_data.acc[1] = y;
 			cloud_data.acc[2] = z;
-			cloud_data.acc_timestamp = k_uptime_get();
+			cloud_data.acc_ts = k_uptime_get();
+			cloud_data.acc_trig = true;
 			k_sem_give(&accel_trig_sem);
 		}
 
@@ -647,11 +587,11 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTED:
 		LOG_INF("CLOUD_EVT_CONNECTED");
-		cloud_synchronize();
-		boot_write_img_confirmed();
-		k_delayed_work_submit(&movement_timeout_work,
-				      K_SECONDS(cloud_data.movement_timeout));
 		cloud_connected = true;
+		cloud_synch();
+		boot_write_img_confirmed();
+		k_delayed_work_submit(&mov_timeout_work,
+				      K_SECONDS(cloud_data.mov_timeout));
 		break;
 	case CLOUD_EVT_READY:
 		LOG_INF("CLOUD_EVT_READY");
@@ -775,9 +715,10 @@ static void modem_rsrp_handler(char rsrp_value)
 		return;
 	}
 
-	rsrp = rsrp_value;
+	cloud_data.rsrp = rsrp_value;
 
-	LOG_INF("Incoming RSRP status message, RSRP value is %d", rsrp);
+	LOG_INF("Incoming RSRP status message, RSRP value is %d",
+		cloud_data.rsrp);
 }
 
 static int modem_data_init(void)
@@ -817,8 +758,8 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 		}
 
 		if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
-			cloud_data.button_number = 1;
-			cloud_data.button_ts = k_uptime_get();
+			cloud_data.btn_number = 1;
+			cloud_data.btn_ts = k_uptime_get();
 			k_delayed_work_submit(&cloud_button_message_send_work,
 					      K_NO_WAIT);
 			k_delayed_work_submit(&led_device_mode_set_work,
@@ -831,10 +772,6 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	 * default. Reset accelerometer data.
 	 */
 	if (has_changed & button_states & DK_BTN2_MSK) {
-		cloud_data.acc_timestamp = k_uptime_get();
-		cloud_data.acc[0] = 0;
-		cloud_data.acc[1] = 0;
-		cloud_data.acc[2] = 0;
 		k_sem_give(&accel_trig_sem);
 	}
 #endif
@@ -972,13 +909,24 @@ void main(void)
 		error_handler(err);
 	}
 
+	LOG_INF("Getting device configuration...");
+
 	/*Sleep so that the device manages to adapt
 	  to its new configuration before a GPS search*/
 	k_sleep(K_SECONDS(20));
 
 	while (true) {
+
+		if(cloud_data.active) {
+			LOG_INF("Device in ACTIVE mode");
+		} else {
+			LOG_INF("Device in PASSIVE mode");
+		}
+
 		/*Check current device mode*/
 		if (!cloud_data.active) {
+			k_delayed_work_submit(&led_device_mode_set_work,
+					      K_NO_WAIT);
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 				LOG_INF("The cat is moving!");
 			}
@@ -993,15 +941,11 @@ void main(void)
 		/*Stop GPS search*/
 		gps_control_stop(K_NO_WAIT);
 
-		/*Check lte connection*/
-		err = lte_connection_check();
-		if (err) {
-			LOG_ERR("lte_connection_check, error: %d", err);
-			error_handler(err);
-		}
-
-		/*Send update to cloud if a connection has been established*/
+		/*Send update to cloud if a connection has been established */
 		cloud_update();
+
+		/* Set device mode led behaviour */
+		k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
 
 		/*Sleep*/
 		LOG_INF("Going to sleep for: %d seconds", check_active_wait());

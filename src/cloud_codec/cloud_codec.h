@@ -1,3 +1,15 @@
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+/**@file
+ *
+ * @defgroup cloud_codec Cloud codec
+ * @brief    Module that encodes and decodes cloud communication.
+ * @{
+ */
+
 #ifndef CLOUD_CODEC_H__
 #define CLOUD_CODEC_H__
 
@@ -14,52 +26,44 @@ extern "C" {
 #endif
 
 struct cloud_data_gps {
+	s64_t gps_ts;
 	double longitude;
 	double latitude;
 	float altitude;
 	float accuracy;
 	float speed;
 	float heading;
-	s64_t gps_timestamp;
 	bool queued;
 };
 
 struct cloud_data {
-	int bat_voltage;
-	s64_t bat_timestamp;
-
+	s64_t bat_ts;
+	s64_t acc_ts;
+	s64_t mod_ts;
+	s64_t btn_ts;
 	double acc[3];
-	s64_t acc_timestamp;
-
-	int gps_timeout;
 	bool active;
+	int gps_timeout;
 	int active_wait;
 	int passive_wait;
-	int movement_timeout;
-	int accel_threshold;
-
+	int mov_timeout;
+	int acc_thres;
+	int btn_number;
+	int rsrp;
 	bool gps_found;
-
-	s64_t roam_modem_data_ts;
-	s64_t dev_modem_data_ts;
-
-	int button_number;
-	s64_t button_ts;
+	bool acc_trig;
+	bool synch;
 };
 
 int cloud_decode_response(char *input, struct cloud_data *cloud_data);
 
 int cloud_encode_sensor_data(struct cloud_msg *output,
 			     struct cloud_data *cloud_data,
-			     struct cloud_data_gps *cir_buf_gps);
+			     struct cloud_data_gps *cir_buf_gps,
+			     struct modem_param_info *modem_info);
 
 int cloud_encode_gps_buffer(struct cloud_msg *output,
 			    struct cloud_data_gps *cir_buf_gps);
-
-int cloud_encode_modem_data(struct cloud_msg *output,
-			    struct cloud_data *cloud_data,
-			    struct modem_param_info *modem_info,
-			    bool include_dev_data, int rsrp);
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
 			  struct cloud_data *cloud_data);
