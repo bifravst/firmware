@@ -50,5 +50,8 @@ RUN cd /workdir/ncs/nrf && \
     pip3 install -r zephyr/scripts/requirements.txt && \
     pip3 install -r nrf/scripts/requirements.txt && \
     pip3 install -r bootloader/mcuboot/scripts/requirements.txt
+
+# Update to latest west version
+RUN pip3 install -U west && west -V
 RUN mkdir /workdir/.cache
 ENV XDG_CACHE_HOME=/workdir/.cache
