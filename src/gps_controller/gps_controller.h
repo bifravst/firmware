@@ -18,21 +18,15 @@
 extern "C" {
 #endif
 
-int gps_control_init(gps_trigger_handler_t handler);
-
-void gps_control_on_trigger(void);
+int gps_control_init(gps_event_handler_t handler);
 
 void gps_control_stop(u32_t delay_ms);
 
-void gps_control_start(u32_t delay_ms);
+void gps_control_start(u32_t delay_ms, u32_t timeout);
 
 bool gps_control_is_active(void);
 
-bool gps_control_is_enabled(void);
-
-void gps_control_enable(void);
-
-void gps_control_disable(void);
+bool gps_control_set_active(bool active);
 
 #ifdef __cplusplus
 }

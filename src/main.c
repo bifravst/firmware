@@ -184,28 +184,32 @@ static int check_active_wait(void)
 	return cloud_data.active_wait;
 }
 
-static void set_current_time(struct gps_data gps_data)
+static void set_current_time(struct gps_pvt *gps_data)
 {
 	struct tm gps_time;
 
 	/* Change datetime.year and datetime.month to accomodate the
 	 * correct input format. */
-	gps_time.tm_year = gps_data.pvt.datetime.year - 1900;
-	gps_time.tm_mon = gps_data.pvt.datetime.month - 1;
-	gps_time.tm_mday = gps_data.pvt.datetime.day;
-	gps_time.tm_hour = gps_data.pvt.datetime.hour;
-	gps_time.tm_min = gps_data.pvt.datetime.minute;
-	gps_time.tm_sec = gps_data.pvt.datetime.seconds;
+	gps_time.tm_year = gps_data->datetime.year  - 1900;
+	gps_time.tm_mon  = gps_data->datetime.month - 1;
+	gps_time.tm_mday = gps_data->datetime.day;
+	gps_time.tm_hour = gps_data->datetime.hour;
+	gps_time.tm_min  = gps_data->datetime.minute;
+	gps_time.tm_sec  = gps_data->datetime.seconds;
 
 	date_time_set(&gps_time);
 }
 
 static void led_device_mode_set(void)
 {
-	if (!cloud_data.active) {
-		ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+	if (!gps_control_is_active()) {
+		if (!cloud_data.active) {
+			ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+		} else {
+			ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+		}
 	} else {
-		ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 	}
 }
 
@@ -222,7 +226,7 @@ static double get_accel_thres(void)
 	return acc_thres_double;
 }
 
-static void populate_gps_buffer(struct gps_data gps_data)
+static void populate_gps_buffer(struct gps_pvt *gps_data)
 {
 	cloud_data.gps_found = true;
 
@@ -231,14 +235,14 @@ static void populate_gps_buffer(struct gps_data gps_data)
 		head_cir_buf = 0;
 	}
 
-	cir_buf_gps[head_cir_buf].longitude = gps_data.pvt.longitude;
-	cir_buf_gps[head_cir_buf].latitude = gps_data.pvt.latitude;
-	cir_buf_gps[head_cir_buf].altitude = gps_data.pvt.altitude;
-	cir_buf_gps[head_cir_buf].accuracy = gps_data.pvt.accuracy;
-	cir_buf_gps[head_cir_buf].speed = gps_data.pvt.speed;
-	cir_buf_gps[head_cir_buf].heading = gps_data.pvt.heading;
-	cir_buf_gps[head_cir_buf].gps_ts = k_uptime_get();
-	cir_buf_gps[head_cir_buf].queued = true;
+	cir_buf_gps[head_cir_buf].longitude = gps_data->longitude;
+	cir_buf_gps[head_cir_buf].latitude  = gps_data->latitude;
+	cir_buf_gps[head_cir_buf].altitude  = gps_data->altitude;
+	cir_buf_gps[head_cir_buf].accuracy  = gps_data->accuracy;
+	cir_buf_gps[head_cir_buf].speed     = gps_data->speed;
+	cir_buf_gps[head_cir_buf].heading   = gps_data->heading;
+	cir_buf_gps[head_cir_buf].gps_ts    = k_uptime_get();
+	cir_buf_gps[head_cir_buf].queued    = true;
 
 	LOG_INF("Entry: %d in gps_buffer filled", head_cir_buf);
 }
@@ -537,25 +541,52 @@ static void adxl362_trigger_handler(struct device *dev,
 	}
 }
 
-static void gps_trigger_handler(struct device *dev, struct gps_trigger *trigger)
+static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 {
-	static u32_t fix_count;
-	struct gps_data gps_data;
-
-	ARG_UNUSED(trigger);
-
-	if (++fix_count < CONFIG_GPS_CONTROL_FIX_COUNT) {
-		return;
+	switch (evt->type) {
+	case GPS_EVT_SEARCH_STARTED:
+		LOG_INF("GPS_EVT_SEARCH_STARTED");
+		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
+		break;
+	case GPS_EVT_SEARCH_STOPPED:
+		LOG_INF("GPS_EVT_SEARCH_STOPPED");
+		break;
+	case GPS_EVT_SEARCH_TIMEOUT:
+		LOG_INF("GPS_EVT_SEARCH_TIMEOUT");
+		gps_control_set_active(false);
+		k_sem_give(&gps_timeout_sem);
+		break;
+	case GPS_EVT_PVT:
+		/* Don't spam logs */
+		break;
+	case GPS_EVT_PVT_FIX:
+		LOG_INF("GPS_EVT_PVT_FIX");
+		gps_control_set_active(false);
+		set_current_time(&evt->pvt);
+		populate_gps_buffer(&evt->pvt);
+		k_sem_give(&gps_timeout_sem);
+		break;
+	case GPS_EVT_NMEA:
+		/* Don't spam logs */
+		break;
+	case GPS_EVT_NMEA_FIX:
+		LOG_INF("Position fix with NMEA data");
+		break;
+	case GPS_EVT_OPERATION_BLOCKED:
+		LOG_INF("GPS_EVT_OPERATION_BLOCKED");
+		break;
+	case GPS_EVT_OPERATION_UNBLOCKED:
+		LOG_INF("GPS_EVT_OPERATION_UNBLOCKED");
+		break;
+	case GPS_EVT_AGPS_DATA_NEEDED:
+		LOG_INF("GPS_EVT_AGPS_DATA_NEEDED");
+		break;
+	case GPS_EVT_ERROR:
+		LOG_INF("GPS_EVT_ERROR\n");
+		break;
+	default:
+		break;
 	}
-
-	fix_count = 0;
-
-	LOG_INF("gps control handler triggered!");
-
-	gps_channel_get(dev, GPS_CHAN_PVT, &gps_data);
-	set_current_time(gps_data);
-	populate_gps_buffer(gps_data);
-	k_sem_give(&gps_timeout_sem);
 }
 
 static void adxl362_init(void)
@@ -596,6 +627,12 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		break;
 	case CLOUD_EVT_READY:
 		LOG_INF("CLOUD_EVT_READY");
+		err = lte_lc_psm_req(true);
+		if (err) {
+			LOG_ERR("PSM request failed, error: %d", err);
+		} else {
+			LOG_INF("PSM enabled");
+		}
 		break;
 	case CLOUD_EVT_DISCONNECTED:
 		LOG_INF("CLOUD_EVT_DISCONNECTED");
@@ -671,6 +708,7 @@ connect:
 
 		if (err == 0) {
 			cloud_ping(cloud_backend);
+			LOG_INF("Cloud ping!");
 			continue;
 		}
 
@@ -934,13 +972,10 @@ void main(void)
 		}
 
 		/*Start GPS search*/
-		gps_control_start(K_NO_WAIT);
+		gps_control_start(K_NO_WAIT, cloud_data.gps_timeout);
 
 		/*Wait for GPS search timeout*/
-		k_sem_take(&gps_timeout_sem, K_SECONDS(cloud_data.gps_timeout));
-
-		/*Stop GPS search*/
-		gps_control_stop(K_NO_WAIT);
+		k_sem_take(&gps_timeout_sem, K_FOREVER);
 
 		/*Send update to cloud if a connection has been established */
 		cloud_update();
