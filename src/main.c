@@ -546,7 +546,6 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 	switch (evt->type) {
 	case GPS_EVT_SEARCH_STARTED:
 		LOG_INF("GPS_EVT_SEARCH_STARTED");
-		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 		break;
 	case GPS_EVT_SEARCH_STOPPED:
 		LOG_INF("GPS_EVT_SEARCH_STOPPED");
@@ -787,8 +786,12 @@ static int modem_data_init(void)
 
 static void button_handler(u32_t button_states, u32_t has_changed)
 {
+	static int try_again_timeout;
 
-	if (has_changed & button_states & DK_BTN1_MSK) {
+	/* Publication of data due to button presses limited
+	 * to 1 push every 2 seconds to avoid spamming the cloud socket. */
+	if ((has_changed & button_states & DK_BTN1_MSK) &&
+	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
 
 		int err = lte_connection_check();
 		if (err) {
@@ -797,14 +800,22 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 		}
 
 		if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+
+			LOG_INF("Cloud publication by button 1 triggered, ");
+			LOG_INF("2 seconds to next allowed cloud publication ");
+			LOG_INF("triggered by button 1");
+
 			cloud_data.btn_number = 1;
 			cloud_data.btn_ts = k_uptime_get();
 			k_delayed_work_submit(&cloud_button_message_send_work,
 					      K_NO_WAIT);
 			k_delayed_work_submit(&led_device_mode_set_work,
-					K_SECONDS(5));
+					K_SECONDS(3));
 		}
+
+		try_again_timeout = k_uptime_get();
 	}
+
 
 #if defined(CONFIG_BOARD_NRF9160_PCA10090NS)
 	/* Fake motion. The nRF9160 DK does not have an accelerometer by

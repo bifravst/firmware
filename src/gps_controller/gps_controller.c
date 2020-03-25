@@ -35,6 +35,8 @@ static void start(struct k_work *work)
 		return;
 	}
 
+	ui_led_set_pattern(UI_LED_GPS_SEARCHING);
+
 	err = gps_start(gps_dev, &gps_cfg);
 	if (err) {
 		LOG_ERR("Failed to enable GPS, error: %d", err);
