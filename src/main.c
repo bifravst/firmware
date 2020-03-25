@@ -63,6 +63,7 @@ static struct cloud_backend *cloud_backend;
 
 static bool queued_entries;
 static bool cloud_connected;
+static int cloud_connect_retries;
 
 static int head_cir_buf;
 static int num_queued_entries;
@@ -619,6 +620,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_CONNECTED:
 		LOG_INF("CLOUD_EVT_CONNECTED");
 		cloud_connected = true;
+		cloud_connect_retries = 0;
 		cloud_synch();
 		boot_write_img_confirmed();
 		k_delayed_work_submit(&mov_timeout_work,
@@ -718,14 +720,23 @@ connect:
 		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
 			LOG_ERR("Socket error: POLLNVAL");
 			LOG_ERR("The cloud socket was unexpectedly closed.");
-			break;
+			error_handler(-EIO);
+			return;
 		}
 
 		if ((fds[0].revents & POLLHUP) == POLLHUP) {
 			LOG_ERR("Socket error: POLLHUP");
 			LOG_ERR("Connection was closed by the cloud.");
+			LOG_ERR("TRYING TO RECONNECT...");
+			if (cloud_connect_retries >
+			    CONFIG_CLOUD_RECONNECT_RETRIES) {
+				LOG_ERR("Too many retires, reboot");
 			error_handler(-EIO);
-			return;
+			}
+			cloud_connect_retries++;
+			LOG_ERR("cloud connect retries %d",
+			        cloud_connect_retries);
+			break;
 		}
 
 		if ((fds[0].revents & POLLERR) == POLLERR) {

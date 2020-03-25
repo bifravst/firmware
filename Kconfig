@@ -71,6 +71,10 @@ config CLOUD_POLL_PRIORITY
 	int
 	default 7
 
+config CLOUD_RECONNECT_RETRIES
+	int "Number of retires after a cloud socket POLLUP"
+	default 2
+
 endmenu # Cloud socket poll
 
 menu "Cloud codec"
