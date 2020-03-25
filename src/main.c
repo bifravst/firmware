@@ -472,11 +472,11 @@ static void mov_timeout_work_fn(struct k_work *work)
 	if (!cloud_data.active) {
 		LOG_INF("Movement timeout triggered");
 		cloud_update();
+		k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
 	}
 
 	k_delayed_work_submit(&mov_timeout_work,
 			      K_SECONDS(cloud_data.mov_timeout));
-	k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
 }
 
 static void work_init(void)
