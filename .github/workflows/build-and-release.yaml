@@ -5,6 +5,7 @@ on: push
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
+  DEVICE_TREE_COMPILER_VERSION: 1.4.7-3
 
 jobs:
   build:
@@ -42,17 +43,17 @@ jobs:
         id: cache-dtc
         with:
           path: device-tree-compiler/
-          key: ${{ runner.OS }}-device-tree-compiler_1.4.7-1_amd64.deb
+          key: ${{ runner.OS }}-device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
 
-      - name: Download Device Tree Compile 1.4.7
+      - name: Download Device Tree Compiler
         if: steps.cache-dtc.outputs.cache-hit != 'true'
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/device-tree-compiler/
-          wget -q 'http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb' -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
+          wget -q http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
 
-      - name: Install Device Tree Compile 1.4.7
+      - name: Install Device Tree Compiler
         run: |
-          sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_1.4.7-1_amd64.deb
+          sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
 
       # Workaround for https://github.com/NordicSemiconductor/pc-nrfutil/issues/288
       - name: Install latest PIP

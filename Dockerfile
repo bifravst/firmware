@@ -14,7 +14,7 @@ RUN mkdir /data/gcc-arm && \
     tar xjf /data/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
 ENV ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
 ENV GNUARMEMB_TOOLCHAIN_PATH=/workdir/gcc-arm-none-eabi-7-2018-q2-update
-# Device Tree Compiler 1.4.7
+# Device Tree Compiler
 ARG DEVICE_TREE_COMPILER_VERSION=1.4.7-3
 RUN mkdir -p /data/device-tree-compiler/ && \
     wget -q http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb \
