@@ -5,7 +5,6 @@ on: push
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
-  DEVICE_TREE_COMPILER_VERSION: 1.4.7-3
 
 jobs:
   build:
@@ -21,11 +20,11 @@ jobs:
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
 
       - name: Configure the AWS IoT broker hostname
-        if: env.BROKER_HOSTNAME != ''
+        if: github.head_ref == ''
         run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
 
-      - name: Stub AWS IoT broker hostname
-        if: env.BROKER_HOSTNAME == ''
+      - name: Stub AWS IoT broker hostname (this is a PR)
+        if: github.head_ref != ''
         run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
 
       - name: Build image
