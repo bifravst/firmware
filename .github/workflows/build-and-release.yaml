@@ -21,7 +21,12 @@ jobs:
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
 
       - name: Configure the AWS IoT broker hostname
+        if: env.BROKER_HOSTNAME != ''
         run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
+
+      - name: Stub AWS IoT broker hostname
+        if: env.BROKER_HOSTNAME == ''
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com" >> prj.conf
 
       - name: Build image
         run: docker build -t bifravst-firmware-docker .
