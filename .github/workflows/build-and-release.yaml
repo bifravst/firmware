@@ -14,136 +14,43 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Preserve PIP cache
-        id: cache-pip
-        uses: actions/cache@v1
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.OS }}-pip
-
-      - name: Cache GCC ARM Embed binary
-        id: cache-gcc-arm
-        uses: actions/cache@v1
-        with:
-          path: gcc-arm/
-          key: ${{ runner.OS }}-gcc-arm-none-eabi-7-2018-q2-update-linux
-
-      - name: Download GCC ARM Embed
-        if: steps.cache-gcc-arm.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ${GITHUB_WORKSPACE}/gcc-arm/
-          wget -q 'https://developer.arm.com/-/media/Files/downloads/gnu-rm/7-2018q2/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2?revision=bc2c96c0-14b5-4bb4-9f18-bceb4050fee7?product=GNU%20Arm%20Embedded%20Toolchain,64-bit,,Linux,7-2018-q2-update' -O ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
-
-      - name: Install GCC ARM Embed
-        run: |
-          tar xjf ${GITHUB_WORKSPACE}/gcc-arm/gcc-arm-none-eabi-7-2018-q2-update-linux.tar.bz2
-
-      - name: Cache Device Tree Compile binary
-        uses: actions/cache@v1
-        id: cache-dtc
-        with:
-          path: device-tree-compiler/
-          key: ${{ runner.OS }}-device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
-
-      - name: Download Device Tree Compiler
-        if: steps.cache-dtc.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p ${GITHUB_WORKSPACE}/device-tree-compiler/
-          wget -q http://mirrors.kernel.org/ubuntu/pool/main/d/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb -O ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
-
-      - name: Install Device Tree Compiler
-        run: |
-          sudo dpkg -i ${GITHUB_WORKSPACE}/device-tree-compiler/device-tree-compiler_${DEVICE_TREE_COMPILER_VERSION}_amd64.deb
-
-      # Workaround for https://github.com/NordicSemiconductor/pc-nrfutil/issues/288
-      - name: Install latest PIP
-        run: |
-          sudo python3 -m pip install -U pip
-          # Newer PIP will not overwrite distutils, so upgrade PyYAML manually
-          sudo apt-get install python3-setuptools
-          sudo python3 -m pip install --ignore-installed -U PyYAML
-
-      - name: Install Zephyr dependencies
-        run: |
-          sudo apt-get -y install ninja-build gperf python3-pip python3-setuptools
-          sudo env "PATH=$PATH" pip3 install cmake wheel
-
-      - name: Install Rust+Cargo
-        run: |
-          sudo /bin/sh -c 'curl https://sh.rustup.rs -sSf | sh -s -- -y'
-
-      - name: Install West
-        run: |
-          sudo env "PATH=$PATH" pip3 install -U west
-          west -V
-          which west
-
-      - name: West init
-        run: |
-          export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          mkdir ${GITHUB_WORKSPACE}/ncs
-          cd ${GITHUB_WORKSPACE}/ncs
-          git clone https://github.com/${GITHUB_REPOSITORY} ${GITHUB_WORKSPACE}/ncs/firmware
-          cd ${GITHUB_WORKSPACE}/ncs/firmware
-          git reset --hard ${GITHUB_SHA}
-          west init -l
-          cd ${GITHUB_WORKSPACE}/ncs
-          west update
-          sudo env "PATH=$PATH" pip3 install -r zephyr/scripts/requirements.txt
-          sudo env "PATH=$PATH" pip3 install pc_ble_driver_py
-          sudo env "PATH=$PATH" pip3 install -r nrf/scripts/requirements.txt
-          sudo apt-get -y remove python-cryptography python3-cryptography
-          sudo env "PATH=$PATH" pip3 install -r bootloader/mcuboot/scripts/requirements.txt
-
-      # The previous task will install an older version of west,
-      # as part of the zephyr dependencies
-      - name: Update West (again)
-        run: |
-          sudo env "PATH=$PATH" pip3 install -U west
-          west -V
-          which west
-
       - name: Determine next release version
         run: |
           npm ci
-          export NEXT_VERSION=`node ${GITHUB_WORKSPACE}/ncs/firmware/.github/workflows/get-next-version.js`
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
+          export NEXT_VERSION=`node .github/workflows/get-next-version.js`
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
 
       - name: Configure the AWS IoT broker hostname
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
+        if: env.BROKER_HOSTNAME != ''
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
+
+      - name: Stub AWS IoT broker hostname
+        if: env.BROKER_HOSTNAME == ''
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
+
+      - name: Build image
+        run: docker build -t bifravst-firmware-docker .
 
       - name: Build
         run: |
-          export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
-          export GNUARMEMB_TOOLCHAIN_PATH=${GITHUB_WORKSPACE}/gcc-arm-none-eabi-7-2018-q2-update
-          export PATH=~/.local/bin:/usr/share/rust/.cargo/bin:$PATH
-          mkdir -p -v ${GITHUB_WORKSPACE}/.cache
-          export XDG_CACHE_HOME=${GITHUB_WORKSPACE}/.cache
-          cd ${GITHUB_WORKSPACE}/ncs/firmware
           # Print config
           cat prj.conf
-          # Configure west
-          source ${GITHUB_WORKSPACE}/ncs/zephyr/zephyr-env.sh
-          which west
-          west -V
-          west manifest --validate
-          west list
           # NB-IoT
-          west build -p always -b nrf9160_pca20035ns
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
-          west build -p always -b nrf9160_pca10090ns
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca20035ns'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-app_update.bin
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
           # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ ${GITHUB_WORKSPACE}/ncs/firmware/prj.conf
-          west build -p always -b nrf9160_pca20035ns
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
-          west build -p always -b nrf9160_pca10090ns
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          mv -v ${GITHUB_WORKSPACE}/ncs/firmware/build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj.conf
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca20035ns'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
