@@ -26,7 +26,7 @@ jobs:
 
       - name: Stub AWS IoT broker hostname
         if: env.BROKER_HOSTNAME == ''
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com" >> prj.conf
+        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
 
       - name: Build image
         run: docker build -t bifravst-firmware-docker .
