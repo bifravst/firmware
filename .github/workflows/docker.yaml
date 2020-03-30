@@ -20,10 +20,10 @@ jobs:
 
       - name: Build for Thingy:91
         run: |
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p auto -b nrf9160_pca20035ns'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca20035ns'
           ls -la build/zephyr/merged.hex
 
       - name: Build for 9160 DK
         run: |
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p auto -b nrf9160_pca10090ns'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
           ls -la build/zephyr/merged.hex

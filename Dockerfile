@@ -8,6 +8,4 @@ RUN \
     pip3 install -r zephyr/scripts/requirements.txt && \
     pip3 install -r nrf/scripts/requirements.txt && \
     pip3 install -r bootloader/mcuboot/scripts/requirements.txt && \
-    echo "source /workdir/ncs/zephyr/zephyr-env.sh" >> ~/.bashrc && \
-    mkdir /workdir/.cache && \
     rm -rf /workdir/ncs/nrf
