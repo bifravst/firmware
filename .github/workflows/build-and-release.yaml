@@ -4,7 +4,6 @@ on: push
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
 
 jobs:
   build:
@@ -21,6 +20,8 @@ jobs:
 
       - name: Configure the AWS IoT broker hostname
         if: github.head_ref == ''
+        env:
+          BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
         run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
 
       - name: Stub AWS IoT broker hostname (this is a PR)
