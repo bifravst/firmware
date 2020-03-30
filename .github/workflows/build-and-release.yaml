@@ -17,6 +17,7 @@ jobs:
           npm ci
           export NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
+          echo $NEXT_VERSION
 
       - name: Configure the AWS IoT broker hostname
         if: github.head_ref == ''
