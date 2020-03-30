@@ -1,4 +1,5 @@
 FROM coderbyheart/fw-nrfconnect-nrf-docker:latest
+RUN rm -rf /workdir/ncs
 COPY . /workdir/ncs/nrf
 RUN \
     # Zephyr requirements of nrf
