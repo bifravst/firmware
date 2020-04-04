@@ -472,8 +472,7 @@ static void mov_timeout_work_fn(struct k_work *work)
 {
 	if (!cloud_data.active) {
 		LOG_INF("Movement timeout triggered");
-		cloud_update();
-		k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
+		k_sem_give(&accel_trig_sem);
 	}
 
 	k_delayed_work_submit(&mov_timeout_work,
@@ -623,8 +622,6 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		cloud_connect_retries = 0;
 		cloud_synch();
 		boot_write_img_confirmed();
-		k_delayed_work_submit(&mov_timeout_work,
-				      K_SECONDS(cloud_data.mov_timeout));
 		break;
 	case CLOUD_EVT_READY:
 		LOG_INF("CLOUD_EVT_READY");
@@ -800,7 +797,8 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	static int try_again_timeout;
 
 	/* Publication of data due to button presses limited
-	 * to 1 push every 2 seconds to avoid spamming the cloud socket. */
+	 * to 1 push every 2 seconds to avoid spamming the cloud socket.
+	 */
 	if ((has_changed & button_states & DK_BTN1_MSK) &&
 	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
 
@@ -972,9 +970,17 @@ void main(void)
 
 	LOG_INF("Getting device configuration...");
 
-	/*Sleep so that the device manages to adapt
-	  to its new configuration before a GPS search*/
+	/* Sleep so that the device manages to adapt
+	 * to its new configuration before a GPS search.
+	 */
 	k_sleep(K_SECONDS(20));
+
+	/* Start movement timer which triggers every movement timeout.
+	 * Makes sure the device publishes every once and a while even
+	 * though the device is in passive mode and movement is not detected.
+	 */
+	k_delayed_work_submit(&mov_timeout_work,
+			      K_SECONDS(cloud_data.mov_timeout));
 
 	while (true) {
 
