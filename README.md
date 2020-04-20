@@ -8,7 +8,7 @@ This application is built with [fw-nrfconnect-nrf](https://github.com/NordicPlay
 
 ## Building
 
-Follow the instructions [in the handbook](https://bifravst.gitbook.io/bifravst/v/saga/cat-tracker-firmware/building).
+Follow the instructions [in the handbook](https://bifravst.gitbook.io/bifravst/cat-tracker-firmware/gettingstarted).
 
 ## Automated releases
 
