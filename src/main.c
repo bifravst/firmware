@@ -573,7 +573,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 
 static void adxl362_init(void)
 {
-	struct device *dev = device_get_binding(CONFIG_ACCEL_DEV_NAME);
+	struct device *dev = device_get_binding(CONFIG_ADXL362_DEV_NAME);
 
 	if (dev == NULL) {
 		LOG_INF("Device get binding device");

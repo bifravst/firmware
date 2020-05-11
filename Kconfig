@@ -55,7 +55,7 @@ endmenu # Cloud socket poll
 
 menu "Accelerometer"
 
-config ACCEL_DEV_NAME
+config ADXL362_DEV_NAME
 	string "Accelerometer device name"
 	default "ADXL362"
 
