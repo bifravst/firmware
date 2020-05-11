@@ -10,33 +10,9 @@ rsource "src/ui/Kconfig"
 
 menu "GPS"
 
-choice
-	prompt "GPS device"
-	default GPS_USE_SIM
-	help
-	  Select from which device GPS data will be fetched.
-
-config GPS_USE_SIM
-	bool "Use GPS simulator"
-	select GPS_SIM
-	select GPS_SIM_TRIGGER
-	help
-	  Use simulated GPS data.
-
-config GPS_USE_EXTERNAL
-	bool "User provided GPS device"
-	help
-	  Provide a GPS device that location data will be fetched from and
-	  sent to nRF Cloud
-
-endchoice
-
 config GPS_DEV_NAME
 	string "GPS device name"
-	default GPS_SIM_DEV_NAME if GPS_USE_SIM
-	help
-	  GPS device from which location data will be fetched and sent
-	  to nRF Cloud.
+	default "NRF9160_GPS"
 
 endmenu # GPS
 
@@ -76,6 +52,14 @@ config CLOUD_RECONNECT_RETRIES
 	default 2
 
 endmenu # Cloud socket poll
+
+menu "Accelerometer"
+
+config ACCEL_DEV_NAME
+	string "Accelerometer device name"
+	default "ADXL362"
+
+endmenu # Accelerometer
 
 menu "Cloud codec"
 

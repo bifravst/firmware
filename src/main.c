@@ -63,7 +63,7 @@ static struct cloud_backend *cloud_backend;
 
 static bool queued_entries;
 static bool cloud_connected;
-static int cloud_connect_retries;
+static int  cloud_connect_retries;
 
 static int head_cir_buf;
 static int num_queued_entries;
@@ -76,9 +76,9 @@ static struct k_delayed_work cloud_button_message_send_work;
 static struct k_delayed_work led_device_mode_set_work;
 static struct k_delayed_work mov_timeout_work;
 
-K_SEM_DEFINE(accel_trig_sem, 0, 1);
+K_SEM_DEFINE(accel_trig_sem,  0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
-K_SEM_DEFINE(cloud_conn_sem, 0, 1);
+K_SEM_DEFINE(cloud_conn_sem,  0, 1);
 
 void error_handler(int err_code)
 {
@@ -110,73 +110,75 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	CODE_UNREACHABLE;
 }
 
+static void lte_evt_handler(const struct lte_lc_evt *const evt)
+{
+	switch (evt->type) {
+	case LTE_LC_EVT_NW_REG_STATUS:
+		if ((evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_HOME) &&
+		    (evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_ROAMING)) {
+			k_sem_take(&cloud_conn_sem, K_NO_WAIT);
+			break;
+	}
+
+		LOG_INF("Network registration status: %s",
+			evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ?
+			"Connected to home network" : "Connected to roaming network");
+
+		/* Make sure time is pushed to the modem by the celluar network
+		 * before time is requested.
+		 */
+	k_sleep(K_SECONDS(5));
+
+	date_time_update();
+
+	k_sem_give(&cloud_conn_sem);
+		break;
+	case LTE_LC_EVT_PSM_UPDATE:
+		LOG_DBG("PSM parameter update: TAU: %d, Active time: %d",
+			evt->psm_cfg.tau, evt->psm_cfg.active_time);
+		break;
+	case LTE_LC_EVT_EDRX_UPDATE: {
+		char log_buf[60];
+		ssize_t len;
+
+		len = snprintf(log_buf, sizeof(log_buf),
+			       "eDRX parameter update: eDRX: %f, PTW: %f",
+			       evt->edrx_cfg.edrx, evt->edrx_cfg.ptw);
+		if (len > 0) {
+			LOG_DBG("%s", log_strdup(log_buf));
+}
+		break;
+	}
+	case LTE_LC_EVT_RRC_UPDATE:
+		LOG_DBG("RRC mode: %s",
+			evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ?
+			"Connected" : "Idle");
+		break;
+	case LTE_LC_EVT_CELL_UPDATE:
+		LOG_DBG("LTE cell changed: Cell ID: %d, Tracking area: %d",
+			evt->cell.id, evt->cell.tac);
+		break;
+	default:
+		break;
+	}
+}
+
 static int modem_configure(void)
 {
 	int err;
 
-	ui_led_set_pattern(UI_LTE_CONNECTING);
+	LOG_INF("Configuring the modem...");
 
-	LOG_INF("Connecting to LTE network. ");
-	LOG_INF("This may take several minutes.");
-	err = lte_lc_init_and_connect();
+	err = lte_lc_init_and_connect_async(lte_evt_handler);
 	if (err) {
-		LOG_ERR("lte_lc_init_connect, error: %d", err);
+		LOG_ERR("lte_lc_init_connect_async, error: %d", err);
 		return err;
 	}
-
-	LOG_INF("Connected to LTE network");
-
-	/* Sleep to make sure the network has pushed time to modem. */
-	k_sleep(K_SECONDS(5));
-
-	/* Update time before any publication. */
-	date_time_update();
-
-	k_sleep(K_SECONDS(10));
-
-	k_sem_give(&cloud_conn_sem);
 
 	return 0;
 }
 
-static int lte_connection_check(void)
-{
-	int err;
-
-	enum lte_lc_nw_reg_status nw_reg_status;
-
-	err = lte_lc_nw_reg_status_get(&nw_reg_status);
-	if (err) {
-		LOG_ERR("lte_lc_nw_reg_status, error: %d", err);
-		return err;
-	}
-
-	LOG_INF("Checking LTE connection...");
-
-	switch (nw_reg_status) {
-	case LTE_LC_NW_REG_REGISTERED_HOME:
-	case LTE_LC_NW_REG_REGISTERED_ROAMING:
-		break;
-	default:
-		goto exit;
-	}
-
-	LOG_INF("LTE link maintained");
-
-	k_sem_give(&cloud_conn_sem);
-
-	return 0;
-
-exit:
-
-	LOG_ERR("LTE link not maintained");
-
-	k_sem_take(&cloud_conn_sem, K_NO_WAIT);
-
-	return 0;
-}
-
-static int check_active_wait(void)
+static int active_wait_check(void)
 {
 	if (!cloud_data.active) {
 		return cloud_data.passive_wait;
@@ -185,7 +187,7 @@ static int check_active_wait(void)
 	return cloud_data.active_wait;
 }
 
-static void set_current_time(struct gps_pvt *gps_data)
+static void current_time_set(struct gps_pvt *gps_data)
 {
 	struct tm gps_time;
 
@@ -252,8 +254,6 @@ static void cloud_configuration_get(void)
 {
 	int err;
 
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_STATE,
 				 .buf = "",
@@ -293,8 +293,6 @@ static void cloud_configuration_send(void)
 {
 	int err;
 
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint.type = CLOUD_EP_TOPIC_MSG,
@@ -319,8 +317,6 @@ static void cloud_configuration_send(void)
 static void cloud_sensor_data_send(void)
 {
 	int err;
-
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -360,8 +356,6 @@ static void cloud_buffered_data_send(void)
 {
 	int err;
 
-	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
-
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint = pub_ep_topics_sub[0],
@@ -400,15 +394,9 @@ exit:
 
 static void cloud_synch(void)
 {
-	int err;
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
-	err = lte_connection_check();
-	if (err) {
-		LOG_ERR("lte_connection_check, error: %d", err);
-		error_handler(err);
-	}
-
-	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+	if (cloud_connected) {
 		k_delayed_work_submit(&cloud_configuration_get_work,
 					K_NO_WAIT);
 		k_delayed_work_submit(&cloud_configuration_send_work,
@@ -420,17 +408,11 @@ static void cloud_synch(void)
 
 static void cloud_update(void)
 {
-	int err;
-
-	err = lte_connection_check();
-	if (err) {
-		LOG_ERR("lte_connection_check, error: %d", err);
-		error_handler(err);
-	}
-
 	cloud_data.synch = false;
 
-	if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
+
+	if (cloud_connected) {
 		k_delayed_work_submit(&cloud_sensor_data_send_work,
 				      K_NO_WAIT);
 		k_delayed_work_submit(&cloud_buffered_data_send_work,
@@ -561,7 +543,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 	case GPS_EVT_PVT_FIX:
 		LOG_INF("GPS_EVT_PVT_FIX");
 		gps_control_set_active(false);
-		set_current_time(&evt->pvt);
+		current_time_set(&evt->pvt);
 		populate_gps_buffer(&evt->pvt);
 		k_sem_give(&gps_timeout_sem);
 		break;
@@ -576,6 +558,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 		break;
 	case GPS_EVT_OPERATION_UNBLOCKED:
 		LOG_INF("GPS_EVT_OPERATION_UNBLOCKED");
+		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
 		break;
 	case GPS_EVT_AGPS_DATA_NEEDED:
 		LOG_INF("GPS_EVT_AGPS_DATA_NEEDED");
@@ -590,7 +573,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 
 static void adxl362_init(void)
 {
-	struct device *dev = device_get_binding(DT_INST_0_ADI_ADXL362_LABEL);
+	struct device *dev = device_get_binding(CONFIG_ACCEL_DEV_NAME);
 
 	if (dev == NULL) {
 		LOG_INF("Device get binding device");
@@ -802,13 +785,7 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	if ((has_changed & button_states & DK_BTN1_MSK) &&
 	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
 
-		int err = lte_connection_check();
-		if (err) {
-			LOG_ERR("lte_connection_check, error: %d", err);
-			error_handler(err);
-		}
-
-		if (k_sem_count_get(&cloud_conn_sem) && cloud_connected) {
+		if (cloud_connected) {
 
 			LOG_INF("Cloud publication by button 1 triggered, ");
 			LOG_INF("2 seconds to next allowed cloud publication ");
@@ -834,7 +811,6 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 		k_sem_give(&accel_trig_sem);
 	}
 #endif
-
 }
 
 static int populate_app_endpoint_topics()
@@ -890,7 +866,7 @@ static int cloud_setup(void)
 	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
 		 CONFIG_CLOUD_BACKEND);
 
-	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf);
+	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf, sizeof(client_id_buf));
 	if (err != AWS_CLOUD_CLIENT_ID_LEN) {
 		LOG_ERR("modem_info_string_get, error: %d", err);
 		return err;
@@ -925,9 +901,9 @@ void main(void)
 	LOG_INF("The cat tracker has started");
 	LOG_INF("Version: %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
 
-	if (IS_ENABLED(CONFIG_WATCHDOG)) {
-		watchdog_init_and_start();
-	}
+#if defined(CONFIG_WATCHDOG)
+	watchdog_init_and_start();
+#endif
 
 	work_init();
 	adxl362_init();
@@ -970,11 +946,6 @@ void main(void)
 
 	LOG_INF("Getting device configuration...");
 
-	/* Sleep so that the device manages to adapt
-	 * to its new configuration before a GPS search.
-	 */
-	k_sleep(K_SECONDS(20));
-
 	/* Start movement timer which triggers every movement timeout.
 	 * Makes sure the device publishes every once and a while even
 	 * though the device is in passive mode and movement is not detected.
@@ -1005,14 +976,14 @@ void main(void)
 		/*Wait for GPS search timeout*/
 		k_sem_take(&gps_timeout_sem, K_FOREVER);
 
-		/*Send update to cloud if a connection has been established */
+		/*Send update to cloud. */
 		cloud_update();
 
 		/* Set device mode led behaviour */
 		k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
 
 		/*Sleep*/
-		LOG_INF("Going to sleep for: %d seconds", check_active_wait());
-		k_sleep(K_SECONDS(check_active_wait()));
+		LOG_INF("Going to sleep for: %d seconds", active_wait_check());
+		k_sleep(K_SECONDS(active_wait_check()));
 	}
 }

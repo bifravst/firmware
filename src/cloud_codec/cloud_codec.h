@@ -63,13 +63,13 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 			     struct modem_param_info *modem_info);
 
 int cloud_encode_gps_buffer(struct cloud_msg *output,
-			    struct cloud_data_gps *cir_buf_gps);
+			     struct cloud_data_gps *cir_buf_gps);
 
 int cloud_encode_cfg_data(struct cloud_msg *output,
-			  struct cloud_data *cloud_data);
+			     struct cloud_data *cloud_data);
 
 int cloud_encode_button_message_data(struct cloud_msg *output,
-				     struct cloud_data *cloud_data);
+				 struct cloud_data *cloud_data);
 
 static inline void cloud_release_data(struct cloud_msg *data)
 {
