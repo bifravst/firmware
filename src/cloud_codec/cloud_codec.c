@@ -367,7 +367,7 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	output->buf = buffer;
 	output->len = strlen(buffer);
 
-	change_gpst				= false;
+	change_gpst			= false;
 	change_active			= false;
 	change_active_wait		= false;
 	change_passive_wait		= false;
@@ -398,6 +398,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		cloud_data->acc_ts  = 0;
 		cloud_data->bat_ts  = 0;
 		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
 		return err;
 	}
 
@@ -408,6 +410,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		cloud_data->acc_ts  = 0;
 		cloud_data->bat_ts  = 0;
 		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
 		return err;
 	}
 
@@ -418,6 +422,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		cloud_data->acc_ts  = 0;
 		cloud_data->bat_ts  = 0;
 		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
 		return err;
 	}
 
@@ -428,28 +434,57 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		cloud_data->acc_ts  = 0;
 		cloud_data->bat_ts  = 0;
 		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
 		return err;
 	}
 
-	cJSON *root_obj			= cJSON_CreateObject();
-	cJSON *state_obj		= cJSON_CreateObject();
-	cJSON *reported_obj		= cJSON_CreateObject();
-	cJSON *bat_obj			= cJSON_CreateObject();
-	cJSON *acc_obj			= cJSON_CreateObject();
-	cJSON *acc_v_obj		= cJSON_CreateObject();
-	cJSON *gps_obj			= cJSON_CreateObject();
-	cJSON *gps_val_obj		= cJSON_CreateObject();
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->hmt_ts);
+	if (err) {
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
+		cloud_data->mod_ts  = 0;
+		cloud_data->acc_ts  = 0;
+		cloud_data->bat_ts  = 0;
+		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
+		return err;
+	}
+
+	err = date_time_uptime_to_unix_time_ms(&cloud_data->tmp_ts);
+	if (err) {
+		LOG_ERR("date_time_uptime_to_unix_time_ms, error: %d", err);
+		cloud_data->mod_ts  = 0;
+		cloud_data->acc_ts  = 0;
+		cloud_data->bat_ts  = 0;
+		cir_buf_gps->gps_ts = 0;
+		cloud_data->hmt_ts  = 0;
+		cloud_data->tmp_ts  = 0;
+		return err;
+	}
+
+	cJSON *root_obj		= cJSON_CreateObject();
+	cJSON *state_obj	= cJSON_CreateObject();
+	cJSON *reported_obj	= cJSON_CreateObject();
+	cJSON *bat_obj		= cJSON_CreateObject();
+	cJSON *acc_obj		= cJSON_CreateObject();
+	cJSON *acc_v_obj	= cJSON_CreateObject();
+	cJSON *gps_obj		= cJSON_CreateObject();
+	cJSON *gps_val_obj	= cJSON_CreateObject();
 	cJSON *static_m_data	= cJSON_CreateObject();
 	cJSON *static_m_data_v	= cJSON_CreateObject();
 	cJSON *dynamic_m_data	= cJSON_CreateObject();
 	cJSON *dynamic_m_data_v = cJSON_CreateObject();
+	cJSON *tmp_obj		= cJSON_CreateObject();
+	cJSON *hmt_obj		= cJSON_CreateObject();
 
 	if (root_obj	    == NULL || state_obj        == NULL ||
 	    reported_obj    == NULL || gps_obj 	        == NULL ||
-	    bat_obj			== NULL || acc_obj          == NULL || 
+	    bat_obj	    == NULL || acc_obj		== NULL ||
 	    gps_val_obj	    == NULL || static_m_data    == NULL ||
 	    dynamic_m_data  == NULL || dynamic_m_data_v == NULL ||
-	    static_m_data_v == NULL || acc_v_obj		== NULL) {
+	    static_m_data_v == NULL || acc_v_obj	== NULL ||
+	    hmt_obj         == NULL || tmp_obj		== NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
@@ -462,6 +497,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		cJSON_Delete(static_m_data_v);
 		cJSON_Delete(dynamic_m_data);
 		cJSON_Delete(dynamic_m_data_v);
+		cJSON_Delete(tmp_obj);
+		cJSON_Delete(hmt_obj);
 		return -ENOMEM;
 	}
 
@@ -501,6 +538,14 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	}
 
+	/*TMP*/
+	err += json_add_number(tmp_obj, "v", cloud_data->tmp);
+	err += json_add_number(tmp_obj, "ts", cloud_data->tmp_ts);
+
+	/*HMD*/
+	err += json_add_number(hmt_obj, "v", cloud_data->hmt);
+	err += json_add_number(hmt_obj, "ts", cloud_data->hmt_ts);
+
 	/*BAT*/
 	err += json_add_number(bat_obj, "v", modem_info->device.battery.value);
 	err += json_add_number(bat_obj, "ts", cloud_data->mod_ts);
@@ -523,10 +568,14 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	/*Parameters included depending on mode and obtained gps fix*/
 	if (cloud_data->active && !cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "tmp", tmp_obj);
+		err += json_add_obj(reported_obj, "hmt", hmt_obj);
 	}
 
 	if (cloud_data->active && cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
+		err += json_add_obj(reported_obj, "tmp", tmp_obj);
+		err += json_add_obj(reported_obj, "hmt", hmt_obj);
 		err += json_add_obj(gps_obj, "v", gps_val_obj);
 		err += json_add_number(gps_obj, "ts", cir_buf_gps->gps_ts);
 		err += json_add_obj(reported_obj, "gps", gps_obj);
@@ -534,7 +583,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	if (!cloud_data->active && !cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-		
+		err += json_add_obj(reported_obj, "tmp", tmp_obj);
+		err += json_add_obj(reported_obj, "hmt", hmt_obj);
 		if (cloud_data->acc_trig) {
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
@@ -542,7 +592,8 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	if (!cloud_data->active && cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-
+		err += json_add_obj(reported_obj, "tmp", tmp_obj);
+		err += json_add_obj(reported_obj, "hmt", hmt_obj);
 		if (cloud_data->acc_trig) {
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
@@ -608,6 +659,8 @@ exit:
 	cloud_data->acc_ts  = 0;
 	cloud_data->bat_ts  = 0;
 	cir_buf_gps->gps_ts = 0;
+	cloud_data->hmt_ts  = 0;
+	cloud_data->tmp_ts  = 0;
 
 	return err;
 }

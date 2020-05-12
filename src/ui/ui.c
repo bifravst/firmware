@@ -54,7 +54,6 @@ static void leds_update(struct k_work *work)
 			if (passive_mode) {
 				k_delayed_work_submit(&leds_update_work,
 						      UI_LED_OFF_PERIOD_LONG);
-				
 			} else {
 				k_delayed_work_submit(&leds_update_work,
 					      	      UI_LED_OFF_PERIOD_NORMAL);

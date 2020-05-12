@@ -53,13 +53,22 @@ config CLOUD_RECONNECT_RETRIES
 
 endmenu # Cloud socket poll
 
-menu "Accelerometer"
+menu "External sensors"
 
-config ADXL362_DEV_NAME
+config EXTERNAL_SENSORS
+	bool "Enable external sensors"
+	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+
+config ACCELEROMETER_DEV_NAME
 	string "Accelerometer device name"
-	default "ADXL362"
 
-endmenu # Accelerometer
+config MULTISENSOR_DEV_NAME
+	string "Multisensor device name"
+
+config ACCELEROMETER_TRIGGER
+	bool "Accelerometer trigger"
+
+endmenu # External sensors
 
 menu "Cloud codec"
 
