@@ -134,10 +134,10 @@ int ext_sensors_temperature_get(struct cloud_data *cloud_data)
         }
 
 	k_spinlock_key_t key = k_spin_lock(&(temp_sensor.lock));
-	cloud_data->tmp = sensor_value_to_double(&data);
+	cloud_data->temp = sensor_value_to_double(&data);
 	k_spin_unlock(&(temp_sensor.lock), key);
 
-        cloud_data->tmp_ts = k_uptime_get();
+        cloud_data->temp_ts = k_uptime_get();
 
 	return 0;
 }
@@ -162,10 +162,10 @@ int ext_sensors_humidity_get(struct cloud_data *cloud_data)
         }
 
 	k_spinlock_key_t key = k_spin_lock(&(humid_sensor.lock));
-	cloud_data->hmt = sensor_value_to_double(&data);
+	cloud_data->hum = sensor_value_to_double(&data);
 	k_spin_unlock(&(humid_sensor.lock), key);
 
-        cloud_data->hmt_ts = k_uptime_get();
+        cloud_data->hum_ts = k_uptime_get();
 
 	return 0;
 }

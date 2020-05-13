@@ -41,8 +41,8 @@ struct cloud_data {
 	s64_t acc_ts;
 	s64_t mod_ts;
 	s64_t btn_ts;
-	s64_t tmp_ts;
-	s64_t hmt_ts;
+	s64_t temp_ts;
+	s64_t hum_ts;
 	double acc[3];
 	bool active;
 	int gps_timeout;
@@ -52,8 +52,8 @@ struct cloud_data {
 	int acc_thres;
 	int btn_number;
 	int rsrp;
-	double tmp;
-	double hmt;
+	double temp;
+	double hum;
 	bool gps_found;
 	bool acc_trig;
 	bool synch;
