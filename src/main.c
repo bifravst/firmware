@@ -126,13 +126,6 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 			evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ?
 			"Connected to home network" : "Connected to roaming network");
 
-		/* Make sure time is pushed to the modem by the celluar network
-		* before time is requested.
-		*/
-		k_sleep(K_SECONDS(5));
-
-		date_time_update();
-
 		k_sem_give(&cloud_conn_sem);
 		break;
 	case LTE_LC_EVT_PSM_UPDATE:
@@ -616,6 +609,13 @@ void cloud_poll(void)
 connect:
 
 	k_sem_take(&cloud_conn_sem, K_FOREVER);
+
+	date_time_update();
+
+	/* Sleep in order to ensure that date time
+	 * is properly updated before cloud communication.
+	 */
+	k_sleep(K_SECONDS(10));
 
 	err = cloud_connect(cloud_backend);
 	if (err) {
