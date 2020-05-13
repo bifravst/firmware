@@ -41,8 +41,7 @@ struct cloud_data {
 	s64_t acc_ts;
 	s64_t mod_ts;
 	s64_t btn_ts;
-	s64_t temp_ts;
-	s64_t hum_ts;
+	s64_t env_ts;
 	double acc[3];
 	bool active;
 	int gps_timeout;
