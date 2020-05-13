@@ -549,12 +549,12 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	/*Parameters included depending on mode and obtained gps fix*/
 	if (cloud_data->active && !cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-		err += json_add_obj(reported_obj, "env", env_object);
+		err += json_add_obj(reported_obj, "env", env_obj);
 	}
 
 	if (cloud_data->active && cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-		err += json_add_obj(reported_obj, "env", env_object);
+		err += json_add_obj(reported_obj, "env", env_obj);
 		err += json_add_obj(gps_obj, "v", gps_val_obj);
 		err += json_add_number(gps_obj, "ts", cir_buf_gps->gps_ts);
 		err += json_add_obj(reported_obj, "gps", gps_obj);
@@ -562,7 +562,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	if (!cloud_data->active && !cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-		err += json_add_obj(reported_obj, "env", env_object);
+		err += json_add_obj(reported_obj, "env", env_obj);
 		if (cloud_data->acc_trig) {
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
@@ -570,7 +570,7 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 
 	if (!cloud_data->active && cloud_data->gps_found) {
 		err += json_add_obj(reported_obj, "bat", bat_obj);
-		err += json_add_obj(reported_obj, "env", env_object);
+		err += json_add_obj(reported_obj, "env", env_obj);
 		if (cloud_data->acc_trig) {
 			err += json_add_obj(reported_obj, "acc", acc_obj);
 		}
