@@ -14,6 +14,7 @@
 #include <dfu/mcuboot.h>
 #include <date_time.h>
 #include <dk_buttons_and_leds.h>
+#include <math.h>
 
 /* Application spesific module*/
 #include "gps_controller.h"
@@ -65,7 +66,6 @@ static struct cloud_backend *cloud_backend;
 
 static bool queued_entries;
 static bool cloud_connected;
-static int  cloud_connect_retries;
 
 static int head_cir_buf;
 static int num_queued_entries;
@@ -531,7 +531,6 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 	}
 }
 
-
 void cloud_event_handler(const struct cloud_backend *const backend,
 			 const struct cloud_event *const evt, void *user_data)
 {
@@ -543,7 +542,6 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_CONNECTED:
 		LOG_INF("CLOUD_EVT_CONNECTED");
 		cloud_connected = true;
-		cloud_connect_retries = 0;
 		cloud_synch();
 		boot_write_img_confirmed();
 		break;
@@ -605,23 +603,39 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 void cloud_poll(void)
 {
 	int err;
-
-connect:
+	int cloud_connect_retries = 0;
+	int retry_backoff_s = 0;
 
 	k_sem_take(&cloud_conn_sem, K_FOREVER);
 
+connect:
+
+	if (cloud_connect_retries >= CONFIG_CLOUD_RECONNECT_RETRIES) {
+		LOG_ERR("Too many cloud connect retires, reboot");
+		error_handler(-EIO);
+	}
+
+	/* Exponential backoff in case of disconnect from
+	 * cloud.
+	 */
+
+	retry_backoff_s = 10 + pow(cloud_connect_retries, 4);
+	cloud_connect_retries++;
+
+	LOG_INF("Trying to connect to cloud in %d seconds",
+		retry_backoff_s);
+
 	date_time_update();
 
-	/* Sleep in order to ensure that date time
-	 * is properly updated before cloud communication.
-	 */
-	k_sleep(K_SECONDS(10));
+	k_sleep(K_SECONDS(retry_backoff_s));
 
 	err = cloud_connect(cloud_backend);
 	if (err) {
 		LOG_ERR("cloud_connect failed: %d", err);
 		goto connect;
 	}
+
+	cloud_connect_retries++;
 
 	struct pollfd fds[] = { { .fd = cloud_backend->config->socket,
 				  .events = POLLIN } };
@@ -657,14 +671,6 @@ connect:
 			LOG_ERR("Socket error: POLLHUP");
 			LOG_ERR("Connection was closed by the cloud.");
 			LOG_ERR("TRYING TO RECONNECT...");
-			if (cloud_connect_retries >
-			    CONFIG_CLOUD_RECONNECT_RETRIES) {
-				LOG_ERR("Too many retires, reboot");
-			error_handler(-EIO);
-			}
-			cloud_connect_retries++;
-			LOG_ERR("cloud connect retries %d",
-			        cloud_connect_retries);
 			break;
 		}
 
@@ -940,5 +946,4 @@ void main(void)
 		LOG_INF("Going to sleep for: %d seconds", active_wait_check());
 		k_sleep(K_SECONDS(active_wait_check()));
 	}
-
 }

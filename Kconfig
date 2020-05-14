@@ -49,7 +49,7 @@ config CLOUD_POLL_PRIORITY
 
 config CLOUD_RECONNECT_RETRIES
 	int "Number of retires after a cloud socket POLLUP"
-	default 2
+	default 20
 
 endmenu # Cloud socket poll
 
