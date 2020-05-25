@@ -46,44 +46,44 @@
         {
           "assets": [
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca20035ns.hex",
-              "name": "cat-tracker-PCA20035-Thingy52-${nextRelease.gitTag}.hex",
-              "label": "Pre-build HEX file for PCA20035 / Thingy:91 (${nextRelease.gitTag}) NB-IoT"
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}.hex",
+              "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca20035ns-app_update.bin",
-              "name": "cat-tracker-PCA20035-Thingy52-${nextRelease.gitTag}-app_update.bin",
-              "label": "App update file for PCA20035 / Thingy:91 (${nextRelease.gitTag}) NB-IoT"
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-app_update.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-app_update.bin",
+              "label": "App update file for Thingy:91 (${nextRelease.gitTag}) NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca10090ns.hex",
-              "name": "cat-tracker-PCA10090-nRF9160DK-${nextRelease.gitTag}.hex",
-              "label": "Pre-build HEX file for PCA10090 / nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}.hex",
+              "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca10090ns-app_update.bin",
-              "name": "cat-tracker-PCA10090-nRF9160DK-${nextRelease.gitTag}-app_update.bin",
-              "label": "App update file for PCA10090 / nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-app_update.bin",
+              "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca20035ns-ltem.hex",
-              "name": "cat-tracker-PCA20035-Thingy52-${nextRelease.gitTag}-ltem.hex",
-              "label": "Pre-build HEX file for PCA20035 / Thingy:91 (${nextRelease.gitTag}) LTE-m"
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem.hex",
+              "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) LTE-m"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca20035ns-ltem-app_update.bin",
-              "name": "cat-tracker-PCA20035-Thingy52-${nextRelease.gitTag}-ltem-app_update.bin",
-              "label": "App update file for PCA20035 / Thingy:91 (${nextRelease.gitTag}) LTE-m"
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-app_update.bin",
+              "label": "App update file for Thingy:91 (${nextRelease.gitTag}) LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca10090ns-ltem.hex",
-              "name": "cat-tracker-PCA10090-nRF9160DK-${nextRelease.gitTag}-ltem.hex",
-              "label": "Pre-build HEX file for PCA10090 / nRF9160 DK (${nextRelease.gitTag}) LTE-m"
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem.hex",
+              "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin",
-              "name": "cat-tracker-PCA10090-nRF9160DK-${nextRelease.gitTag}-ltem-app_update.bin",
-              "label": "App update file for PCA10090 / nRF9160 DK (${nextRelease.gitTag}) LTE-m"
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-app_update.bin",
+              "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) LTE-m"
             }
           ]
         }
