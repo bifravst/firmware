@@ -1,4 +1,4 @@
-FROM coderbyheart/fw-nrfconnect-nrf-docker:latest
+FROM coderbyheart/sdk-nrf-docker:latest
 RUN rm -rf /workdir/ncs
 COPY . /workdir/ncs/firmware
 RUN \
