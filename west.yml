@@ -1,7 +1,7 @@
 manifest:
   remotes:
     - name: nordic
-      url-base: https://github.com/NordicPlayground
+      url-base: https://github.com/nrfconnect
   projects:
     - name: sdk-nrf
       path: nrf
