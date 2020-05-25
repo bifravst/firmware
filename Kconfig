@@ -57,7 +57,7 @@ menu "External sensors"
 
 config EXTERNAL_SENSORS
 	bool "Enable external sensors"
-	default y if BOARD_NRF9160_PCA20035NS || BOARD_NRF9160_PCA10015NS
+	default y if BOARD_THINGY91_NRF9160NS || BOARD_NRF9160_PCA10015NS
 
 config ACCELEROMETER_DEV_NAME
 	string "Accelerometer device name"
