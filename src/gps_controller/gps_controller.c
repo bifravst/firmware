@@ -20,10 +20,8 @@ static struct device *gps_dev;
 static struct k_delayed_work start_work;
 static struct k_delayed_work stop_work;
 static atomic_t gps_is_active;
-static struct gps_config gps_cfg = {
-	.nav_mode = GPS_NAV_MODE_SINGLE_FIX,
-	.power_mode = GPS_POWER_MODE_DISABLED
-};
+static struct gps_config gps_cfg = { .nav_mode = GPS_NAV_MODE_SINGLE_FIX,
+				     .power_mode = GPS_POWER_MODE_DISABLED };
 
 static void start(struct k_work *work)
 {

@@ -28,15 +28,16 @@ enum ext_sensor_evt_type {
 struct ext_sensor_evt {
 	/** Sensor type. */
 	enum ext_sensor_evt_type type;
-    /* Event data. */
-    union {
-        double value_array[ACCELEROMETER_CHANNELS];
-        /* Single external sensor value. */
-        double value;
+	/* Event data. */
+	union {
+		double value_array[ACCELEROMETER_CHANNELS];
+		/* Single external sensor value. */
+		double value;
 	};
 };
 
-typedef void (*ext_sensors_evt_handler_t)(const struct ext_sensor_evt *const evt);
+typedef void (*ext_sensors_evt_handler_t)(
+	const struct ext_sensor_evt *const evt);
 
 int ext_sensors_init(ext_sensors_evt_handler_t handler);
 

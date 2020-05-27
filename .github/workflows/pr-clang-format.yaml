@@ -9,9 +9,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Install ClangFormat
-        run: sudo apt install clang-format
-
       - name: Install run-clang-format.py
         run: |
           curl -s https://raw.githubusercontent.com/Sarcasm/run-clang-format/50a5250a2666218595ee21d68c71f50ac39866d2/run-clang-format.py > run-clang-format.py
@@ -19,5 +16,6 @@ jobs:
 
       - name: Run ClangFormat
         run: |
+          clang-format --version
           curl -s https://raw.githubusercontent.com/nrfconnect/sdk-nrf/master/.clang-format > .clang-format
           ./run-clang-format.py -r src

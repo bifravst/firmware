@@ -157,27 +157,32 @@ get_data:
 		change_active = true;
 	}
 
-	if (active_wait != NULL && cloud_data->active_wait != active_wait->valueint) {
+	if (active_wait != NULL &&
+	    cloud_data->active_wait != active_wait->valueint) {
 		cloud_data->active_wait = active_wait->valueint;
 		LOG_INF("SETTING ACTIVE WAIT TO: %d", active_wait->valueint);
 		change_active_wait = true;
 	}
 
-	if (passive_wait != NULL && cloud_data->passive_wait != passive_wait->valueint) {
+	if (passive_wait != NULL &&
+	    cloud_data->passive_wait != passive_wait->valueint) {
 		cloud_data->passive_wait = passive_wait->valueint;
 		LOG_INF("SETTING PASSIVE_WAIT TO: %d", passive_wait->valueint);
 		change_passive_wait = true;
 	}
 
-	if (mov_timeout != NULL && cloud_data->mov_timeout != mov_timeout->valueint) {
+	if (mov_timeout != NULL &&
+	    cloud_data->mov_timeout != mov_timeout->valueint) {
 		cloud_data->mov_timeout = mov_timeout->valueint;
-		LOG_INF("SETTING MOVEMENT TIMEOUT TO: %d", mov_timeout->valueint);
+		LOG_INF("SETTING MOVEMENT TIMEOUT TO: %d",
+			mov_timeout->valueint);
 		change_mov_timeout = true;
 	}
 
 	if (acc_thres != NULL && cloud_data->acc_thres != acc_thres->valueint) {
 		cloud_data->acc_thres = acc_thres->valueint;
-		LOG_INF("SETTING ACCEL THRESHOLD TIMEOUT TO: %d", acc_thres->valueint);
+		LOG_INF("SETTING ACCEL THRESHOLD TIMEOUT TO: %d",
+			acc_thres->valueint);
 		change_acc_thres = true;
 	}
 exit:
@@ -300,8 +305,8 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	cJSON *reported_obj = cJSON_CreateObject();
 	cJSON *cfg_obj = cJSON_CreateObject();
 
-	if (root_obj == NULL || state_obj == NULL ||
-	    reported_obj == NULL || cfg_obj == NULL) {
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
+	    cfg_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
@@ -312,7 +317,8 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	/*CFG*/
 
 	if (change_gpst) {
-		err += json_add_number(cfg_obj, "gpst", cloud_data->gps_timeout);
+		err += json_add_number(cfg_obj, "gpst",
+				       cloud_data->gps_timeout);
 		change_cnt++;
 	}
 
@@ -322,12 +328,14 @@ int cloud_encode_cfg_data(struct cloud_msg *output,
 	}
 
 	if (change_active_wait) {
-		err += json_add_number(cfg_obj, "actwt", cloud_data->active_wait);
+		err += json_add_number(cfg_obj, "actwt",
+				       cloud_data->active_wait);
 		change_cnt++;
 	}
 
 	if (change_passive_wait) {
-		err += json_add_number(cfg_obj, "mvres", cloud_data->passive_wait);
+		err += json_add_number(cfg_obj, "mvres",
+				       cloud_data->passive_wait);
 		change_cnt++;
 	}
 
@@ -438,13 +446,12 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	cJSON *env_obj = cJSON_CreateObject();
 	cJSON *env_val_obj = cJSON_CreateObject();
 
-	if (root_obj	    == NULL || state_obj        == NULL ||
-	    reported_obj    == NULL || gps_obj 	        == NULL ||
-	    bat_obj	    == NULL || acc_obj		== NULL ||
-	    gps_val_obj	    == NULL || static_m_data    == NULL ||
-	    dynamic_m_data  == NULL || dynamic_m_data_v == NULL ||
-	    static_m_data_v == NULL || acc_v_obj	== NULL ||
-	    env_obj	    == NULL || env_val_obj      == NULL) {
+	if (root_obj == NULL || state_obj == NULL || reported_obj == NULL ||
+	    gps_obj == NULL || bat_obj == NULL || acc_obj == NULL ||
+	    gps_val_obj == NULL || static_m_data == NULL ||
+	    dynamic_m_data == NULL || dynamic_m_data_v == NULL ||
+	    static_m_data_v == NULL || acc_v_obj == NULL || env_obj == NULL ||
+	    env_val_obj == NULL) {
 		cJSON_Delete(root_obj);
 		cJSON_Delete(state_obj);
 		cJSON_Delete(reported_obj);
@@ -473,28 +480,41 @@ int cloud_encode_sensor_data(struct cloud_msg *output,
 	}
 
 	/*MODEM DATA*/
-	err += json_add_number(static_m_data_v, "band", modem_info->network.current_band.value);
-	err += json_add_str(static_m_data_v, "nw", modem_info->network.network_mode);
-	err += json_add_str(static_m_data_v, "iccid", modem_info->sim.iccid.value_string);
-	err += json_add_str(static_m_data_v, "modV", modem_info->device.modem_fw.value_string);
+	err += json_add_number(static_m_data_v, "band",
+			       modem_info->network.current_band.value);
+	err += json_add_str(static_m_data_v, "nw",
+			    modem_info->network.network_mode);
+	err += json_add_str(static_m_data_v, "iccid",
+			    modem_info->sim.iccid.value_string);
+	err += json_add_str(static_m_data_v, "modV",
+			    modem_info->device.modem_fw.value_string);
 	err += json_add_str(static_m_data_v, "brdV", modem_info->device.board);
-	err += json_add_str(static_m_data_v, "appV", CONFIG_CAT_TRACKER_APP_VERSION);
+	err += json_add_str(static_m_data_v, "appV",
+			    CONFIG_CAT_TRACKER_APP_VERSION);
 	err += json_add_number(dynamic_m_data_v, "rsrp", cloud_data->rsrp);
-	err += json_add_number(dynamic_m_data_v, "area", modem_info->network.area_code.value);
-	err += json_add_number(dynamic_m_data_v, "mccmnc", strtol(modem_info->network.current_operator.value_string, NULL, 10));
-	err += json_add_number(dynamic_m_data_v, "cell", modem_info->network.cellid_dec);
-	err += json_add_str(dynamic_m_data_v, "ip", modem_info->network.ip_address.value_string);
+	err += json_add_number(dynamic_m_data_v, "area",
+			       modem_info->network.area_code.value);
+	err += json_add_number(
+		dynamic_m_data_v, "mccmnc",
+		strtol(modem_info->network.current_operator.value_string, NULL,
+		       10));
+	err += json_add_number(dynamic_m_data_v, "cell",
+			       modem_info->network.cellid_dec);
+	err += json_add_str(dynamic_m_data_v, "ip",
+			    modem_info->network.ip_address.value_string);
 
 	if (cloud_data->synch) {
 		err += json_add_obj(static_m_data, "v", static_m_data_v);
 		err += json_add_number(static_m_data, "ts", cloud_data->mod_ts);
 		err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
-		err += json_add_number(dynamic_m_data, "ts", cloud_data->mod_ts);
+		err += json_add_number(dynamic_m_data, "ts",
+				       cloud_data->mod_ts);
 		err += json_add_obj(reported_obj, "dev", static_m_data);
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	} else {
 		err += json_add_obj(dynamic_m_data, "v", dynamic_m_data_v);
-		err += json_add_number(dynamic_m_data, "ts", cloud_data->mod_ts);
+		err += json_add_number(dynamic_m_data, "ts",
+				       cloud_data->mod_ts);
 		err += json_add_obj(reported_obj, "roam", dynamic_m_data);
 	}
 

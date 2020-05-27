@@ -24,7 +24,7 @@ static void leds_update(struct k_work *work)
 	static u8_t current_led_on_mask;
 	u8_t led_on_mask;
 
-	if(current_led_state == UI_LED_PASSIVE_MODE) {
+	if (current_led_state == UI_LED_PASSIVE_MODE) {
 		passive_mode = true;
 	} else {
 		passive_mode = false;
@@ -49,14 +49,14 @@ static void leds_update(struct k_work *work)
 	if (work) {
 		if (led_on) {
 			k_delayed_work_submit(&leds_update_work,
-						UI_LED_ON_PERIOD_NORMAL);
+					      UI_LED_ON_PERIOD_NORMAL);
 		} else {
 			if (passive_mode) {
 				k_delayed_work_submit(&leds_update_work,
 						      UI_LED_OFF_PERIOD_LONG);
 			} else {
 				k_delayed_work_submit(&leds_update_work,
-					      	      UI_LED_OFF_PERIOD_NORMAL);
+						      UI_LED_OFF_PERIOD_NORMAL);
 			}
 		}
 	}
@@ -68,7 +68,7 @@ void ui_led_set_pattern(enum ui_led_pattern state)
 	current_led_state = state;
 #ifdef CONFIG_UI_LED_USE_PWM
 	ui_led_set_effect(state);
-#endif  /* CONFIG_UI_LED_USE_PWM */
+#endif /* CONFIG_UI_LED_USE_PWM */
 }
 
 enum ui_led_pattern ui_led_get_pattern(void)
