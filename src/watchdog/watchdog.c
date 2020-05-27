@@ -39,12 +39,13 @@ static void primary_feed_worker(struct k_work *work_desc)
 static int watchdog_timeout_install(struct wdt_data_storage *data)
 {
 	static const struct wdt_timeout_cfg wdt_settings = {
-			.window = {
+		.window =
+			{
 				.min = 0,
 				.max = CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC,
 			},
-			.callback = NULL,
-			.flags = WDT_FLAG_RESET_SOC
+		.callback = NULL,
+		.flags = WDT_FLAG_RESET_SOC
 	};
 
 	__ASSERT_NO_MSG(data != NULL);
