@@ -36,22 +36,19 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define MESSAGES_TOPIC "%s/messages"
 #define MESSAGES_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 9)
 
-enum app_endpoint_type {
-	CLOUD_EP_TOPIC_MESSAGES = CLOUD_EP_PRIV_START
-};
+enum app_endpoint_type { CLOUD_EP_TOPIC_MESSAGES = CLOUD_EP_PRIV_START };
 
 static struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
 
-static struct cloud_data cloud_data = {
-				.gps_timeout = 60,
-				.active = true,
-				.active_wait = 60,
-				.passive_wait = 60,
-				.mov_timeout = 3600,
-				.acc_thres = 100,
-				.gps_found = false,
-				.synch = true,
-				.acc_trig = false};
+static struct cloud_data cloud_data = { .gps_timeout = 60,
+					.active = true,
+					.active_wait = 60,
+					.passive_wait = 60,
+					.mov_timeout = 3600,
+					.acc_thres = 100,
+					.gps_found = false,
+					.synch = true,
+					.acc_trig = false };
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
 static struct cloud_endpoint pub_ep_topics_sub[2];
@@ -78,9 +75,9 @@ static struct k_delayed_work cloud_btn_send_work;
 static struct k_delayed_work led_device_mode_set_work;
 static struct k_delayed_work mov_timeout_work;
 
-K_SEM_DEFINE(accel_trig_sem,  0, 1);
+K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
-K_SEM_DEFINE(cloud_conn_sem,  0, 1);
+K_SEM_DEFINE(cloud_conn_sem, 0, 1);
 
 void error_handler(int err_code)
 {
@@ -124,7 +121,8 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 
 		LOG_INF("Network registration status: %s",
 			evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ?
-			"Connected to home network" : "Connected to roaming network");
+				"Connected to home network" :
+				"Connected to roaming network");
 
 		k_sem_give(&cloud_conn_sem);
 		break;
@@ -141,13 +139,14 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 			       evt->edrx_cfg.edrx, evt->edrx_cfg.ptw);
 		if (len > 0) {
 			LOG_DBG("%s", log_strdup(log_buf));
-}
+		}
 		break;
 	}
 	case LTE_LC_EVT_RRC_UPDATE:
 		LOG_DBG("RRC mode: %s",
 			evt->rrc_mode == LTE_LC_RRC_MODE_CONNECTED ?
-			"Connected" : "Idle");
+				"Connected" :
+				"Idle");
 		break;
 	case LTE_LC_EVT_CELL_UPDATE:
 		LOG_DBG("LTE cell changed: Cell ID: %d, Tracking area: %d",
@@ -161,17 +160,17 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 #if defined(CONFIG_EXTERNAL_SENSORS)
 static void ext_sensors_evt_handler(const struct ext_sensor_evt *const evt)
 {
-	switch(evt->type) {
-		case EXT_SENSOR_EVT_ACCELEROMETER_TRIGGER:
-			cloud_data.acc[0] = evt->value_array[0];
-			cloud_data.acc[1] = evt->value_array[1];
-			cloud_data.acc[2] = evt->value_array[2];
-			cloud_data.acc_ts = k_uptime_get();
-			cloud_data.acc_trig = true;
-			k_sem_give(&accel_trig_sem);
-			break;
-		default:
-			break;
+	switch (evt->type) {
+	case EXT_SENSOR_EVT_ACCELEROMETER_TRIGGER:
+		cloud_data.acc[0] = evt->value_array[0];
+		cloud_data.acc[1] = evt->value_array[1];
+		cloud_data.acc[2] = evt->value_array[2];
+		cloud_data.acc_ts = k_uptime_get();
+		cloud_data.acc_trig = true;
+		k_sem_give(&accel_trig_sem);
+		break;
+	default:
+		break;
 	}
 }
 #endif
@@ -206,12 +205,12 @@ static void current_time_set(struct gps_pvt *gps_data)
 
 	/* Change datetime.year and datetime.month to accomodate the
 	 * correct input format. */
-	gps_time.tm_year = gps_data->datetime.year  - 1900;
-	gps_time.tm_mon  = gps_data->datetime.month - 1;
+	gps_time.tm_year = gps_data->datetime.year - 1900;
+	gps_time.tm_mon = gps_data->datetime.month - 1;
 	gps_time.tm_mday = gps_data->datetime.day;
 	gps_time.tm_hour = gps_data->datetime.hour;
-	gps_time.tm_min  = gps_data->datetime.minute;
-	gps_time.tm_sec  = gps_data->datetime.seconds;
+	gps_time.tm_min = gps_data->datetime.minute;
+	gps_time.tm_sec = gps_data->datetime.seconds;
 
 	date_time_set(&gps_time);
 }
@@ -239,13 +238,13 @@ static void gps_buffer_populate(struct gps_pvt *gps_data)
 	}
 
 	cir_buf_gps[head_cir_buf].longitude = gps_data->longitude;
-	cir_buf_gps[head_cir_buf].latitude  = gps_data->latitude;
-	cir_buf_gps[head_cir_buf].altitude  = gps_data->altitude;
-	cir_buf_gps[head_cir_buf].accuracy  = gps_data->accuracy;
-	cir_buf_gps[head_cir_buf].speed     = gps_data->speed;
-	cir_buf_gps[head_cir_buf].heading   = gps_data->heading;
-	cir_buf_gps[head_cir_buf].gps_ts    = k_uptime_get();
-	cir_buf_gps[head_cir_buf].queued    = true;
+	cir_buf_gps[head_cir_buf].latitude = gps_data->latitude;
+	cir_buf_gps[head_cir_buf].altitude = gps_data->altitude;
+	cir_buf_gps[head_cir_buf].accuracy = gps_data->accuracy;
+	cir_buf_gps[head_cir_buf].speed = gps_data->speed;
+	cir_buf_gps[head_cir_buf].heading = gps_data->heading;
+	cir_buf_gps[head_cir_buf].gps_ts = k_uptime_get();
+	cir_buf_gps[head_cir_buf].queued = true;
 
 	LOG_INF("Entry: %d in gps_buffer filled", head_cir_buf);
 }
@@ -348,9 +347,8 @@ static void cloud_data_send(void)
 	}
 #endif
 
-	err = cloud_encode_sensor_data(&msg, &cloud_data,
-				       &cir_buf_gps[head_cir_buf],
-				       &modem_param);
+	err = cloud_encode_sensor_data(
+		&msg, &cloud_data, &cir_buf_gps[head_cir_buf], &modem_param);
 	if (err) {
 		LOG_ERR("Error enconding message %d", err);
 		return;
@@ -477,8 +475,10 @@ static void work_init(void)
 	k_delayed_work_init(&cloud_config_get_work, cloud_config_get_work_fn);
 	k_delayed_work_init(&cloud_data_send_work, cloud_data_send_work_fn);
 	k_delayed_work_init(&cloud_config_send_work, cloud_config_send_work_fn);
-	k_delayed_work_init(&cloud_buff_data_send_work, cloud_buff_data_send_work_fn);
-	k_delayed_work_init(&led_device_mode_set_work, led_device_mode_set_work_fn);
+	k_delayed_work_init(&cloud_buff_data_send_work,
+			    cloud_buff_data_send_work_fn);
+	k_delayed_work_init(&led_device_mode_set_work,
+			    led_device_mode_set_work_fn);
 	k_delayed_work_init(&mov_timeout_work, mov_timeout_work_fn);
 	k_delayed_work_init(&cloud_btn_send_work, cloud_btn_send_work_fn);
 }
@@ -585,8 +585,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 			LOG_ERR("Could not decode response %d", err);
 		}
 		ext_sensors_accelerometer_threshold_set(&cloud_data);
-		k_delayed_work_submit(&cloud_config_send_work,
-				      K_NO_WAIT);
+		k_delayed_work_submit(&cloud_config_send_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
@@ -622,8 +621,7 @@ connect:
 	retry_backoff_s = 10 + pow(cloud_connect_retries, 4);
 	cloud_connect_retries++;
 
-	LOG_INF("Trying to connect to cloud in %d seconds",
-		retry_backoff_s);
+	LOG_INF("Trying to connect to cloud in %d seconds", retry_backoff_s);
 
 	date_time_update();
 
@@ -739,24 +737,20 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	 */
 	if ((has_changed & button_states & DK_BTN1_MSK) &&
 	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
-
 		if (cloud_connected) {
-
 			LOG_INF("Cloud publication by button 1 triggered, ");
 			LOG_INF("2 seconds to next allowed cloud publication ");
 			LOG_INF("triggered by button 1");
 
 			cloud_data.btn_number = 1;
 			cloud_data.btn_ts = k_uptime_get();
-			k_delayed_work_submit(&cloud_btn_send_work,
-					      K_NO_WAIT);
+			k_delayed_work_submit(&cloud_btn_send_work, K_NO_WAIT);
 			k_delayed_work_submit(&led_device_mode_set_work,
-					K_SECONDS(3));
+					      K_SECONDS(3));
 		}
 
 		try_again_timeout = k_uptime_get();
 	}
-
 
 #if defined(CONFIG_BOARD_NRF9160_PCA10090NS)
 	/* Fake motion. The nRF9160 DK does not have an accelerometer by
@@ -792,8 +786,7 @@ static int populate_app_endpoint_topics()
 	pub_ep_topics_sub[1].len = MESSAGES_TOPIC_LEN;
 	pub_ep_topics_sub[1].type = CLOUD_EP_TOPIC_MESSAGES;
 
-	err = snprintf(cfg_topic, sizeof(cfg_topic), CFG_TOPIC,
-		       client_id_buf);
+	err = snprintf(cfg_topic, sizeof(cfg_topic), CFG_TOPIC, client_id_buf);
 	if (err != CFG_TOPIC_LEN) {
 		return -ENOMEM;
 	}
@@ -802,8 +795,7 @@ static int populate_app_endpoint_topics()
 	sub_ep_topics_sub[0].len = CFG_TOPIC_LEN;
 	sub_ep_topics_sub[0].type = CLOUD_EP_TOPIC_CONFIG;
 
-	err = cloud_ep_subscriptions_add(cloud_backend,
-					 sub_ep_topics_sub,
+	err = cloud_ep_subscriptions_add(cloud_backend, sub_ep_topics_sub,
 					 ARRAY_SIZE(sub_ep_topics_sub));
 	if (err) {
 		LOG_INF("cloud_ep_subscriptions_add, error: %d", err);
@@ -821,7 +813,8 @@ static int cloud_setup(void)
 	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
 		 CONFIG_CLOUD_BACKEND);
 
-	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf, sizeof(client_id_buf));
+	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf,
+				    sizeof(client_id_buf));
 	if (err != AWS_CLOUD_CLIENT_ID_LEN) {
 		LOG_ERR("modem_info_string_get, error: %d", err);
 		return err;
@@ -917,14 +910,13 @@ void main(void)
 			      K_SECONDS(cloud_data.mov_timeout));
 
 	while (true) {
-
 		/*Check current device mode*/
 		if (!cloud_data.active) {
 			LOG_INF("Device in PASSIVE mode");
 			k_delayed_work_submit(&led_device_mode_set_work,
 					      K_NO_WAIT);
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
-					LOG_INF("The cat is moving!");
+				LOG_INF("The cat is moving!");
 			}
 		} else {
 			LOG_INF("Device in ACTIVE mode");

@@ -11,7 +11,8 @@
 #include <logging/log.h>
 LOG_MODULE_REGISTER(watchdog, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
-#define WDT_FEED_WORKER_DELAY_MS ((CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC)/2)
+#define WDT_FEED_WORKER_DELAY_MS                                               \
+	((CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC) / 2)
 
 struct wdt_data_storage {
 	struct device *wdt_drv;
@@ -48,8 +49,8 @@ static int watchdog_timeout_install(struct wdt_data_storage *data)
 
 	__ASSERT_NO_MSG(data != NULL);
 
-	data->wdt_channel_id = wdt_install_timeout(
-			data->wdt_drv, &wdt_settings);
+	data->wdt_channel_id =
+		wdt_install_timeout(data->wdt_drv, &wdt_settings);
 	if (data->wdt_channel_id < 0) {
 		LOG_ERR("Cannot install watchdog timer! Error code: %d",
 			data->wdt_channel_id);
@@ -79,8 +80,7 @@ static int watchdog_feed_enable(struct wdt_data_storage *data)
 {
 	__ASSERT_NO_MSG(data != NULL);
 
-	k_delayed_work_init(&data->system_workqueue_work,
-			    primary_feed_worker);
+	k_delayed_work_init(&data->system_workqueue_work, primary_feed_worker);
 
 	int err = wdt_feed(data->wdt_drv, data->wdt_channel_id);
 
@@ -93,7 +93,8 @@ static int watchdog_feed_enable(struct wdt_data_storage *data)
 				    WDT_FEED_WORKER_DELAY_MS);
 	if (err) {
 		LOG_ERR("Cannot start watchdog feed worker!"
-				" Error code: %d", err);
+			" Error code: %d",
+			err);
 	} else {
 		LOG_INF("Watchdog feed enabled. Timeout: %d",
 			WDT_FEED_WORKER_DELAY_MS);
