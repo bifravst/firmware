@@ -35,6 +35,11 @@ jobs:
         run: |
           export PATH=$PATH:/home/runner/.local/bin
           curl -s https://raw.githubusercontent.com/nrfconnect/sdk-nrf/master/.checkpatch.conf > .checkpatch.conf
+          mkdir -p scripts/checkpatch
+          curl -s https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/master/scripts/checkpatch.pl > scripts/checkpatch.pl
+          chmod +x scripts/checkpatch.pl
+          curl -s https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/master/scripts/spelling.txt > scripts/spelling.txt
+          curl -s https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/master/scripts/checkpatch/typedefsfile > scripts/checkpatch/typedefsfile
           ../ci-tools/scripts/check_compliance.py -p ${{ github.event.pull_request.number }} \
             -S ${{ github.event.pull_request.head.sha }} \
             -g \
