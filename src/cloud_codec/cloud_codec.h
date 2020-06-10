@@ -30,146 +30,145 @@
 extern "C" {
 #endif
 
+/** @brief Combinations of data entries to be encoded. */
+enum cloud_data_encode_schema {
+	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT,
+	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_GPS,
+	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_GPS_ACCEL,
+	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_ACCEL,
+	CLOUD_DATA_ENCODE_MDYN_SENS_BAT,
+	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS,
+	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS_ACCEL,
+	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_ACCEL,
+	CLOUD_DATA_ENCODE_UI
+};
+
+/** @brief Structure containing battery data published to cloud. */
+struct cloud_data_battery {
+
+	u16_t bat;
+
+	s64_t bat_ts;
+
+	bool queued;
+};
+
 /** @brief Structure containing GPS data published to cloud. */
 struct cloud_data_gps {
 	/** GPS data timestamp. UNIX milliseconds. */
 	s64_t gps_ts;
 	/** Longitude */
-	double longitude;
+	double longi;
 	/** Latitude */
-	double latitude;
+	double lat;
 	/** Altitude above WGS-84 ellipsoid in meters. */
-	float altitude;
+	float alt;
 	/** Accuracy in (2D 1-sigma) in meters. */
-	float accuracy;
+	float acc;
 	/** Horizontal speed in meters. */
-	float speed;
+	float spd;
 	/** Heading of movement in degrees. */
-	float heading;
-	/** Flag signifying if the GPS fix is to be
-	 *  published, aux variable.
-	 */
+	float hdg;
+	/** Flag signifying if the GPS fix is to be published, aux variable. */
 	bool queued;
 };
 
-/** @brief Structure containing data published to cloud. */
-struct cloud_data {
-	/** Batter voltage timestamp. UNIX milliseconds. */
-	s64_t bat_ts;
+struct cloud_data_cfg {
+	/** Device mode configurations. */
+	bool act;
+	/** GPS search timeout. */
+	int gpst;
+	/** Time between cloud publications in active mode. */
+	int actw;
+	/** Time between cloud publications in passive mode. */
+	int pasw;
+	/** Time between cloud publications regardless of mode. */
+	int movt;
+	/** Accelerometer trigger threshold value. */
+	int acct;
+};
+
+struct cloud_data_accelerometer {
 	/** Accelerometer readings timestamp. UNIX milliseconds. */
-	s64_t acc_ts;
-	/** Modem data timestamp. UNIX milliseconds. */
-	s64_t mod_ts;
-	/** Button pushed timestamp. UNIX milliseconds. */
-	s64_t btn_ts;
+	s64_t ts;
+	/** Accelerometer readings. */
+	double values[3];
+
+	bool queued;
+};
+
+struct cloud_data_sensors {
 	/** Environmental sensors timestamp. UNIX milliseconds. */
 	s64_t env_ts;
-	/** Accelerometer readings. */
-	double acc[3];
-	/** Device mode configurations. */
-	bool active;
-	/** GPS search timeout. */
-	int gps_timeout;
-	/** Time between cloud publications
-	 *  in active mode.
-	 */
-	int active_wait;
-	/** Time between cloud publications
-	 *  in passive mode.
-	 */
-	int passive_wait;
-	/** Time between cloud publications
-	 *  regardless of mode.
-	 */
-	int mov_timeout;
-	/** Accelerometer trigger threshold value. */
-	int acc_thres;
-	/** Button number published to cloud. */
-	int btn_number;
-	/** Modem RSRP value. */
-	int rsrp;
 	/** Temperature in celcius */
 	double temp;
 	/** Humidity level in percentage */
 	double hum;
-	/** GPS found trigger flag, aux variable. */
-	bool gps_found;
-	/** Accelerometer trigger flag, aux variable. */
-	bool acc_trig;
-	/** Cloud synchronization flag, aux variable. */
-	bool synch;
+
+	bool queued;
 };
 
-/**
- * @brief Decodes a receiving cloud response/message.
- *
- * @param[in]  input      Pointer to a cloud response message.
- * @param[out] cloud_data Pointer to a structure containing cloud data.
- *
- * @return 0 on success or negative error value on failure.
- */
-int cloud_decode_response(char *input, struct cloud_data *cloud_data);
+struct cloud_data_modem {
+	/** Modem data timestamp. UNIX milliseconds. */
+	s64_t mod_ts;
+	s64_t mod_ts_static;
+	u16_t area;
+	u16_t cell;
+	u16_t bnd;
+	u16_t nw_gps;
+	u16_t nw_lte_m;
+	u16_t nw_nb_iot;
+	u16_t rsrp;
+	char *ip;
+	char *mccmnc;
+	char *appv;
+	const char *brdv;
+	char *fw;
+	char *iccid;
+	bool queued;
+};
 
-/**
- * @brief Encodes sensor data.
- *
- * @param[out] output      Pointer to a structure containing the encoded data
- *                         to be published.
- * @param[in]  cloud_data  Pointer to a structure containing cloud data.
- * @param[in]  cir_buf_gps Pointer to a structure containing GPS data.
- * @param[in]  modem_info  Pointer to a structure containing modem data.
- *
- * @return 0 on success or negative error value on failure.
- */
-int cloud_encode_sensor_data(struct cloud_msg *output,
-			     struct cloud_data *cloud_data,
-			     struct cloud_data_gps *cir_buf_gps,
-			     struct modem_param_info *modem_info);
+struct cloud_data_ui {
+	s64_t btn_ts;
+	int btn;
+	bool queued;
+};
 
-/**
- * @brief Encodes buffered GPS fix entries from the circular GPS buffer.
- *
- * @param[out] output      Pointer to a structure containing the encoded data
- *                         to be published.
- * @param[in]  cir_buf_gps Pointer to a structure containing GPS data.
- *
- * @return 0 on success or negative error value on failure.
- */
-int cloud_encode_gps_buffer(struct cloud_msg *output,
-			    struct cloud_data_gps *cir_buf_gps);
+int cloud_codec_decode_response(char *input, struct cloud_data_cfg *cfg);
 
-/**
- * @brief Encodes device configuration.
- *
- * @param[out] output      Pointer to a structure containing the encoded data
- *                         to be published.
- * @param[in]  cloud_data  Pointer to a structure containing device configuraton.
- *
- * @return 0 on success or negative error value on failure.
- */
-int cloud_encode_cfg_data(struct cloud_msg *output,
-			  struct cloud_data *cloud_data);
+int cloud_codec_encode_cfg_data(struct cloud_msg *output,
+				struct cloud_data_cfg *cfg_buffer);
 
-/**
- * @brief Encodes messages triggered by button push.
- *
- * @param[out] output      Pointer to a structure containing the encoded data
- *                         to be published.
- * @param[in]  cloud_data  Pointer to a structure containing button data.
- *
- * @return 0 on success or negative error value on failure.
- */
-int cloud_encode_button_message_data(struct cloud_msg *output,
-				     struct cloud_data *cloud_data);
+int cloud_codec_encode_data(struct cloud_msg *output,
+			    struct cloud_data_gps *gps_buf,
+			    struct cloud_data_sensors *sensor_buf,
+			    struct cloud_data_modem *modem_buf,
+			    struct cloud_data_ui *ui_buf,
+			    struct cloud_data_accelerometer *accel_buf,
+			    struct cloud_data_battery *bat_buf,
+			    enum cloud_data_encode_schema encode_schema);
 
-/**
- * @brief Releases dynamically allocated data allocated by the library.
- *
- * @param[in] data Pointer to data to be freed.
- */
-static inline void cloud_release_data(struct cloud_msg *data)
+int cloud_codec_encode_gps_buffer(struct cloud_msg *output,
+				  struct cloud_data_gps *data);
+
+int cloud_codec_encode_modem_buffer(struct cloud_msg *output,
+				    struct cloud_data_modem *data);
+
+int cloud_codec_encode_sensor_buffer(struct cloud_msg *output,
+				     struct cloud_data_sensors *data);
+
+int cloud_codec_encode_ui_buffer(struct cloud_msg *output,
+				 struct cloud_data_ui *data);
+
+int cloud_codec_encode_accel_buffer(struct cloud_msg *output,
+				    struct cloud_data_accelerometer *data);
+
+int cloud_codec_encode_bat_buffer(struct cloud_msg *output,
+				    struct cloud_data_battery *data);
+
+static inline void cloud_codec_release_data(struct cloud_msg *output)
 {
-	free(data->buf);
+	free(output->buf);
 }
 
 #ifdef __cplusplus

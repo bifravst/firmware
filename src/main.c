@@ -38,17 +38,27 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
 enum app_endpoint_type { CLOUD_EP_TOPIC_MESSAGES = CLOUD_EP_PRIV_START };
 
-static struct cloud_data_gps cir_buf_gps[CONFIG_CIRCULAR_SENSOR_BUFFER_MAX];
+static struct cloud_data_gps gps_buf[CONFIG_GPS_BUFFER_MAX];
+static struct cloud_data_sensors sensors_buf[CONFIG_SENSOR_BUFFER_MAX];
+static struct cloud_data_modem modem_buf[CONFIG_MODEM_BUFFER_MAX];
+static struct cloud_data_ui ui_buf[CONFIG_UI_BUFFER_MAX];
+static struct cloud_data_accelerometer accel_buf[CONFIG_ACCEL_BUFFER_MAX];
+static struct cloud_data_battery bat_buf[CONFIG_BAT_BUFFER_MAX];
 
-static struct cloud_data cloud_data = { .gps_timeout = 60,
-					.active = true,
-					.active_wait = 60,
-					.passive_wait = 60,
-					.mov_timeout = 3600,
-					.acc_thres = 100,
-					.gps_found = false,
-					.synch = true,
-					.acc_trig = false };
+static struct cloud_data_cfg cfg = { .gpst = 60,
+				     .act = true,
+				     .actw = 60,
+				     .pasw = 60,
+				     .movt = 3600,
+				     .acct = 100 };
+
+/** Head of circular buffers. */
+static int head_gps_buf;
+static int head_sensor_buf;
+static int head_modem_buf;
+static int head_ui_buf;
+static int head_accel_buf;
+static int head_bat_buf;
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
 static struct cloud_endpoint pub_ep_topics_sub[2];
@@ -61,18 +71,17 @@ static char messages_topic[MESSAGES_TOPIC_LEN + 1];
 static struct modem_param_info modem_param;
 static struct cloud_backend *cloud_backend;
 
-static bool queued_entries;
+static bool gps_fix;
+
 static bool cloud_connected;
+static bool initial_cloud_connection;
 
-static int head_cir_buf;
-static int num_queued_entries;
-
-static struct k_delayed_work cloud_config_get_work;
-static struct k_delayed_work cloud_config_send_work;
-static struct k_delayed_work cloud_data_send_work;
-static struct k_delayed_work cloud_buff_data_send_work;
-static struct k_delayed_work cloud_btn_send_work;
-static struct k_delayed_work led_device_mode_set_work;
+static struct k_delayed_work device_config_get_work;
+static struct k_delayed_work device_config_send_work;
+static struct k_delayed_work data_send_work;
+static struct k_delayed_work buffered_data_send_work;
+static struct k_delayed_work ui_send_work;
+static struct k_delayed_work leds_set_work;
 static struct k_delayed_work mov_timeout_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
@@ -107,6 +116,199 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 	LOG_ERR("k_sys_fatal_error_handler, error: %d", reason);
 	error_handler(reason);
 	CODE_UNREACHABLE;
+}
+
+static int device_mode_check(void)
+{
+	if (!cfg.act) {
+		return cfg.pasw;
+	}
+
+	return cfg.actw;
+}
+
+static void time_set(struct gps_pvt *gps_data)
+{
+	struct tm gps_time;
+
+	/* Change datetime.year and datetime.month to accomodate the
+	 * correct input format. */
+	gps_time.tm_year = gps_data->datetime.year - 1900;
+	gps_time.tm_mon = gps_data->datetime.month - 1;
+	gps_time.tm_mday = gps_data->datetime.day;
+	gps_time.tm_hour = gps_data->datetime.hour;
+	gps_time.tm_min = gps_data->datetime.minute;
+	gps_time.tm_sec = gps_data->datetime.seconds;
+
+	date_time_set(&gps_time);
+}
+
+static void leds_set(void)
+{
+	if (!gps_control_is_active()) {
+		if (!cfg.act) {
+			ui_led_set_pattern(UI_LED_PASSIVE_MODE);
+		} else {
+			ui_led_set_pattern(UI_LED_ACTIVE_MODE);
+		}
+	} else {
+		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
+	}
+}
+
+static void battery_buffer_populate(void)
+{
+	/* Go to start of buffer if end is reached. */
+	head_bat_buf += 1;
+	if (head_bat_buf == CONFIG_BAT_BUFFER_MAX - 1) {
+		head_bat_buf = 0;
+	}
+
+	bat_buf[head_bat_buf].bat = modem_param.device.battery.value;
+	bat_buf[head_bat_buf].bat_ts = k_uptime_get();
+	bat_buf[head_bat_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in battery buffer filled", head_accel_buf,
+		CONFIG_BAT_BUFFER_MAX);
+}
+
+static void gps_buffer_populate(struct gps_pvt *gps_data)
+{
+	/* Go to start of buffer if end is reached. */
+	head_gps_buf += 1;
+	if (head_gps_buf == CONFIG_GPS_BUFFER_MAX - 1) {
+		head_gps_buf = 0;
+	}
+
+	gps_buf[head_gps_buf].longi = gps_data->longitude;
+	gps_buf[head_gps_buf].lat = gps_data->latitude;
+	gps_buf[head_gps_buf].alt = gps_data->altitude;
+	gps_buf[head_gps_buf].acc = gps_data->accuracy;
+	gps_buf[head_gps_buf].spd = gps_data->speed;
+	gps_buf[head_gps_buf].hdg = gps_data->heading;
+	gps_buf[head_gps_buf].gps_ts = k_uptime_get();
+	gps_buf[head_gps_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in GPS buffer filled", head_gps_buf,
+		CONFIG_GPS_BUFFER_MAX);
+}
+
+static void accelerometer_buffer_populate(
+		const struct ext_sensor_evt *const accel_data)
+{
+	/* Go to start of buffer if end is reached. */
+	head_accel_buf += 1;
+	if (head_accel_buf == CONFIG_ACCEL_BUFFER_MAX - 1) {
+		head_accel_buf = 0;
+	}
+
+	accel_buf[head_accel_buf].values[0] = accel_data->value_array[0];
+	accel_buf[head_accel_buf].values[1] = accel_data->value_array[1];
+	accel_buf[head_accel_buf].values[2] = accel_data->value_array[2];
+	accel_buf[head_accel_buf].ts = k_uptime_get();
+	accel_buf[head_accel_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in accelerometer buffer filled",
+		head_accel_buf, CONFIG_ACCEL_BUFFER_MAX);
+}
+
+static int modem_buffer_populate(void)
+{
+	int err;
+
+	/* Request data from modem. */
+	err = modem_info_params_get(&modem_param);
+	if (err) {
+		LOG_ERR("modem_info_params_get, error: %d", err);
+		return err;
+	}
+
+	/* Go to start of buffer if end is reached. */
+	head_modem_buf += 1;
+	if (head_modem_buf == CONFIG_MODEM_BUFFER_MAX - 1) {
+		head_modem_buf = 0;
+	}
+
+	modem_buf[head_modem_buf].ip =
+		modem_param.network.ip_address.value_string;
+	modem_buf[head_modem_buf].cell =
+		modem_param.network.cellid_dec;
+	modem_buf[head_modem_buf].mccmnc =
+		modem_param.network.current_operator.value_string;
+	modem_buf[head_modem_buf].area =
+		modem_param.network.area_code.value;
+	modem_buf[head_modem_buf].appv =
+		CONFIG_CAT_TRACKER_APP_VERSION;
+	modem_buf[head_modem_buf].brdv =
+		modem_param.device.board;
+	modem_buf[head_modem_buf].fw =
+		modem_param.device.modem_fw.value_string;
+	modem_buf[head_modem_buf].iccid =
+		modem_param.sim.iccid.value_string;
+	modem_buf[head_modem_buf].nw_lte_m =
+		modem_param.network.lte_mode.value;
+	modem_buf[head_modem_buf].nw_nb_iot =
+		modem_param.network.nbiot_mode.value;
+	modem_buf[head_modem_buf].nw_gps =
+		modem_param.network.gps_mode.value;
+	modem_buf[head_modem_buf].bnd =
+		modem_param.network.current_band.value;
+	modem_buf[head_modem_buf].mod_ts = k_uptime_get();
+	modem_buf[head_modem_buf].mod_ts_static = k_uptime_get();
+	modem_buf[head_modem_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in modem buffer filled", head_modem_buf,
+		CONFIG_MODEM_BUFFER_MAX);
+
+	return 0;
+}
+
+static int sensors_buffer_populate(void)
+{
+	int err;
+
+	/* Go to start of buffer if end is reached. */
+	head_sensor_buf += 1;
+	if (head_sensor_buf == CONFIG_SENSOR_BUFFER_MAX - 1) {
+		head_sensor_buf = 0;
+	}
+
+	/* Request data from external sensors. */
+	err = ext_sensors_temperature_get(&sensors_buf[head_sensor_buf].temp);
+	if (err) {
+		LOG_ERR("temperature_get, error: %d", err);
+		return err;
+	}
+
+	err = ext_sensors_humidity_get(&sensors_buf[head_sensor_buf].hum);
+	if (err) {
+		LOG_ERR("temperature_get, error: %d", err);
+		return err;
+	}
+
+	sensors_buf[head_sensor_buf].env_ts = k_uptime_get();
+	sensors_buf[head_sensor_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in sensor buffer filled", head_sensor_buf,
+		CONFIG_SENSOR_BUFFER_MAX);
+
+	return 0;
+}
+
+static void ui_buffer_populate(int btn_number)
+{
+	/* Go to start of buffer if end is reached. */
+	head_ui_buf += 1;
+	if (head_ui_buf == CONFIG_UI_BUFFER_MAX - 1) {
+		head_ui_buf = 0;
+	}
+
+	ui_buf[head_ui_buf].btn = 1;
+	ui_buf[head_ui_buf].btn_ts = k_uptime_get();
+	ui_buf[head_ui_buf].queued = true;
+
+	LOG_INF("Entry: %d of %d in UI buffer filled", head_ui_buf,
+		CONFIG_UI_BUFFER_MAX);
 }
 
 static void lte_evt_handler(const struct lte_lc_evt *const evt)
@@ -162,11 +364,7 @@ static void ext_sensors_evt_handler(const struct ext_sensor_evt *const evt)
 {
 	switch (evt->type) {
 	case EXT_SENSOR_EVT_ACCELEROMETER_TRIGGER:
-		cloud_data.acc[0] = evt->value_array[0];
-		cloud_data.acc[1] = evt->value_array[1];
-		cloud_data.acc[2] = evt->value_array[2];
-		cloud_data.acc_ts = k_uptime_get();
-		cloud_data.acc_trig = true;
+		accelerometer_buffer_populate(evt);
 		k_sem_give(&accel_trig_sem);
 		break;
 	default:
@@ -184,72 +382,12 @@ static int modem_configure(void)
 	err = lte_lc_init_and_connect_async(lte_evt_handler);
 	if (err) {
 		LOG_ERR("lte_lc_init_connect_async, error: %d", err);
-		return err;
 	}
 
-	return 0;
+	return err;
 }
 
-static int active_wait_check(void)
-{
-	if (!cloud_data.active) {
-		return cloud_data.passive_wait;
-	}
-
-	return cloud_data.active_wait;
-}
-
-static void current_time_set(struct gps_pvt *gps_data)
-{
-	struct tm gps_time;
-
-	/* Change datetime.year and datetime.month to accomodate the
-	 * correct input format. */
-	gps_time.tm_year = gps_data->datetime.year - 1900;
-	gps_time.tm_mon = gps_data->datetime.month - 1;
-	gps_time.tm_mday = gps_data->datetime.day;
-	gps_time.tm_hour = gps_data->datetime.hour;
-	gps_time.tm_min = gps_data->datetime.minute;
-	gps_time.tm_sec = gps_data->datetime.seconds;
-
-	date_time_set(&gps_time);
-}
-
-static void led_device_mode_set(void)
-{
-	if (!gps_control_is_active()) {
-		if (!cloud_data.active) {
-			ui_led_set_pattern(UI_LED_PASSIVE_MODE);
-		} else {
-			ui_led_set_pattern(UI_LED_ACTIVE_MODE);
-		}
-	} else {
-		ui_led_set_pattern(UI_LED_GPS_SEARCHING);
-	}
-}
-
-static void gps_buffer_populate(struct gps_pvt *gps_data)
-{
-	cloud_data.gps_found = true;
-
-	head_cir_buf += 1;
-	if (head_cir_buf == CONFIG_CIRCULAR_SENSOR_BUFFER_MAX - 1) {
-		head_cir_buf = 0;
-	}
-
-	cir_buf_gps[head_cir_buf].longitude = gps_data->longitude;
-	cir_buf_gps[head_cir_buf].latitude = gps_data->latitude;
-	cir_buf_gps[head_cir_buf].altitude = gps_data->altitude;
-	cir_buf_gps[head_cir_buf].accuracy = gps_data->accuracy;
-	cir_buf_gps[head_cir_buf].speed = gps_data->speed;
-	cir_buf_gps[head_cir_buf].heading = gps_data->heading;
-	cir_buf_gps[head_cir_buf].gps_ts = k_uptime_get();
-	cir_buf_gps[head_cir_buf].queued = true;
-
-	LOG_INF("Entry: %d in gps_buffer filled", head_cir_buf);
-}
-
-static void cloud_config_get(void)
+static void device_config_get(void)
 {
 	int err;
 
@@ -264,40 +402,43 @@ static void cloud_config_get(void)
 	}
 }
 
-static void cloud_btn_send(void)
+static void ui_send(void)
 {
 	int err;
 
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint = pub_ep_topics_sub[1],
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint = pub_ep_topics_sub[1] };
 
-	err = cloud_encode_button_message_data(&msg, &cloud_data);
+	err = cloud_codec_encode_data(&msg,
+				      &gps_buf[head_gps_buf],
+				      &sensors_buf[head_sensor_buf],
+				      &modem_buf[head_modem_buf],
+				      &ui_buf[head_ui_buf],
+				      &accel_buf[head_accel_buf],
+				      &bat_buf[head_bat_buf],
+				      CLOUD_DATA_ENCODE_UI);
 	if (err) {
 		LOG_ERR("cloud_encode_button_message_data, error: %d", err);
 		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	cloud_release_data(&msg);
+	cloud_codec_release_data(&msg);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 	}
 }
 
-static void cloud_config_send(void)
+static void device_config_send(void)
 {
 	int err;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG,
-	};
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
-	err = cloud_encode_cfg_data(&msg, &cloud_data);
+	err = cloud_codec_encode_cfg_data(&msg, &cfg);
 	if (err == -EAGAIN) {
 		LOG_INF("No change in device configuration");
 		return;
@@ -307,180 +448,354 @@ static void cloud_config_send(void)
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	cloud_release_data(&msg);
+	cloud_codec_release_data(&msg);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 	}
 }
 
-static void cloud_data_send(void)
+static void data_send(void)
 {
 	int err;
+	enum cloud_data_encode_schema pub_schema;
 
-	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG,
-	};
+	/** Data encoded depending on mode, obtained gps fix and
+	 * accelerometer trigger.
+	 */
 
-	/* Request data from modem. */
-	err = modem_info_params_get(&modem_param);
+	if (!initial_cloud_connection) {
+		pub_schema = CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT;
+	} else {
+		if (cfg.act && !gps_fix) {
+			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT;
+		}
+
+		if (cfg.act && gps_fix) {
+			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS;
+		}
+
+		if (!cfg.act && !gps_fix) {
+			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_ACCEL;
+		}
+
+		if (!cfg.act && gps_fix) {
+			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS_ACCEL;
+		}
+	}
+
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
+
+	err = modem_buffer_populate();
 	if (err) {
-		LOG_ERR("modem_info_params_get, error: %d", err);
+		LOG_ERR("modem_buffer_populate, error: %d", err);
 		return;
 	}
 
-	/* Set modem data sample uptime. */
-	cloud_data.mod_ts = k_uptime_get();
+	battery_buffer_populate();
 
 #if defined(CONFIG_EXTERNAL_SENSORS)
-	/* Request data from external sensors. */
-	err = ext_sensors_temperature_get(&cloud_data);
+	err = sensors_buffer_populate();
 	if (err) {
-		LOG_ERR("temperature_get, error: %d", err);
-		return;
-	}
-
-	err = ext_sensors_humidity_get(&cloud_data);
-	if (err) {
-		LOG_ERR("temperature_get, error: %d", err);
+		LOG_ERR("sensors_buffer_populate, error: %d", err);
 		return;
 	}
 #endif
 
-	err = cloud_encode_sensor_data(
-		&msg, &cloud_data, &cir_buf_gps[head_cir_buf], &modem_param);
+	err = cloud_codec_encode_data(&msg,
+				      &gps_buf[head_gps_buf],
+				      &sensors_buf[head_sensor_buf],
+				      &modem_buf[head_modem_buf],
+				      &ui_buf[head_ui_buf],
+				      &accel_buf[head_accel_buf],
+				      &bat_buf[head_bat_buf],
+				      pub_schema);
 	if (err) {
 		LOG_ERR("Error enconding message %d", err);
 		return;
 	}
 
 	err = cloud_send(cloud_backend, &msg);
-	cloud_release_data(&msg);
+	cloud_codec_release_data(&msg);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 		return;
 	}
 
-	cloud_data.gps_found = false;
-	cloud_data.acc_trig = false;
-	cir_buf_gps[head_cir_buf].queued = false;
+	gps_fix = false;
+	initial_cloud_connection = false;
 }
 
-static void cloud_buff_data_send(void)
+static void buffered_data_send(void)
 {
 	int err;
+	bool queued_entries = false;
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
 		.endpoint = pub_ep_topics_sub[0],
 	};
 
+check_gps_buffer:
+
 	/* Check if it exists queued entries in the gps buffer. */
-	for (int i = 0; i < CONFIG_CIRCULAR_SENSOR_BUFFER_MAX; i++) {
-		if (cir_buf_gps[i].queued) {
+	for (int i = 0; i < CONFIG_GPS_BUFFER_MAX; i++) {
+		if (gps_buf[i].queued) {
 			queued_entries = true;
-			num_queued_entries++;
+			break;
+		} else {
+			queued_entries = false;
 		}
 	}
 
-	/* Encode and send queued entries in batches. */
-	while (num_queued_entries > 0 && queued_entries) {
-		err = cloud_encode_gps_buffer(&msg, cir_buf_gps);
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_gps_buffer(&msg, gps_buf);
 		if (err) {
-			LOG_ERR("Error encoding circular buffer: %d", err);
-			goto exit;
+			LOG_ERR("Error encoding GPS buffer: %d", err);
+			return;
 		}
 
 		err = cloud_send(cloud_backend, &msg);
-		cloud_release_data(&msg);
+		cloud_codec_release_data(&msg);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
-			goto exit;
+			return;
 		}
 
-		num_queued_entries -= CONFIG_CIRCULAR_SENSOR_BUFFER_MAX;
+		goto check_gps_buffer;
 	}
 
-exit:
-	num_queued_entries = 0;
-	queued_entries = false;
+check_sensors_buffer:
+
+	/* Check if it exists queued entries in the gps buffer. */
+	for (int i = 0; i < CONFIG_SENSOR_BUFFER_MAX; i++) {
+		if (sensors_buf[i].queued) {
+			queued_entries = true;
+			break;
+		} else {
+			queued_entries = false;
+		}
+	}
+
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_sensor_buffer(&msg, sensors_buf);
+		if (err) {
+			LOG_ERR("Error encoding sensors buffer: %d", err);
+			return;
+		}
+
+		err = cloud_send(cloud_backend, &msg);
+		cloud_codec_release_data(&msg);
+		if (err) {
+			LOG_ERR("Cloud send failed, err: %d", err);
+			return;
+		}
+
+		goto check_sensors_buffer;
+	}
+
+check_modem_buffer:
+
+	/* Check if it exists queued entries in the gps buffer. */
+	for (int i = 0; i < CONFIG_MODEM_BUFFER_MAX; i++) {
+		if (modem_buf[i].queued) {
+			queued_entries = true;
+			break;
+		} else {
+			queued_entries = false;
+		}
+	}
+
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_modem_buffer(&msg, modem_buf);
+		if (err) {
+			LOG_ERR("Error encoding modem buffer: %d", err);
+			return;
+		}
+
+		err = cloud_send(cloud_backend, &msg);
+		cloud_codec_release_data(&msg);
+		if (err) {
+			LOG_ERR("Cloud send failed, err: %d", err);
+			return;
+		}
+
+		goto check_modem_buffer;
+	}
+
+check_ui_buffer:
+
+	/* Check if it exists queued entries in the gps buffer. */
+	for (int i = 0; i < CONFIG_UI_BUFFER_MAX; i++) {
+		if (ui_buf[i].queued) {
+			queued_entries = true;
+			break;
+		} else {
+			queued_entries = false;
+		}
+	}
+
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_ui_buffer(&msg, ui_buf);
+		if (err) {
+			LOG_ERR("Error encoding modem buffer: %d", err);
+			return;
+		}
+
+		err = cloud_send(cloud_backend, &msg);
+		cloud_codec_release_data(&msg);
+		if (err) {
+			LOG_ERR("Cloud send failed, err: %d", err);
+			return;
+		}
+
+		goto check_ui_buffer;
+	}
+
+check_accel_buffer:
+
+	/* Check if it exists queued entries in the gps buffer. */
+	for (int i = 0; i < CONFIG_ACCEL_BUFFER_MAX; i++) {
+		if (accel_buf[i].queued) {
+			queued_entries = true;
+			break;
+		} else {
+			queued_entries = false;
+		}
+	}
+
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_accel_buffer(&msg, accel_buf);
+		if (err) {
+			LOG_ERR("Error encoding accelerometer buffer: %d", err);
+			return;
+		}
+
+		err = cloud_send(cloud_backend, &msg);
+		cloud_codec_release_data(&msg);
+		if (err) {
+			LOG_ERR("Cloud send failed, err: %d", err);
+			return;
+		}
+
+		goto check_accel_buffer;
+	}
+
+check_battery_buffer:
+
+	/* Check if it exists queued entries in the gps buffer. */
+	for (int i = 0; i < CONFIG_BAT_BUFFER_MAX; i++) {
+		if (bat_buf[i].queued) {
+			queued_entries = true;
+			break;
+		} else {
+			queued_entries = false;
+		}
+	}
+
+	if (queued_entries) {
+		/* Encode and send queued entries in batches. */
+		err = cloud_codec_encode_bat_buffer(&msg, bat_buf);
+		if (err) {
+			LOG_ERR("Error encoding accelerometer buffer: %d", err);
+			return;
+		}
+
+		err = cloud_send(cloud_backend, &msg);
+		cloud_codec_release_data(&msg);
+		if (err) {
+			LOG_ERR("Cloud send failed, err: %d", err);
+			return;
+		}
+
+		goto check_battery_buffer;
+	}
 }
 
-static void cloud_synch(void)
+static void config_get(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	if (cloud_connected) {
-		k_delayed_work_submit(&cloud_config_get_work, K_NO_WAIT);
-		k_delayed_work_submit(&cloud_config_send_work, K_NO_WAIT);
-		k_delayed_work_submit(&cloud_data_send_work, K_NO_WAIT);
+		k_delayed_work_submit(&device_config_get_work, K_NO_WAIT);
+		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
+		k_delayed_work_submit(&data_send_work, K_NO_WAIT);
+		k_delayed_work_submit(&buffered_data_send_work, K_NO_WAIT);
 	}
 }
 
-static void cloud_update(void)
+static void data_publish(void)
 {
-	cloud_data.synch = false;
-
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
 	if (cloud_connected) {
-		k_delayed_work_submit(&cloud_data_send_work, K_NO_WAIT);
-		k_delayed_work_submit(&cloud_buff_data_send_work, K_NO_WAIT);
+		k_delayed_work_submit(&data_send_work, K_NO_WAIT);
+		k_delayed_work_submit(&buffered_data_send_work, K_NO_WAIT);
 	}
 }
 
-static void led_device_mode_set_work_fn(struct k_work *work)
+static void leds_set_work_fn(struct k_work *work)
 {
-	led_device_mode_set();
+	leds_set();
 }
 
-static void cloud_config_get_work_fn(struct k_work *work)
+static void device_config_get_work_fn(struct k_work *work)
 {
-	cloud_config_get();
+	device_config_get();
 }
 
-static void cloud_config_send_work_fn(struct k_work *work)
+static void device_config_send_work_fn(struct k_work *work)
 {
-	cloud_config_send();
+	device_config_send();
 }
 
-static void cloud_data_send_work_fn(struct k_work *work)
+static void data_send_work_fn(struct k_work *work)
 {
-	cloud_data_send();
+	data_send();
 }
 
-static void cloud_buff_data_send_work_fn(struct k_work *work)
+static void buffered_data_send_work_fn(struct k_work *work)
 {
-	cloud_buff_data_send();
+	buffered_data_send();
 }
 
-static void cloud_btn_send_work_fn(struct k_work *work)
+static void ui_send_work_fn(struct k_work *work)
 {
-	cloud_btn_send();
+	ui_send();
 }
 
 static void mov_timeout_work_fn(struct k_work *work)
 {
-	if (!cloud_data.active) {
+	if (!cfg.act) {
 		LOG_INF("Movement timeout triggered");
 		k_sem_give(&accel_trig_sem);
 	}
 
 	k_delayed_work_submit(&mov_timeout_work,
-			      K_SECONDS(cloud_data.mov_timeout));
+			      K_SECONDS(cfg.movt));
 }
 
 static void work_init(void)
 {
-	k_delayed_work_init(&cloud_config_get_work, cloud_config_get_work_fn);
-	k_delayed_work_init(&cloud_data_send_work, cloud_data_send_work_fn);
-	k_delayed_work_init(&cloud_config_send_work, cloud_config_send_work_fn);
-	k_delayed_work_init(&cloud_buff_data_send_work,
-			    cloud_buff_data_send_work_fn);
-	k_delayed_work_init(&led_device_mode_set_work,
-			    led_device_mode_set_work_fn);
-	k_delayed_work_init(&mov_timeout_work, mov_timeout_work_fn);
-	k_delayed_work_init(&cloud_btn_send_work, cloud_btn_send_work_fn);
+	k_delayed_work_init(&device_config_get_work,
+			    device_config_get_work_fn);
+	k_delayed_work_init(&data_send_work,
+			    data_send_work_fn);
+	k_delayed_work_init(&device_config_send_work,
+			    device_config_send_work_fn);
+	k_delayed_work_init(&buffered_data_send_work,
+			    buffered_data_send_work_fn);
+	k_delayed_work_init(&leds_set_work,
+			    leds_set_work_fn);
+	k_delayed_work_init(&mov_timeout_work,
+			    mov_timeout_work_fn);
+	k_delayed_work_init(&ui_send_work,
+			    ui_send_work_fn);
 }
 
 static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
@@ -503,8 +818,9 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 	case GPS_EVT_PVT_FIX:
 		LOG_INF("GPS_EVT_PVT_FIX");
 		gps_control_set_active(false);
-		current_time_set(&evt->pvt);
+		time_set(&evt->pvt);
 		gps_buffer_populate(&evt->pvt);
+		gps_fix = true;
 		k_sem_give(&gps_timeout_sem);
 		break;
 	case GPS_EVT_NMEA:
@@ -542,7 +858,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_CONNECTED:
 		LOG_INF("CLOUD_EVT_CONNECTED");
 		cloud_connected = true;
-		cloud_synch();
+		config_get();
 		boot_write_img_confirmed();
 		break;
 	case CLOUD_EVT_READY:
@@ -580,12 +896,12 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		break;
 	case CLOUD_EVT_DATA_RECEIVED:
 		LOG_INF("CLOUD_EVT_DATA_RECEIVED");
-		err = cloud_decode_response(evt->data.msg.buf, &cloud_data);
+		err = cloud_codec_decode_response(evt->data.msg.buf, &cfg);
 		if (err) {
 			LOG_ERR("Could not decode response %d", err);
 		}
-		ext_sensors_accelerometer_threshold_set(&cloud_data);
-		k_delayed_work_submit(&cloud_config_send_work, K_NO_WAIT);
+		ext_sensors_accelerometer_threshold_set(cfg.acct);
+		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
@@ -697,10 +1013,10 @@ static void modem_rsrp_handler(char rsrp_value)
 		return;
 	}
 
-	cloud_data.rsrp = rsrp_value;
+	modem_buf[head_modem_buf].rsrp = rsrp_value;
 
 	LOG_INF("Incoming RSRP status message, RSRP value is %d",
-		cloud_data.rsrp);
+		modem_buf[head_modem_buf].rsrp);
 }
 
 static int modem_data_init(void)
@@ -737,15 +1053,15 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	 */
 	if ((has_changed & button_states & DK_BTN1_MSK) &&
 	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
-		if (cloud_connected) {
-			LOG_INF("Cloud publication by button 1 triggered, ");
-			LOG_INF("2 seconds to next allowed cloud publication ");
-			LOG_INF("triggered by button 1");
+		LOG_INF("Cloud publication by button 1 triggered, ");
+		LOG_INF("2 seconds to next allowed cloud publication ");
+		LOG_INF("triggered by button 1");
 
-			cloud_data.btn_number = 1;
-			cloud_data.btn_ts = k_uptime_get();
-			k_delayed_work_submit(&cloud_btn_send_work, K_NO_WAIT);
-			k_delayed_work_submit(&led_device_mode_set_work,
+		ui_buffer_populate(1);
+
+		if (cloud_connected) {
+			k_delayed_work_submit(&ui_send_work, K_NO_WAIT);
+			k_delayed_work_submit(&leds_set_work,
 					      K_SECONDS(3));
 		}
 
@@ -907,13 +1223,13 @@ void main(void)
 	 * though the device is in passive mode and movement is not detected.
 	 */
 	k_delayed_work_submit(&mov_timeout_work,
-			      K_SECONDS(cloud_data.mov_timeout));
+			      K_SECONDS(cfg.movt));
 
 	while (true) {
 		/*Check current device mode*/
-		if (!cloud_data.active) {
+		if (!cfg.act) {
 			LOG_INF("Device in PASSIVE mode");
-			k_delayed_work_submit(&led_device_mode_set_work,
+			k_delayed_work_submit(&leds_set_work,
 					      K_NO_WAIT);
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 				LOG_INF("The cat is moving!");
@@ -923,19 +1239,19 @@ void main(void)
 		}
 
 		/*Start GPS search*/
-		gps_control_start(K_NO_WAIT, cloud_data.gps_timeout);
+		gps_control_start(K_NO_WAIT, cfg.gpst);
 
 		/*Wait for GPS search timeout*/
 		k_sem_take(&gps_timeout_sem, K_FOREVER);
 
 		/*Send update to cloud. */
-		cloud_update();
+		data_publish();
 
 		/* Set device mode led behaviour */
-		k_delayed_work_submit(&led_device_mode_set_work, K_SECONDS(15));
+		k_delayed_work_submit(&leds_set_work, K_SECONDS(15));
 
 		/*Sleep*/
-		LOG_INF("Going to sleep for: %d seconds", active_wait_check());
-		k_sleep(K_SECONDS(active_wait_check()));
+		LOG_INF("Going to sleep for: %d seconds", device_mode_check());
+		k_sleep(K_SECONDS(device_mode_check()));
 	}
 }

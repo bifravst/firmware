@@ -116,7 +116,7 @@ int ext_sensors_init(ext_sensors_evt_handler_t handler)
 	return 0;
 }
 
-int ext_sensors_temperature_get(struct cloud_data *cloud_data)
+int ext_sensors_temperature_get(double *ext_temp)
 {
 	int err;
 	struct sensor_value data;
@@ -136,15 +136,13 @@ int ext_sensors_temperature_get(struct cloud_data *cloud_data)
 	}
 
 	k_spinlock_key_t key = k_spin_lock(&(temp_sensor.lock));
-	cloud_data->temp = sensor_value_to_double(&data);
+	*ext_temp = sensor_value_to_double(&data);
 	k_spin_unlock(&(temp_sensor.lock), key);
-
-	cloud_data->env_ts = k_uptime_get();
 
 	return 0;
 }
 
-int ext_sensors_humidity_get(struct cloud_data *cloud_data)
+int ext_sensors_humidity_get(double *ext_hum)
 {
 	int err;
 	struct sensor_value data;
@@ -164,19 +162,17 @@ int ext_sensors_humidity_get(struct cloud_data *cloud_data)
 	}
 
 	k_spinlock_key_t key = k_spin_lock(&(humid_sensor.lock));
-	cloud_data->hum = sensor_value_to_double(&data);
+	*ext_hum = sensor_value_to_double(&data);
 	k_spin_unlock(&(humid_sensor.lock), key);
-
-	cloud_data->env_ts = k_uptime_get();
 
 	return 0;
 }
 
-void ext_sensors_accelerometer_threshold_set(struct cloud_data *cloud_data)
+void ext_sensors_accelerometer_threshold_set(int acc_thres)
 {
-	if (cloud_data->acc_thres == 0) {
+	if (acc_thres == 0) {
 		accelerometer_threshold = 0;
 	} else {
-		accelerometer_threshold = cloud_data->acc_thres / 10;
+		accelerometer_threshold = acc_thres / 10;
 	}
 }

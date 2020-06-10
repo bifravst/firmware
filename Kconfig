@@ -77,11 +77,31 @@ config SERIALIZATION_JSON
 	default y
 	select CJSON_LIB
 
-config CIRCULAR_SENSOR_BUFFER_MAX
-	int "Maximum amount of buffered sensor entries"
+config GPS_BUFFER_MAX
+	int "Sets the number of entries in the GPS buffer"
 	default 10
 
-config MAX_PER_ENCODED_ENTRIES
+config SENSOR_BUFFER_MAX
+	int "Sets the number of entries in the sensor buffer"
+	default 10
+
+config MODEM_BUFFER_MAX
+	int "Sets the number of entries in the modem buffer"
+	default 10
+
+config UI_BUFFER_MAX
+	int "Sets the number of entries in the UI buffer"
+	default 10
+
+config ACCEL_BUFFER_MAX
+	int "Sets the number of entries in the accelerometer buffer"
+	default 10
+
+config BAT_BUFFER_MAX
+	int "Sets the number of entries in the battery buffer"
+	default 10
+
+config CONFIG_PER_MESSAGE_MAX
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 

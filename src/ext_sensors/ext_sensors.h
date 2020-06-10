@@ -68,7 +68,7 @@ int ext_sensors_init(ext_sensors_evt_handler_t handler);
  *
  * @return 0 on success or negative error value on failure.
  */
-int ext_sensors_temperature_get(struct cloud_data *cloud_data);
+int ext_sensors_temperature_get(double *ext_temp);
 
 /**
  * @brief Get humidity from library.
@@ -77,7 +77,7 @@ int ext_sensors_temperature_get(struct cloud_data *cloud_data);
  *
  * @return 0 on success or negative error value on failure.
  */
-int ext_sensors_humidity_get(struct cloud_data *cloud_data);
+int ext_sensors_humidity_get(double *ext_hum);
 
 /**
  * @brief Set the threshold that triggeres callback on accelerometer data.
@@ -86,7 +86,7 @@ int ext_sensors_humidity_get(struct cloud_data *cloud_data);
  *
  * @return 0 on success or negative error value on failure.
  */
-void ext_sensors_accelerometer_threshold_set(struct cloud_data *cloud_data);
+void ext_sensors_accelerometer_threshold_set(int acc_thresh);
 
 #ifdef __cplusplus
 }
