@@ -730,7 +730,7 @@ int cloud_codec_encode_gps_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_GPS_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_gps_data_add(gps_obj, &data[i],
 							true);
 			encoded_counter++;
@@ -775,7 +775,7 @@ int cloud_codec_encode_modem_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_MODEM_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_dynamic_modem_data_add(modem_obj,
 								  &data[i],
 								  true);
@@ -821,7 +821,7 @@ int cloud_codec_encode_sensor_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_SENSOR_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_sensor_data_add(sensor_obj,
 							   &data[i],
 							   true);
@@ -867,7 +867,7 @@ int cloud_codec_encode_ui_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_UI_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_ui_data_add(ui_obj, &data[i], true);
 			encoded_counter++;
 		}
@@ -911,7 +911,7 @@ int cloud_codec_encode_accel_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_ACCEL_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_accel_data_add(acc_obj, &data[i],
 							  true);
 			encoded_counter++;
@@ -956,7 +956,7 @@ int cloud_codec_encode_bat_buffer(struct cloud_msg *output,
 
 	for (int i = 0; i < CONFIG_BAT_BUFFER_MAX; i++) {
 		if (data[i].queued &&
-		    (encoded_counter < CONFIG_CONFIG_PER_MESSAGE_MAX)) {
+		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
 			err += cloud_codec_bat_data_add(root_obj, &data[i],
 							true);
 			encoded_counter++;

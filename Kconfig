@@ -101,7 +101,7 @@ config BAT_BUFFER_MAX
 	int "Sets the number of entries in the battery buffer"
 	default 10
 
-config CONFIG_PER_MESSAGE_MAX
+config ENCODED_BUFFER_ENTRIES_MAX
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
