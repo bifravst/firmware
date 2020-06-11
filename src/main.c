@@ -204,20 +204,20 @@ static void accelerometer_buffer_populate(
 	if (k_uptime_get() - buf_entry_try_again_timeout >
 		K_SECONDS(CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC)) {
 
-	/* Go to start of buffer if end is reached. */
-	head_accel_buf += 1;
-	if (head_accel_buf == CONFIG_ACCEL_BUFFER_MAX - 1) {
-		head_accel_buf = 0;
-	}
+		/* Go to start of buffer if end is reached. */
+		head_accel_buf += 1;
+		if (head_accel_buf == CONFIG_ACCEL_BUFFER_MAX - 1) {
+			head_accel_buf = 0;
+		}
 
 		accel_buf[head_accel_buf].values[0] = acc_data->value_array[0];
 		accel_buf[head_accel_buf].values[1] = acc_data->value_array[1];
 		accel_buf[head_accel_buf].values[2] = acc_data->value_array[2];
-	accel_buf[head_accel_buf].ts = k_uptime_get();
-	accel_buf[head_accel_buf].queued = true;
+		accel_buf[head_accel_buf].ts = k_uptime_get();
+		accel_buf[head_accel_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in accelerometer buffer filled",
-		head_accel_buf, CONFIG_ACCEL_BUFFER_MAX);
+		LOG_INF("Entry: %d of %d in accelerometer buffer filled",
+			head_accel_buf, CONFIG_ACCEL_BUFFER_MAX);
 
 		buf_entry_try_again_timeout = k_uptime_get();
 	}
