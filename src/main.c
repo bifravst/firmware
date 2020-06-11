@@ -83,6 +83,7 @@ static struct k_delayed_work buffered_data_send_work;
 static struct k_delayed_work ui_send_work;
 static struct k_delayed_work leds_set_work;
 static struct k_delayed_work mov_timeout_work;
+static struct k_delayed_work sample_data_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
@@ -497,22 +498,6 @@ static void data_send(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
-	err = modem_buffer_populate();
-	if (err) {
-		LOG_ERR("modem_buffer_populate, error: %d", err);
-		return;
-	}
-
-	battery_buffer_populate();
-
-#if defined(CONFIG_EXTERNAL_SENSORS)
-	err = sensors_buffer_populate();
-	if (err) {
-		LOG_ERR("sensors_buffer_populate, error: %d", err);
-		return;
-	}
-#endif
-
 	err = cloud_codec_encode_data(&msg,
 				      &gps_buf[head_gps_buf],
 				      &sensors_buf[head_sensor_buf],
@@ -735,6 +720,11 @@ static void config_get(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
+	/** Sample data from modem and environmental sensor before
+	 *  cloud publication.
+	 */
+	k_delayed_work_submit(&sample_data_work, K_NO_WAIT);
+
 	if (cloud_connected) {
 		k_delayed_work_submit(&device_config_get_work, K_NO_WAIT);
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
@@ -747,10 +737,36 @@ static void data_publish(void)
 {
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
+	/** Sample data from modem and environmental sensor before
+	 *  cloud publication.
+	 */
+	k_delayed_work_submit(&sample_data_work, K_NO_WAIT);
+
 	if (cloud_connected) {
 		k_delayed_work_submit(&data_send_work, K_NO_WAIT);
 		k_delayed_work_submit(&buffered_data_send_work, K_NO_WAIT);
 	}
+}
+
+static void sample_data_work_fn(struct k_work *work)
+{
+	int err;
+
+	err = modem_buffer_populate();
+	if (err) {
+		LOG_ERR("modem_buffer_populate, error: %d", err);
+		return;
+	}
+
+	battery_buffer_populate();
+
+#if defined(CONFIG_EXTERNAL_SENSORS)
+	err = sensors_buffer_populate();
+	if (err) {
+		LOG_ERR("sensors_buffer_populate, error: %d", err);
+		return;
+	}
+#endif
 }
 
 static void leds_set_work_fn(struct k_work *work)
@@ -810,6 +826,8 @@ static void work_init(void)
 			    mov_timeout_work_fn);
 	k_delayed_work_init(&ui_send_work,
 			    ui_send_work_fn);
+	k_delayed_work_init(&sample_data_work,
+			    sample_data_work_fn);
 }
 
 static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
