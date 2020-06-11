@@ -168,7 +168,7 @@ static void battery_buffer_populate(void)
 	bat_buf[head_bat_buf].bat_ts = k_uptime_get();
 	bat_buf[head_bat_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in battery buffer filled", head_accel_buf,
+	LOG_INF("Entry: %d of %d in battery buffer filled", head_bat_buf,
 		CONFIG_BAT_BUFFER_MAX);
 }
 
@@ -194,22 +194,33 @@ static void gps_buffer_populate(struct gps_pvt *gps_data)
 }
 
 static void accelerometer_buffer_populate(
-		const struct ext_sensor_evt *const accel_data)
+		const struct ext_sensor_evt *const acc_data)
 {
+	static int buf_entry_try_again_timeout;
+
+	/** Only populate accelerometer buffer if a configurable amount of time
+	 *  has passed since the last accelerometer buffer entry.
+	 */
+	if (k_uptime_get() - buf_entry_try_again_timeout >
+		K_SECONDS(CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC)) {
+
 	/* Go to start of buffer if end is reached. */
 	head_accel_buf += 1;
 	if (head_accel_buf == CONFIG_ACCEL_BUFFER_MAX - 1) {
 		head_accel_buf = 0;
 	}
 
-	accel_buf[head_accel_buf].values[0] = accel_data->value_array[0];
-	accel_buf[head_accel_buf].values[1] = accel_data->value_array[1];
-	accel_buf[head_accel_buf].values[2] = accel_data->value_array[2];
+		accel_buf[head_accel_buf].values[0] = acc_data->value_array[0];
+		accel_buf[head_accel_buf].values[1] = acc_data->value_array[1];
+		accel_buf[head_accel_buf].values[2] = acc_data->value_array[2];
 	accel_buf[head_accel_buf].ts = k_uptime_get();
 	accel_buf[head_accel_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in accelerometer buffer filled",
 		head_accel_buf, CONFIG_ACCEL_BUFFER_MAX);
+
+		buf_entry_try_again_timeout = k_uptime_get();
+	}
 }
 
 static int modem_buffer_populate(void)
@@ -668,7 +679,10 @@ check_accel_buffer:
 		}
 	}
 
-	if (queued_entries) {
+	/** Only publish buffered accelerometer data if in
+	 * passive device mode.
+	 */
+	if (queued_entries && !cfg.act) {
 		/* Encode and send queued entries in batches. */
 		err = cloud_codec_encode_accel_buffer(&msg, accel_buf);
 		if (err) {
@@ -938,6 +952,9 @@ connect:
 	cloud_connect_retries++;
 
 	LOG_INF("Trying to connect to cloud in %d seconds", retry_backoff_s);
+
+	/** Sleep in order to make sure time has been pushed to the modem. */
+	k_sleep(K_SECONDS(5));
 
 	date_time_update();
 

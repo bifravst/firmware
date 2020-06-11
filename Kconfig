@@ -105,6 +105,10 @@ config ENCODED_BUFFER_ENTRIES_MAX
 	int "Maximum amount of encoded and published sensor buffer entries"
 	default 7
 
+config TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC
+	int "How often the device is allowed to update the accelerometer buffer"
+	default 60
+
 endmenu # Cloud codec
 
 menu "Watchdog"
