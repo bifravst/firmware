@@ -174,7 +174,7 @@ exit:
 static int cloud_codec_static_modem_data_add(cJSON *parent,
 					     struct cloud_data_modem *data)
 {
-	int err;
+	int err = 0;
 	char nw_mode[50];
 
 	const char lte_string[]   = "LTE-M";
@@ -182,7 +182,8 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	const char gps_string[]   = " GPS";
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of modem buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->mod_ts_static);
@@ -221,6 +222,7 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	err += json_add_number(static_m, "ts", data->mod_ts_static);
 	err += json_add_obj(parent, "dev", static_m);
 
+exit:
 	return err;
 }
 
@@ -228,11 +230,12 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 					      struct cloud_data_modem *data,
 					      bool buffered_entry)
 {
-	int err;
+	int err = 0;
 	long mccmnc;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of modem buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->mod_ts);
@@ -274,9 +277,9 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 		err += json_add_obj(parent, "roam", dynamic_m);
 	}
 
-
 	data->queued = false;
 
+exit:
 	return err;
 }
 
@@ -284,10 +287,11 @@ static int cloud_codec_sensor_data_add(cJSON *parent,
 					struct cloud_data_sensors *data,
 					bool buffered_entry)
 {
-	int err;
+	int err = 0;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of sensor buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->env_ts);
@@ -322,6 +326,7 @@ static int cloud_codec_sensor_data_add(cJSON *parent,
 
 	data->queued = false;
 
+exit:
 	return err;
 }
 
@@ -329,10 +334,11 @@ static int cloud_codec_gps_data_add(cJSON *parent,
 				    struct cloud_data_gps *data,
 				    bool buffered_entry)
 {
-	int err;
+	int err = 0;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of gps buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->gps_ts);
@@ -376,6 +382,7 @@ static int cloud_codec_gps_data_add(cJSON *parent,
 
 	data->queued = false;
 
+exit:
 	return err;
 }
 
@@ -383,10 +390,11 @@ static int cloud_codec_accel_data_add(cJSON *parent,
 				      struct cloud_data_accelerometer *data,
 				      bool buffered_entry)
 {
-	int err;
+	int err = 0;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of accel buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->ts);
@@ -420,6 +428,7 @@ static int cloud_codec_accel_data_add(cJSON *parent,
 
 	data->queued = false;
 
+exit:
 	return err;
 }
 
@@ -427,10 +436,11 @@ static int cloud_codec_ui_data_add(cJSON *parent,
 				   struct cloud_data_ui *data,
 				   bool buffered_entry)
 {
-	int err;
+	int err = 0;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of UI buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->btn_ts);
@@ -458,6 +468,7 @@ static int cloud_codec_ui_data_add(cJSON *parent,
 
 	data->queued = false;
 
+exit:
 	return err;
 }
 
@@ -465,10 +476,11 @@ static int cloud_codec_bat_data_add(cJSON *parent,
 				   struct cloud_data_battery *data,
 				   bool buffered_entry)
 {
-	int err;
+	int err = 0;
 
 	if (!data->queued) {
-		return -ENODATA;
+		LOG_INF("Head of battery buffer not indexing a queued entry");
+		goto exit;
 	}
 
 	err = date_time_uptime_to_unix_time_ms(&data->bat_ts);
@@ -496,6 +508,7 @@ static int cloud_codec_bat_data_add(cJSON *parent,
 
 	data->queued = false;
 
+exit:
 	return err;
 }
 

@@ -161,7 +161,7 @@ static void battery_buffer_populate(void)
 {
 	/* Go to start of buffer if end is reached. */
 	head_bat_buf += 1;
-	if (head_bat_buf == CONFIG_BAT_BUFFER_MAX - 1) {
+	if (head_bat_buf == CONFIG_BAT_BUFFER_MAX) {
 		head_bat_buf = 0;
 	}
 
@@ -170,14 +170,14 @@ static void battery_buffer_populate(void)
 	bat_buf[head_bat_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in battery buffer filled", head_bat_buf,
-		CONFIG_BAT_BUFFER_MAX);
+		CONFIG_BAT_BUFFER_MAX - 1);
 }
 
 static void gps_buffer_populate(struct gps_pvt *gps_data)
 {
 	/* Go to start of buffer if end is reached. */
 	head_gps_buf += 1;
-	if (head_gps_buf == CONFIG_GPS_BUFFER_MAX - 1) {
+	if (head_gps_buf == CONFIG_GPS_BUFFER_MAX) {
 		head_gps_buf = 0;
 	}
 
@@ -191,25 +191,90 @@ static void gps_buffer_populate(struct gps_pvt *gps_data)
 	gps_buf[head_gps_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in GPS buffer filled", head_gps_buf,
-		CONFIG_GPS_BUFFER_MAX);
+		CONFIG_GPS_BUFFER_MAX - 1);
+}
+
+void acc_array_swap(struct cloud_data_accelerometer *xp,
+		    struct cloud_data_accelerometer *yp)
+{
+    struct cloud_data_accelerometer temp = *xp;
+    *xp = *yp;
+    *yp = temp;
 }
 
 static void accelerometer_buffer_populate(
 		const struct ext_sensor_evt *const acc_data)
 {
 	static int buf_entry_try_again_timeout;
+	int j, k, n;
+	int i = 0;
+	double temp = 0;
+	double temp_ = 0;
+	s64_t newest_time = 0;
 
 	/** Only populate accelerometer buffer if a configurable amount of time
-	 *  has passed since the last accelerometer buffer entry.
+	 *  has passed since the last accelerometer buffer entry was filled.
+	 *
+	 *  If the circular buffer is filled always keep the highest
+         *  values in the circular buffer.
 	 */
 	if (k_uptime_get() - buf_entry_try_again_timeout >
 		K_SECONDS(CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC)) {
 
-		/* Go to start of buffer if end is reached. */
-		head_accel_buf += 1;
-		if (head_accel_buf == CONFIG_ACCEL_BUFFER_MAX - 1) {
-			head_accel_buf = 0;
+		/** Populate the next available unqueued entry. */
+		for (k = 0; k < ARRAY_SIZE(accel_buf); k++) {
+			if (!accel_buf[k].queued) {
+				head_accel_buf = k;
+				goto populate_buffer;
+			}
 		}
+
+		/** Sort list after highest values using bubble sort.
+		 */
+		for (j = 0; j < ARRAY_SIZE(accel_buf)-i-1; j++) {
+			for (n = 0; n < 3; n++) {
+				if (temp < abs(accel_buf[j].values[n])) {
+					temp = abs(accel_buf[j].values[n]);
+				}
+
+				if (temp_ < abs(accel_buf[j + 1].values[n])) {
+					temp_ = abs(accel_buf[j + 1].values[n]);
+				}
+			}
+
+			if (temp > temp_) {
+				acc_array_swap(&accel_buf[j], &accel_buf[j+1]);
+			}
+		}
+
+
+		temp = 0;
+		temp_ = 0;
+
+		/** Find highest value in new accelerometer entry. */
+		for (n = 0; n < 3; n++) {
+			if (temp < abs(acc_data->value_array[n])) {
+				temp = abs(acc_data->value_array[n]);
+			}
+
+		}
+
+		/** Repalce old accelerometer entry with the new entry if the
+		 *  highest value in new value is greater than the old.
+		 */
+		for (int k = 0; k < ARRAY_SIZE(accel_buf); k++) {
+			for (n = 0; n < 3; n++) {
+				if (temp_ < abs(accel_buf[k].values[n])) {
+					temp_ = abs(accel_buf[k].values[n]);
+				}
+
+				if (temp > temp_) {
+					head_accel_buf = k;
+				}
+			}
+		}
+
+populate_buffer:
 
 		accel_buf[head_accel_buf].values[0] = acc_data->value_array[0];
 		accel_buf[head_accel_buf].values[1] = acc_data->value_array[1];
@@ -218,9 +283,18 @@ static void accelerometer_buffer_populate(
 		accel_buf[head_accel_buf].queued = true;
 
 		LOG_INF("Entry: %d of %d in accelerometer buffer filled",
-			head_accel_buf, CONFIG_ACCEL_BUFFER_MAX);
+			head_accel_buf, CONFIG_ACCEL_BUFFER_MAX - 1);
 
 		buf_entry_try_again_timeout = k_uptime_get();
+
+		/** Always point head of buffer to the newest sampled value. */
+		for(i = 0; i < ARRAY_SIZE(accel_buf); i++) {
+			if (newest_time < accel_buf[i].ts &&
+			    accel_buf[i].queued) {
+				newest_time = accel_buf[i].ts;
+				head_accel_buf = i;
+			}
+		}
 	}
 }
 
@@ -237,7 +311,7 @@ static int modem_buffer_populate(void)
 
 	/* Go to start of buffer if end is reached. */
 	head_modem_buf += 1;
-	if (head_modem_buf == CONFIG_MODEM_BUFFER_MAX - 1) {
+	if (head_modem_buf == CONFIG_MODEM_BUFFER_MAX) {
 		head_modem_buf = 0;
 	}
 
@@ -270,7 +344,7 @@ static int modem_buffer_populate(void)
 	modem_buf[head_modem_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in modem buffer filled", head_modem_buf,
-		CONFIG_MODEM_BUFFER_MAX);
+		CONFIG_MODEM_BUFFER_MAX - 1);
 
 	return 0;
 }
@@ -281,7 +355,7 @@ static int sensors_buffer_populate(void)
 
 	/* Go to start of buffer if end is reached. */
 	head_sensor_buf += 1;
-	if (head_sensor_buf == CONFIG_SENSOR_BUFFER_MAX - 1) {
+	if (head_sensor_buf == CONFIG_SENSOR_BUFFER_MAX) {
 		head_sensor_buf = 0;
 	}
 
@@ -302,7 +376,7 @@ static int sensors_buffer_populate(void)
 	sensors_buf[head_sensor_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in sensor buffer filled", head_sensor_buf,
-		CONFIG_SENSOR_BUFFER_MAX);
+		CONFIG_SENSOR_BUFFER_MAX - 1);
 
 	return 0;
 }
@@ -311,7 +385,7 @@ static void ui_buffer_populate(int btn_number)
 {
 	/* Go to start of buffer if end is reached. */
 	head_ui_buf += 1;
-	if (head_ui_buf == CONFIG_UI_BUFFER_MAX - 1) {
+	if (head_ui_buf == CONFIG_UI_BUFFER_MAX) {
 		head_ui_buf = 0;
 	}
 
@@ -320,7 +394,7 @@ static void ui_buffer_populate(int btn_number)
 	ui_buf[head_ui_buf].queued = true;
 
 	LOG_INF("Entry: %d of %d in UI buffer filled", head_ui_buf,
-		CONFIG_UI_BUFFER_MAX);
+		CONFIG_UI_BUFFER_MAX - 1);
 }
 
 static void lte_evt_handler(const struct lte_lc_evt *const evt)
@@ -376,8 +450,10 @@ static void ext_sensors_evt_handler(const struct ext_sensor_evt *const evt)
 {
 	switch (evt->type) {
 	case EXT_SENSOR_EVT_ACCELEROMETER_TRIGGER:
-		accelerometer_buffer_populate(evt);
-		k_sem_give(&accel_trig_sem);
+		if (!cfg.act) {
+			accelerometer_buffer_populate(evt);
+			k_sem_give(&accel_trig_sem);
+		}
 		break;
 	default:
 		break;
@@ -519,7 +595,7 @@ static void data_send(void)
 	}
 
 	gps_fix = false;
-	initial_cloud_connection = false;
+	initial_cloud_connection = true;
 }
 
 static void buffered_data_send(void)
@@ -1273,11 +1349,13 @@ void main(void)
 			LOG_INF("Device in ACTIVE mode");
 		}
 
-		/*Start GPS search*/
-		gps_control_start(K_NO_WAIT, cfg.gpst);
+		/** Start GPS search, disable GPS if gpst is set to 0. */
+		if (cfg.gpst > 0) {
+			gps_control_start(K_NO_WAIT, cfg.gpst);
 
-		/*Wait for GPS search timeout*/
-		k_sem_take(&gps_timeout_sem, K_FOREVER);
+			/*Wait for GPS search timeout*/
+			k_sem_take(&gps_timeout_sem, K_FOREVER);
+		}
 
 		/*Send update to cloud. */
 		data_publish();
