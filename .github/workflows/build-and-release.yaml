@@ -18,16 +18,22 @@ jobs:
           export NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
           echo $NEXT_VERSION
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj_thingy91_nrf9160ns.conf
+          echo $NEXT_VERSION
 
       - name: Configure the AWS IoT broker hostname
         if: github.head_ref == ''
         env:
           BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
+        run: |
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
 
       - name: Stub AWS IoT broker hostname (this is a PR)
         if: github.head_ref != ''
-        run: echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
+        run: |
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_thingy91_nrf9160ns.conf
 
       - name: Build image
         run: docker build -t bifravst-firmware-docker .
@@ -36,6 +42,7 @@ jobs:
         run: |
           # Print config
           cat prj.conf
+          cat prj_thingy91_nrf9160ns.conf
           # NB-IoT
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns.hex
@@ -47,6 +54,7 @@ jobs:
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj.conf
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
           sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj_thingy91_nrf9160ns.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
