@@ -142,7 +142,7 @@ enum ui_led_pattern ui_led_get_pattern(void);
  *
  * @return 0 on success or negative error value on failure.
  */
-int ui_led_set_color(u8_t red, u8_t green, u8_t blue);
+int ui_led_set_color(uint8_t red, uint8_t green, uint8_t blue);
 
 /**
  * @brief Stops leds

@@ -24,34 +24,13 @@ config CAT_TRACKER_APP_VERSION
 
 endmenu # Firmware versioning
 
-config POWER_OPTIMIZATION_ENABLE
-	bool "Enable power optimization"
-	default y
-	select LTE_EDRX_REQ
-
-menu "Cloud socket poll"
+menu "Cloud"
 
 config CLOUD_BACKEND
 	string
 	default "AWS_IOT"
 
-config MQTT_KEEPALIVE
-	int
-	default 1200
-
-config CLOUD_POLL_STACKSIZE
-	int
-	default 4096
-
-config CLOUD_POLL_PRIORITY
-	int
-	default 7
-
-config CLOUD_RECONNECT_RETRIES
-	int "Number of retires after a cloud socket POLLUP"
-	default 20
-
-endmenu # Cloud socket poll
+endmenu # Cloud
 
 menu "External sensors"
 
@@ -107,7 +86,7 @@ config ENCODED_BUFFER_ENTRIES_MAX
 
 config TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC
 	int "Time in between accelerometer buffer updates"
-	default 0
+	default 10
 
 endmenu # Cloud codec
 

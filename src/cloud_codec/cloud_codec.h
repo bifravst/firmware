@@ -46,9 +46,9 @@ enum cloud_data_encode_schema {
 /** @brief Structure containing battery data published to cloud. */
 struct cloud_data_battery {
 
-	u16_t bat;
+	uint16_t bat;
 
-	s64_t bat_ts;
+	int64_t bat_ts;
 
 	bool queued;
 };
@@ -56,7 +56,7 @@ struct cloud_data_battery {
 /** @brief Structure containing GPS data published to cloud. */
 struct cloud_data_gps {
 	/** GPS data timestamp. UNIX milliseconds. */
-	s64_t gps_ts;
+	int64_t gps_ts;
 	/** Longitude */
 	double longi;
 	/** Latitude */
@@ -90,7 +90,7 @@ struct cloud_data_cfg {
 
 struct cloud_data_accelerometer {
 	/** Accelerometer readings timestamp. UNIX milliseconds. */
-	s64_t ts;
+	int64_t ts;
 	/** Accelerometer readings. */
 	double values[3];
 
@@ -99,7 +99,7 @@ struct cloud_data_accelerometer {
 
 struct cloud_data_sensors {
 	/** Environmental sensors timestamp. UNIX milliseconds. */
-	s64_t env_ts;
+	int64_t env_ts;
 	/** Temperature in celcius */
 	double temp;
 	/** Humidity level in percentage */
@@ -110,15 +110,15 @@ struct cloud_data_sensors {
 
 struct cloud_data_modem {
 	/** Modem data timestamp. UNIX milliseconds. */
-	s64_t mod_ts;
-	s64_t mod_ts_static;
-	u16_t area;
-	u16_t cell;
-	u16_t bnd;
-	u16_t nw_gps;
-	u16_t nw_lte_m;
-	u16_t nw_nb_iot;
-	u16_t rsrp;
+	int64_t mod_ts;
+	int64_t mod_ts_static;
+	uint16_t area;
+	uint16_t cell;
+	uint16_t bnd;
+	uint16_t nw_gps;
+	uint16_t nw_lte_m;
+	uint16_t nw_nb_iot;
+	uint16_t rsrp;
 	char *ip;
 	char *mccmnc;
 	char *appv;
@@ -129,7 +129,7 @@ struct cloud_data_modem {
 };
 
 struct cloud_data_ui {
-	s64_t btn_ts;
+	int64_t btn_ts;
 	int btn;
 	bool queued;
 };

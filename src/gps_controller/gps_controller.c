@@ -65,7 +65,7 @@ static void stop(struct k_work *work)
 	LOG_INF("GPS operation was stopped");
 }
 
-void gps_control_start(u32_t delay_ms, u32_t timeout)
+void gps_control_start(uint32_t delay_ms, uint32_t timeout)
 {
 	if (timeout == 0) {
 		LOG_ERR("No GPS timeout set");
@@ -73,12 +73,12 @@ void gps_control_start(u32_t delay_ms, u32_t timeout)
 	}
 
 	gps_cfg.timeout = timeout;
-	k_delayed_work_submit(&start_work, delay_ms);
+	k_delayed_work_submit(&start_work, K_MSEC(delay_ms));
 }
 
-void gps_control_stop(u32_t delay_ms)
+void gps_control_stop(uint32_t delay_ms)
 {
-	k_delayed_work_submit(&stop_work, delay_ms);
+	k_delayed_work_submit(&stop_work, K_MSEC(delay_ms));
 }
 
 bool gps_control_is_active(void)

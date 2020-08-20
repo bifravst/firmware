@@ -21,8 +21,8 @@ static void leds_update(struct k_work *work)
 {
 	static bool led_on;
 	static bool passive_mode;
-	static u8_t current_led_on_mask;
-	u8_t led_on_mask;
+	static uint8_t current_led_on_mask;
+	uint8_t led_on_mask;
 
 	if (current_led_state == UI_LED_PASSIVE_MODE) {
 		passive_mode = true;
@@ -49,14 +49,14 @@ static void leds_update(struct k_work *work)
 	if (work) {
 		if (led_on) {
 			k_delayed_work_submit(&leds_update_work,
-					      UI_LED_ON_PERIOD_NORMAL);
+					      K_MSEC(UI_LED_ON_PERIOD_NORMAL));
 		} else {
 			if (passive_mode) {
 				k_delayed_work_submit(&leds_update_work,
-						      UI_LED_OFF_PERIOD_LONG);
+						      K_MSEC(UI_LED_OFF_PERIOD_LONG));
 			} else {
 				k_delayed_work_submit(&leds_update_work,
-						      UI_LED_OFF_PERIOD_NORMAL);
+						      K_MSEC(UI_LED_OFF_PERIOD_NORMAL));
 			}
 		}
 	}

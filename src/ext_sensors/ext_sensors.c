@@ -9,7 +9,7 @@ LOG_MODULE_REGISTER(ext_sensors, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
 struct env_sensor {
 	enum sensor_channel channel;
-	u8_t *dev_name;
+	uint8_t *dev_name;
 	struct device *dev;
 	struct k_spinlock lock;
 };

@@ -87,7 +87,7 @@ static struct k_delayed_work sample_data_work;
 
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
-K_SEM_DEFINE(cloud_conn_sem, 0, 1);
+K_SEM_DEFINE(lte_conn_sem, 0, 1);
 
 void error_handler(int err_code)
 {
@@ -202,6 +202,7 @@ void acc_array_swap(struct cloud_data_accelerometer *xp,
     *yp = temp;
 }
 
+#if defined(CONFIG_EXTERNAL_SENSORS)
 static void accelerometer_buffer_populate(
 		const struct ext_sensor_evt *const acc_data)
 {
@@ -210,7 +211,7 @@ static void accelerometer_buffer_populate(
 	int i = 0;
 	double temp = 0;
 	double temp_ = 0;
-	s64_t newest_time = 0;
+	int64_t newest_time = 0;
 
 	/** Only populate accelerometer buffer if a configurable amount of time
 	 *  has passed since the last accelerometer buffer entry was filled.
@@ -219,7 +220,7 @@ static void accelerometer_buffer_populate(
          *  values in the circular buffer.
 	 */
 	if (k_uptime_get() - buf_entry_try_again_timeout >
-		K_SECONDS(CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC)) {
+		1000 * CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC) {
 
 		/** Populate the next available unqueued entry. */
 		for (k = 0; k < ARRAY_SIZE(accel_buf); k++) {
@@ -297,6 +298,7 @@ populate_buffer:
 		}
 	}
 }
+#endif
 
 static int modem_buffer_populate(void)
 {
@@ -349,6 +351,7 @@ static int modem_buffer_populate(void)
 	return 0;
 }
 
+#if defined(CONFIG_EXTERNAL_SENSORS)
 static int sensors_buffer_populate(void)
 {
 	int err;
@@ -380,6 +383,7 @@ static int sensors_buffer_populate(void)
 
 	return 0;
 }
+#endif
 
 static void ui_buffer_populate(int btn_number)
 {
@@ -403,7 +407,6 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 	case LTE_LC_EVT_NW_REG_STATUS:
 		if ((evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_HOME) &&
 		    (evt->nw_reg_status != LTE_LC_NW_REG_REGISTERED_ROAMING)) {
-			k_sem_take(&cloud_conn_sem, K_NO_WAIT);
 			break;
 		}
 
@@ -412,7 +415,7 @@ static void lte_evt_handler(const struct lte_lc_evt *const evt)
 				"Connected to home network" :
 				"Connected to roaming network");
 
-		k_sem_give(&cloud_conn_sem);
+		k_sem_give(&lte_conn_sem);
 		break;
 	case LTE_LC_EVT_PSM_UPDATE:
 		LOG_DBG("PSM parameter update: TAU: %d, Active time: %d",
@@ -963,6 +966,9 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	int err;
 
 	switch (evt->type) {
+	case CLOUD_EVT_CONNECTING:
+		LOG_INF("CLOUD_EVT_CONNECTING");
+		break;
 	case CLOUD_EVT_CONNECTED:
 		LOG_INF("CLOUD_EVT_CONNECTED");
 		cloud_connected = true;
@@ -1023,97 +1029,6 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	}
 }
 
-void cloud_poll(void)
-{
-	int err;
-	int cloud_connect_retries = 0;
-	int retry_backoff_s = 0;
-
-	k_sem_take(&cloud_conn_sem, K_FOREVER);
-
-connect:
-
-	if (cloud_connect_retries >= CONFIG_CLOUD_RECONNECT_RETRIES) {
-		LOG_ERR("Too many cloud connect retires, reboot");
-		error_handler(-EIO);
-	}
-
-	/* Exponential backoff in case of disconnect from
-	 * cloud.
-	 */
-
-	retry_backoff_s = 10 + pow(cloud_connect_retries, 4);
-	cloud_connect_retries++;
-
-	LOG_INF("Trying to connect to cloud in %d seconds", retry_backoff_s);
-
-	/** Sleep in order to make sure time has been pushed to the modem. */
-	k_sleep(K_SECONDS(5));
-
-	date_time_update();
-
-	k_sleep(K_SECONDS(retry_backoff_s));
-
-	err = cloud_connect(cloud_backend);
-	if (err) {
-		LOG_ERR("cloud_connect failed: %d", err);
-		goto connect;
-	}
-
-	cloud_connect_retries++;
-
-	struct pollfd fds[] = { { .fd = cloud_backend->config->socket,
-				  .events = POLLIN } };
-
-	while (true) {
-		err = poll(fds, ARRAY_SIZE(fds),
-			   cloud_keepalive_time_left(cloud_backend));
-
-		if (err < 0) {
-			LOG_ERR("poll, error: %d", err);
-			error_handler(err);
-			continue;
-		}
-
-		if (err == 0) {
-			cloud_ping(cloud_backend);
-			LOG_INF("Cloud ping!");
-			continue;
-		}
-
-		if ((fds[0].revents & POLLIN) == POLLIN) {
-			cloud_input(cloud_backend);
-		}
-
-		if ((fds[0].revents & POLLNVAL) == POLLNVAL) {
-			LOG_ERR("Socket error: POLLNVAL");
-			LOG_ERR("The cloud socket was unexpectedly closed.");
-			error_handler(-EIO);
-			return;
-		}
-
-		if ((fds[0].revents & POLLHUP) == POLLHUP) {
-			LOG_ERR("Socket error: POLLHUP");
-			LOG_ERR("Connection was closed by the cloud.");
-			LOG_ERR("TRYING TO RECONNECT...");
-			break;
-		}
-
-		if ((fds[0].revents & POLLERR) == POLLERR) {
-			LOG_ERR("Socket error: POLLERR");
-			LOG_ERR("Cloud connection was unexpectedly closed.");
-			error_handler(-EIO);
-			return;
-		}
-	}
-
-	cloud_disconnect(cloud_backend);
-	goto connect;
-}
-
-K_THREAD_DEFINE(cloud_poll_thread, CONFIG_CLOUD_POLL_STACKSIZE, cloud_poll,
-		NULL, NULL, NULL, CONFIG_CLOUD_POLL_PRIORITY, 0, K_NO_WAIT);
-
 static void modem_rsrp_handler(char rsrp_value)
 {
 	/* RSRP raw values that represent actual signal strength are
@@ -1155,7 +1070,7 @@ static int modem_data_init(void)
 	return 0;
 }
 
-static void button_handler(u32_t button_states, u32_t has_changed)
+static void button_handler(uint32_t button_states, uint32_t has_changed)
 {
 	static int try_again_timeout;
 
@@ -1163,7 +1078,7 @@ static void button_handler(u32_t button_states, u32_t has_changed)
 	 * to 1 push every 2 seconds to avoid spamming the cloud socket.
 	 */
 	if ((has_changed & button_states & DK_BTN1_MSK) &&
-	    k_uptime_get() - try_again_timeout > K_SECONDS(2)) {
+	    k_uptime_get() - try_again_timeout > 2 * 1000) {
 		LOG_INF("Cloud publication by button 1 triggered, ");
 		LOG_INF("2 seconds to next allowed cloud publication ");
 		LOG_INF("triggered by button 1");
@@ -1329,6 +1244,22 @@ void main(void)
 		error_handler(err);
 	}
 
+	k_sem_take(&lte_conn_sem, K_FOREVER);
+
+	k_sleep(K_SECONDS(5));
+
+	date_time_update();
+
+	/** Sleep to ensure the date time library has obtained time before
+	 *  connecting to cloud.
+	 */
+	k_sleep(K_SECONDS(15));
+
+	err = cloud_connect(cloud_backend);
+	if (err) {
+		LOG_ERR("cloud_connect failed: %d", err);
+	}
+
 	/* Start movement timer which triggers every movement timeout.
 	 * Makes sure the device publishes every once and a while even
 	 * though the device is in passive mode and movement is not detected.
@@ -1351,7 +1282,7 @@ void main(void)
 
 		/** Start GPS search, disable GPS if gpst is set to 0. */
 		if (cfg.gpst > 0) {
-			gps_control_start(K_NO_WAIT, cfg.gpst);
+			gps_control_start(0, cfg.gpst);
 
 			/*Wait for GPS search timeout*/
 			k_sem_take(&gps_timeout_sem, K_FOREVER);
