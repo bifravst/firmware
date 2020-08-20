@@ -273,7 +273,7 @@ accelerometer_buffer_populate(const struct ext_sensor_evt *const acc_data)
 			}
 		}
 
-	populate_buffer:
+populate_buffer:
 
 		accel_buf[head_accel_buf].values[0] = acc_data->value_array[0];
 		accel_buf[head_accel_buf].values[1] = acc_data->value_array[1];
