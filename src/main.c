@@ -197,14 +197,14 @@ static void gps_buffer_populate(struct gps_pvt *gps_data)
 void acc_array_swap(struct cloud_data_accelerometer *xp,
 		    struct cloud_data_accelerometer *yp)
 {
-    struct cloud_data_accelerometer temp = *xp;
-    *xp = *yp;
-    *yp = temp;
+	struct cloud_data_accelerometer temp = *xp;
+	*xp = *yp;
+	*yp = temp;
 }
 
 #if defined(CONFIG_EXTERNAL_SENSORS)
-static void accelerometer_buffer_populate(
-		const struct ext_sensor_evt *const acc_data)
+static void
+accelerometer_buffer_populate(const struct ext_sensor_evt *const acc_data)
 {
 	static int buf_entry_try_again_timeout;
 	int j, k, n;
@@ -220,8 +220,7 @@ static void accelerometer_buffer_populate(
          *  values in the circular buffer.
 	 */
 	if (k_uptime_get() - buf_entry_try_again_timeout >
-		1000 * CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC) {
-
+	    1000 * CONFIG_TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC) {
 		/** Populate the next available unqueued entry. */
 		for (k = 0; k < ARRAY_SIZE(accel_buf); k++) {
 			if (!accel_buf[k].queued) {
@@ -232,7 +231,7 @@ static void accelerometer_buffer_populate(
 
 		/** Sort list after highest values using bubble sort.
 		 */
-		for (j = 0; j < ARRAY_SIZE(accel_buf)-i-1; j++) {
+		for (j = 0; j < ARRAY_SIZE(accel_buf) - i - 1; j++) {
 			for (n = 0; n < 3; n++) {
 				if (temp < abs(accel_buf[j].values[n])) {
 					temp = abs(accel_buf[j].values[n]);
@@ -244,10 +243,10 @@ static void accelerometer_buffer_populate(
 			}
 
 			if (temp > temp_) {
-				acc_array_swap(&accel_buf[j], &accel_buf[j+1]);
+				acc_array_swap(&accel_buf[j],
+					       &accel_buf[j + 1]);
 			}
 		}
-
 
 		temp = 0;
 		temp_ = 0;
@@ -257,7 +256,6 @@ static void accelerometer_buffer_populate(
 			if (temp < abs(acc_data->value_array[n])) {
 				temp = abs(acc_data->value_array[n]);
 			}
-
 		}
 
 		/** Repalce old accelerometer entry with the new entry if the
@@ -275,7 +273,7 @@ static void accelerometer_buffer_populate(
 			}
 		}
 
-populate_buffer:
+	populate_buffer:
 
 		accel_buf[head_accel_buf].values[0] = acc_data->value_array[0];
 		accel_buf[head_accel_buf].values[1] = acc_data->value_array[1];
@@ -289,7 +287,7 @@ populate_buffer:
 		buf_entry_try_again_timeout = k_uptime_get();
 
 		/** Always point head of buffer to the newest sampled value. */
-		for(i = 0; i < ARRAY_SIZE(accel_buf); i++) {
+		for (i = 0; i < ARRAY_SIZE(accel_buf); i++) {
 			if (newest_time < accel_buf[i].ts &&
 			    accel_buf[i].queued) {
 				newest_time = accel_buf[i].ts;
@@ -319,28 +317,19 @@ static int modem_buffer_populate(void)
 
 	modem_buf[head_modem_buf].ip =
 		modem_param.network.ip_address.value_string;
-	modem_buf[head_modem_buf].cell =
-		modem_param.network.cellid_dec;
+	modem_buf[head_modem_buf].cell = modem_param.network.cellid_dec;
 	modem_buf[head_modem_buf].mccmnc =
 		modem_param.network.current_operator.value_string;
-	modem_buf[head_modem_buf].area =
-		modem_param.network.area_code.value;
-	modem_buf[head_modem_buf].appv =
-		CONFIG_CAT_TRACKER_APP_VERSION;
-	modem_buf[head_modem_buf].brdv =
-		modem_param.device.board;
-	modem_buf[head_modem_buf].fw =
-		modem_param.device.modem_fw.value_string;
-	modem_buf[head_modem_buf].iccid =
-		modem_param.sim.iccid.value_string;
-	modem_buf[head_modem_buf].nw_lte_m =
-		modem_param.network.lte_mode.value;
+	modem_buf[head_modem_buf].area = modem_param.network.area_code.value;
+	modem_buf[head_modem_buf].appv = CONFIG_CAT_TRACKER_APP_VERSION;
+	modem_buf[head_modem_buf].brdv = modem_param.device.board;
+	modem_buf[head_modem_buf].fw = modem_param.device.modem_fw.value_string;
+	modem_buf[head_modem_buf].iccid = modem_param.sim.iccid.value_string;
+	modem_buf[head_modem_buf].nw_lte_m = modem_param.network.lte_mode.value;
 	modem_buf[head_modem_buf].nw_nb_iot =
 		modem_param.network.nbiot_mode.value;
-	modem_buf[head_modem_buf].nw_gps =
-		modem_param.network.gps_mode.value;
-	modem_buf[head_modem_buf].bnd =
-		modem_param.network.current_band.value;
+	modem_buf[head_modem_buf].nw_gps = modem_param.network.gps_mode.value;
+	modem_buf[head_modem_buf].bnd = modem_param.network.current_band.value;
 	modem_buf[head_modem_buf].mod_ts = k_uptime_get();
 	modem_buf[head_modem_buf].mod_ts_static = k_uptime_get();
 	modem_buf[head_modem_buf].queued = true;
@@ -502,14 +491,11 @@ static void ui_send(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
 				 .endpoint = pub_ep_topics_sub[1] };
 
-	err = cloud_codec_encode_data(&msg,
-				      &gps_buf[head_gps_buf],
-				      &sensors_buf[head_sensor_buf],
-				      &modem_buf[head_modem_buf],
-				      &ui_buf[head_ui_buf],
-				      &accel_buf[head_accel_buf],
-				      &bat_buf[head_bat_buf],
-				      CLOUD_DATA_ENCODE_UI);
+	err = cloud_codec_encode_data(
+		&msg, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
+		&modem_buf[head_modem_buf], &ui_buf[head_ui_buf],
+		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf],
+		CLOUD_DATA_ENCODE_UI);
 	if (err) {
 		LOG_ERR("cloud_encode_button_message_data, error: %d", err);
 		return;
@@ -577,14 +563,10 @@ static void data_send(void)
 	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
 				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
 
-	err = cloud_codec_encode_data(&msg,
-				      &gps_buf[head_gps_buf],
-				      &sensors_buf[head_sensor_buf],
-				      &modem_buf[head_modem_buf],
-				      &ui_buf[head_ui_buf],
-				      &accel_buf[head_accel_buf],
-				      &bat_buf[head_bat_buf],
-				      pub_schema);
+	err = cloud_codec_encode_data(
+		&msg, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
+		&modem_buf[head_modem_buf], &ui_buf[head_ui_buf],
+		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf], pub_schema);
 	if (err) {
 		LOG_ERR("Error enconding message %d", err);
 		return;
@@ -885,28 +867,21 @@ static void mov_timeout_work_fn(struct k_work *work)
 		k_sem_give(&accel_trig_sem);
 	}
 
-	k_delayed_work_submit(&mov_timeout_work,
-			      K_SECONDS(cfg.movt));
+	k_delayed_work_submit(&mov_timeout_work, K_SECONDS(cfg.movt));
 }
 
 static void work_init(void)
 {
-	k_delayed_work_init(&device_config_get_work,
-			    device_config_get_work_fn);
-	k_delayed_work_init(&data_send_work,
-			    data_send_work_fn);
+	k_delayed_work_init(&device_config_get_work, device_config_get_work_fn);
+	k_delayed_work_init(&data_send_work, data_send_work_fn);
 	k_delayed_work_init(&device_config_send_work,
 			    device_config_send_work_fn);
 	k_delayed_work_init(&buffered_data_send_work,
 			    buffered_data_send_work_fn);
-	k_delayed_work_init(&leds_set_work,
-			    leds_set_work_fn);
-	k_delayed_work_init(&mov_timeout_work,
-			    mov_timeout_work_fn);
-	k_delayed_work_init(&ui_send_work,
-			    ui_send_work_fn);
-	k_delayed_work_init(&sample_data_work,
-			    sample_data_work_fn);
+	k_delayed_work_init(&leds_set_work, leds_set_work_fn);
+	k_delayed_work_init(&mov_timeout_work, mov_timeout_work_fn);
+	k_delayed_work_init(&ui_send_work, ui_send_work_fn);
+	k_delayed_work_init(&sample_data_work, sample_data_work_fn);
 }
 
 static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
@@ -1087,8 +1062,7 @@ static void button_handler(uint32_t button_states, uint32_t has_changed)
 
 		if (cloud_connected) {
 			k_delayed_work_submit(&ui_send_work, K_NO_WAIT);
-			k_delayed_work_submit(&leds_set_work,
-					      K_SECONDS(3));
+			k_delayed_work_submit(&leds_set_work, K_SECONDS(3));
 		}
 
 		try_again_timeout = k_uptime_get();
@@ -1264,15 +1238,13 @@ void main(void)
 	 * Makes sure the device publishes every once and a while even
 	 * though the device is in passive mode and movement is not detected.
 	 */
-	k_delayed_work_submit(&mov_timeout_work,
-			      K_SECONDS(cfg.movt));
+	k_delayed_work_submit(&mov_timeout_work, K_SECONDS(cfg.movt));
 
 	while (true) {
 		/*Check current device mode*/
 		if (!cfg.act) {
 			LOG_INF("Device in PASSIVE mode");
-			k_delayed_work_submit(&leds_set_work,
-					      K_NO_WAIT);
+			k_delayed_work_submit(&leds_set_work, K_NO_WAIT);
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 				LOG_INF("The cat is moving!");
 			}

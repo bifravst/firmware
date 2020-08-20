@@ -52,11 +52,13 @@ static void leds_update(struct k_work *work)
 					      K_MSEC(UI_LED_ON_PERIOD_NORMAL));
 		} else {
 			if (passive_mode) {
-				k_delayed_work_submit(&leds_update_work,
-						      K_MSEC(UI_LED_OFF_PERIOD_LONG));
+				k_delayed_work_submit(
+					&leds_update_work,
+					K_MSEC(UI_LED_OFF_PERIOD_LONG));
 			} else {
-				k_delayed_work_submit(&leds_update_work,
-						      K_MSEC(UI_LED_OFF_PERIOD_NORMAL));
+				k_delayed_work_submit(
+					&leds_update_work,
+					K_MSEC(UI_LED_OFF_PERIOD_NORMAL));
 			}
 		}
 	}

@@ -45,7 +45,6 @@ enum cloud_data_encode_schema {
 
 /** @brief Structure containing battery data published to cloud. */
 struct cloud_data_battery {
-
 	uint16_t bat;
 
 	int64_t bat_ts;
@@ -164,7 +163,7 @@ int cloud_codec_encode_accel_buffer(struct cloud_msg *output,
 				    struct cloud_data_accelerometer *data);
 
 int cloud_codec_encode_bat_buffer(struct cloud_msg *output,
-				    struct cloud_data_battery *data);
+				  struct cloud_data_battery *data);
 
 static inline void cloud_codec_release_data(struct cloud_msg *output)
 {

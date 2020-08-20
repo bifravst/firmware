@@ -177,9 +177,9 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	int err = 0;
 	char nw_mode[50];
 
-	const char lte_string[]   = "LTE-M";
+	const char lte_string[] = "LTE-M";
 	const char nbiot_string[] = "NB-IoT";
-	const char gps_string[]   = " GPS";
+	const char gps_string[] = " GPS";
 
 	if (!data->queued) {
 		LOG_INF("Head of modem buffer not indexing a queued entry");
@@ -195,7 +195,7 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	cJSON *static_m = cJSON_CreateObject();
 	cJSON *static_m_v = cJSON_CreateObject();
 
-	if (static_m  == NULL || static_m_v  == NULL) {
+	if (static_m == NULL || static_m_v == NULL) {
 		cJSON_Delete(static_m);
 		cJSON_Delete(static_m_v);
 		return -ENOMEM;
@@ -247,7 +247,7 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 	cJSON *dynamic_m = cJSON_CreateObject();
 	cJSON *dynamic_m_v = cJSON_CreateObject();
 
-	if (dynamic_m  == NULL || dynamic_m_v  == NULL) {
+	if (dynamic_m == NULL || dynamic_m_v == NULL) {
 		cJSON_Delete(dynamic_m);
 		cJSON_Delete(dynamic_m_v);
 		return -ENOMEM;
@@ -256,7 +256,7 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 	mccmnc = strtol(data->mccmnc, NULL, 10);
 
 	if (buffered_entry) {
-		err =  json_add_number(dynamic_m_v, "rsrp", data->rsrp);
+		err = json_add_number(dynamic_m_v, "rsrp", data->rsrp);
 		err += json_add_number(dynamic_m_v, "area", data->area);
 		err += json_add_number(dynamic_m_v, "mccmnc", mccmnc);
 		err += json_add_number(dynamic_m_v, "cell", data->cell);
@@ -266,7 +266,7 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 		err += json_add_number(dynamic_m, "ts", data->mod_ts);
 		err += json_add_obj_array(parent, dynamic_m);
 	} else {
-		err =  json_add_number(dynamic_m_v, "rsrp", data->rsrp);
+		err = json_add_number(dynamic_m_v, "rsrp", data->rsrp);
 		err += json_add_number(dynamic_m_v, "area", data->area);
 		err += json_add_number(dynamic_m_v, "mccmnc", mccmnc);
 		err += json_add_number(dynamic_m_v, "cell", data->cell);
@@ -284,8 +284,8 @@ exit:
 }
 
 static int cloud_codec_sensor_data_add(cJSON *parent,
-					struct cloud_data_sensors *data,
-					bool buffered_entry)
+				       struct cloud_data_sensors *data,
+				       bool buffered_entry)
 {
 	int err = 0;
 
@@ -303,7 +303,7 @@ static int cloud_codec_sensor_data_add(cJSON *parent,
 	cJSON *sensor_obj = cJSON_CreateObject();
 	cJSON *sensor_val_obj = cJSON_CreateObject();
 
-	if (sensor_obj  == NULL || sensor_val_obj  == NULL) {
+	if (sensor_obj == NULL || sensor_val_obj == NULL) {
 		cJSON_Delete(sensor_obj);
 		cJSON_Delete(sensor_val_obj);
 		return -ENOMEM;
@@ -323,15 +323,13 @@ static int cloud_codec_sensor_data_add(cJSON *parent,
 		err += json_add_obj(parent, "env", sensor_obj);
 	}
 
-
 	data->queued = false;
 
 exit:
 	return err;
 }
 
-static int cloud_codec_gps_data_add(cJSON *parent,
-				    struct cloud_data_gps *data,
+static int cloud_codec_gps_data_add(cJSON *parent, struct cloud_data_gps *data,
 				    bool buffered_entry)
 {
 	int err = 0;
@@ -350,7 +348,7 @@ static int cloud_codec_gps_data_add(cJSON *parent,
 	cJSON *gps_obj = cJSON_CreateObject();
 	cJSON *gps_val_obj = cJSON_CreateObject();
 
-	if (gps_obj  == NULL || gps_val_obj == NULL) {
+	if (gps_obj == NULL || gps_val_obj == NULL) {
 		cJSON_Delete(gps_obj);
 		cJSON_Delete(gps_val_obj);
 		return -ENOMEM;
@@ -379,7 +377,6 @@ static int cloud_codec_gps_data_add(cJSON *parent,
 		err += json_add_obj(parent, "gps", gps_obj);
 	}
 
-
 	data->queued = false;
 
 exit:
@@ -406,7 +403,7 @@ static int cloud_codec_accel_data_add(cJSON *parent,
 	cJSON *acc_obj = cJSON_CreateObject();
 	cJSON *acc_v_obj = cJSON_CreateObject();
 
-	if (acc_obj  == NULL || acc_v_obj == NULL) {
+	if (acc_obj == NULL || acc_v_obj == NULL) {
 		cJSON_Delete(acc_obj);
 		cJSON_Delete(acc_v_obj);
 		return -ENOMEM;
@@ -432,8 +429,7 @@ exit:
 	return err;
 }
 
-static int cloud_codec_ui_data_add(cJSON *parent,
-				   struct cloud_data_ui *data,
+static int cloud_codec_ui_data_add(cJSON *parent, struct cloud_data_ui *data,
 				   bool buffered_entry)
 {
 	int err = 0;
@@ -473,8 +469,8 @@ exit:
 }
 
 static int cloud_codec_bat_data_add(cJSON *parent,
-				   struct cloud_data_battery *data,
-				   bool buffered_entry)
+				    struct cloud_data_battery *data,
+				    bool buffered_entry)
 {
 	int err = 0;
 
@@ -610,9 +606,9 @@ int cloud_codec_encode_data(struct cloud_msg *output,
 	int err = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *state_obj = cJSON_CreateObject();
-	cJSON *rep_obj   = cJSON_CreateObject();
+	cJSON *rep_obj = cJSON_CreateObject();
 
 	if (root_obj == NULL || state_obj == NULL || rep_obj == NULL) {
 		cJSON_Delete(root_obj);
@@ -692,7 +688,7 @@ int cloud_codec_encode_data(struct cloud_msg *output,
 	case CLOUD_DATA_ENCODE_MDYN_SENS_BAT_ACCEL:
 		err = cloud_codec_bat_data_add(rep_obj, bat_buf, false);
 		err += cloud_codec_dynamic_modem_data_add(rep_obj, modem_buf,
-							 false);
+							  false);
 		err += cloud_codec_sensor_data_add(rep_obj, sensor_buf, false);
 		err += cloud_codec_accel_data_add(rep_obj, accel_buf, false);
 		err += json_add_obj(state_obj, "reported", rep_obj);
@@ -732,7 +728,7 @@ int cloud_codec_encode_gps_buffer(struct cloud_msg *output,
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || gps_obj == NULL) {
@@ -777,7 +773,7 @@ int cloud_codec_encode_modem_buffer(struct cloud_msg *output,
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *modem_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || modem_obj == NULL) {
@@ -789,9 +785,8 @@ int cloud_codec_encode_modem_buffer(struct cloud_msg *output,
 	for (int i = 0; i < CONFIG_MODEM_BUFFER_MAX; i++) {
 		if (data[i].queued &&
 		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_dynamic_modem_data_add(modem_obj,
-								  &data[i],
-								  true);
+			err += cloud_codec_dynamic_modem_data_add(
+				modem_obj, &data[i], true);
 			encoded_counter++;
 		}
 	}
@@ -823,7 +818,7 @@ int cloud_codec_encode_sensor_buffer(struct cloud_msg *output,
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *sensor_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || sensor_obj == NULL) {
@@ -835,8 +830,7 @@ int cloud_codec_encode_sensor_buffer(struct cloud_msg *output,
 	for (int i = 0; i < CONFIG_SENSOR_BUFFER_MAX; i++) {
 		if (data[i].queued &&
 		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_sensor_data_add(sensor_obj,
-							   &data[i],
+			err += cloud_codec_sensor_data_add(sensor_obj, &data[i],
 							   true);
 			encoded_counter++;
 		}
@@ -869,7 +863,7 @@ int cloud_codec_encode_ui_buffer(struct cloud_msg *output,
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *ui_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || ui_obj == NULL) {
@@ -913,7 +907,7 @@ int cloud_codec_encode_accel_buffer(struct cloud_msg *output,
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *acc_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || acc_obj == NULL) {
@@ -952,13 +946,13 @@ exit:
 }
 
 int cloud_codec_encode_bat_buffer(struct cloud_msg *output,
-				    struct cloud_data_battery *data)
+				  struct cloud_data_battery *data)
 {
 	int err = 0;
 	int encoded_counter = 0;
 	char *buffer;
 
-	cJSON *root_obj  = cJSON_CreateObject();
+	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *bat_obj = cJSON_CreateArray();
 
 	if (root_obj == NULL || bat_obj) {
