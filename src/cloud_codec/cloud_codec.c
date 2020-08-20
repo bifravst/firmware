@@ -177,9 +177,9 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	int err = 0;
 	char nw_mode[50];
 
-	const char lte_string[] = "LTE-M";
-	const char nbiot_string[] = "NB-IoT";
-	const char gps_string[] = " GPS";
+	static const char lte_string[] = "LTE-M";
+	static const char nbiot_string[] = "NB-IoT";
+	static const char gps_string[] = " GPS";
 
 	if (!data->queued) {
 		LOG_INF("Head of modem buffer not indexing a queued entry");
