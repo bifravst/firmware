@@ -24,7 +24,7 @@
     "@commitlint/config-angular": "9.1.2",
     "@semantic-release/commit-analyzer": "8.0.1",
     "husky": "4.2.5",
-    "semantic-release": "17.0.7",
+    "semantic-release": "17.1.1",
     "standard": "14.3.3",
     "stream-buffers": "3.0.2"
   },
