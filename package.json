@@ -20,13 +20,13 @@
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
   "devDependencies": {
-    "@commitlint/cli": "^9.1.2",
-    "@commitlint/config-angular": "^9.1.2",
-    "@semantic-release/commit-analyzer": "^8.0.1",
-    "husky": "^4.2.5",
-    "semantic-release": "^17.0.7",
-    "standard": "^14.3.3",
-    "stream-buffers": "^3.0.2"
+    "@commitlint/cli": "9.1.2",
+    "@commitlint/config-angular": "9.1.2",
+    "@semantic-release/commit-analyzer": "8.0.1",
+    "husky": "4.2.5",
+    "semantic-release": "17.0.7",
+    "standard": "14.3.3",
+    "stream-buffers": "3.0.2"
   },
   "husky": {
     "hooks": {
