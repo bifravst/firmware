@@ -1343,6 +1343,7 @@ void main(void)
 			k_delayed_work_submit(&leds_set_work, K_NO_WAIT);
 			if (!k_sem_take(&accel_trig_sem, K_FOREVER)) {
 				LOG_INF("The cat is moving!");
+				LOG_INF("Or it's lazy and this is just the movement timeout!");
 			}
 		} else {
 			LOG_INF("Device in ACTIVE mode");
