@@ -1,22 +1,27 @@
+/*
+ * Copyright (c) 2020 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+ */
+
 #include <zephyr.h>
 #include <stdio.h>
 #include <string.h>
-#include <logging/log_ctrl.h>
-#include <power/reboot.h>
-#include <device.h>
+#include <stdlib.h>
 #include <drivers/sensor.h>
 #include <drivers/gps.h>
-#include <net/cloud.h>
 #include <modem/lte_lc.h>
-#include <stdlib.h>
 #include <modem/modem_info.h>
 #include <net/socket.h>
+#include <net/cloud.h>
+#include <device.h>
+#include <power/reboot.h>
 #include <dfu/mcuboot.h>
 #include <date_time.h>
 #include <dk_buttons_and_leds.h>
 #include <math.h>
 
-/* Application spesific module*/
+/* Application specific modules. */
 #include "gps_controller.h"
 #include "ext_sensors.h"
 #include "watchdog.h"
@@ -24,8 +29,10 @@
 #include "ui.h"
 
 #include <logging/log.h>
+#include <logging/log_ctrl.h>
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
+/* Application specific AWS topics. */
 #define AWS_CLOUD_CLIENT_ID_LEN 15
 #define AWS "$aws/things/"
 #define AWS_LEN (sizeof(AWS) - 1)
@@ -36,21 +43,23 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define MESSAGES_TOPIC "%s/messages"
 #define MESSAGES_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 9)
 
+/* Timeout in seconds in which the application will wait for an initial event
+ * from the date time library.
+ */
+#define DATE_TIME_TIMEOUT_S 15
+
 enum app_endpoint_type { CLOUD_EP_TOPIC_MESSAGES = CLOUD_EP_PRIV_START };
 
+/* Circular buffers. All data sent to cloud are stored in cicular buffers.
+ * Upon a LTE connection loss the device will keep sampling/storing data in
+ * the buffers, and empty the buffers in batches upon a reconnect.
+ */
 static struct cloud_data_gps gps_buf[CONFIG_GPS_BUFFER_MAX];
 static struct cloud_data_sensors sensors_buf[CONFIG_SENSOR_BUFFER_MAX];
 static struct cloud_data_modem modem_buf[CONFIG_MODEM_BUFFER_MAX];
 static struct cloud_data_ui ui_buf[CONFIG_UI_BUFFER_MAX];
 static struct cloud_data_accelerometer accel_buf[CONFIG_ACCEL_BUFFER_MAX];
 static struct cloud_data_battery bat_buf[CONFIG_BAT_BUFFER_MAX];
-
-static struct cloud_data_cfg cfg = { .gpst = 60,
-				     .act = true,
-				     .actw = 60,
-				     .pasw = 60,
-				     .movt = 3600,
-				     .acct = 100 };
 
 /** Head of circular buffers. */
 static int head_gps_buf;
@@ -59,6 +68,14 @@ static int head_modem_buf;
 static int head_ui_buf;
 static int head_accel_buf;
 static int head_bat_buf;
+
+/* Default device configuration. */
+static struct cloud_data_cfg cfg = { .gpst = 60,
+				     .act = true,
+				     .actw = 60,
+				     .pasw = 60,
+				     .movt = 3600,
+				     .acct = 100 };
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
 static struct cloud_endpoint pub_ep_topics_sub[2];
@@ -72,7 +89,6 @@ static struct modem_param_info modem_param;
 static struct cloud_backend *cloud_backend;
 
 static bool gps_fix;
-
 static bool cloud_connected;
 static bool initial_cloud_connection;
 
@@ -88,6 +104,7 @@ static struct k_delayed_work sample_data_work;
 K_SEM_DEFINE(accel_trig_sem, 0, 1);
 K_SEM_DEFINE(gps_timeout_sem, 0, 1);
 K_SEM_DEFINE(lte_conn_sem, 0, 1);
+K_SEM_DEFINE(date_time_sem, 0, 1);
 
 void error_handler(int err_code)
 {
@@ -121,6 +138,9 @@ void k_sys_fatal_error_handler(unsigned int reason, const z_arch_esf_t *esf)
 
 static int device_mode_check(void)
 {
+	/* Return either active passive timeout depending on the
+	 * device mode.
+	 */
 	if (!cfg.act) {
 		return cfg.pasw;
 	}
@@ -128,18 +148,19 @@ static int device_mode_check(void)
 	return cfg.actw;
 }
 
-static void time_set(struct gps_pvt *gps_data)
+static void gps_time_set(struct gps_pvt *gps_data)
 {
-	struct tm gps_time;
-
-	/* Change datetime.year and datetime.month to accomodate the
-	 * correct input format. */
-	gps_time.tm_year = gps_data->datetime.year - 1900;
-	gps_time.tm_mon = gps_data->datetime.month - 1;
-	gps_time.tm_mday = gps_data->datetime.day;
-	gps_time.tm_hour = gps_data->datetime.hour;
-	gps_time.tm_min = gps_data->datetime.minute;
-	gps_time.tm_sec = gps_data->datetime.seconds;
+	/* Change datetime.year and datetime.month to accommodate the
+	 * correct input format.
+	 */
+	struct tm gps_time = {
+		.tm_year = gps_data->datetime.year - 1900,
+		.tm_mon = gps_data->datetime.month - 1,
+		.tm_mday = gps_data->datetime.day,
+		.tm_hour = gps_data->datetime.hour,
+		.tm_min = gps_data->datetime.minute,
+		.tm_sec = gps_data->datetime.seconds,
+	};
 
 	date_time_set(&gps_time);
 }
@@ -258,7 +279,7 @@ accelerometer_buffer_populate(const struct ext_sensor_evt *const acc_data)
 			}
 		}
 
-		/** Repalce old accelerometer entry with the new entry if the
+		/** Replace old accelerometer entry with the new entry if the
 		 *  highest value in new value is greater than the old.
 		 */
 		for (int k = 0; k < ARRAY_SIZE(accel_buf); k++) {
@@ -538,7 +559,7 @@ static void data_send(void)
 	int err;
 	enum cloud_data_encode_schema pub_schema;
 
-	/** Data encoded depending on mode, obtained gps fix and
+	/* Data encoded depending on mode, obtained gps fix and
 	 * accelerometer trigger.
 	 */
 
@@ -906,7 +927,7 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 	case GPS_EVT_PVT_FIX:
 		LOG_INF("GPS_EVT_PVT_FIX");
 		gps_control_set_active(false);
-		time_set(&evt->pvt);
+		gps_time_set(&evt->pvt);
 		gps_buffer_populate(&evt->pvt);
 		gps_fix = true;
 		k_sem_give(&gps_timeout_sem);
@@ -1150,7 +1171,7 @@ static int cloud_setup(void)
 		return err;
 	}
 
-	/* Populate cloud spesific endpoint topics */
+	/* Populate cloud specific endpoint topics */
 	err = populate_app_endpoint_topics();
 	if (err) {
 		LOG_ERR("populate_app_endpoint_topics, error: %d", err);
@@ -1158,6 +1179,31 @@ static int cloud_setup(void)
 	}
 
 	return err;
+}
+
+static void date_time_event_handler(const struct date_time_evt *evt)
+{
+	switch (evt->type) {
+	case DATE_TIME_OBTAINED_MODEM:
+		LOG_INF("DATE_TIME_OBTAINED_MODEM");
+		break;
+	case DATE_TIME_OBTAINED_NTP:
+		LOG_INF("DATE_TIME_OBTAINED_NTP");
+		break;
+	case DATE_TIME_OBTAINED_EXT:
+		LOG_INF("DATE_TIME_OBTAINED_EXT");
+		break;
+	case DATE_TIME_NOT_OBTAINED:
+		LOG_INF("DATE_TIME_NOT_OBTAINED");
+		break;
+	default:
+		break;
+	}
+
+	/* Do not depend on obtained time, continue upon any event from the
+	 * date time library.
+	 */
+	k_sem_give(&date_time_sem);
 }
 
 void main(void)
@@ -1222,14 +1268,13 @@ void main(void)
 
 	k_sem_take(&lte_conn_sem, K_FOREVER);
 
-	k_sleep(K_SECONDS(5));
+	date_time_update_async(date_time_event_handler);
 
-	date_time_update();
-
-	/** Sleep to ensure the date time library has obtained time before
-	 *  connecting to cloud.
-	 */
-	k_sleep(K_SECONDS(15));
+	err = k_sem_take(&date_time_sem, K_SECONDS(DATE_TIME_TIMEOUT_S));
+	if (err) {
+		LOG_WRN("Date time, no callback event within %d seconds",
+			DATE_TIME_TIMEOUT_S);
+	}
 
 	err = cloud_connect(cloud_backend);
 	if (err) {
