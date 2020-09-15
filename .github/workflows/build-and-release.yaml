@@ -15,11 +15,9 @@ jobs:
       - name: Determine next release version
         run: |
           npm ci
-          export NEXT_VERSION=`node .github/workflows/get-next-version.js`
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj.conf
+          NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo $NEXT_VERSION
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"$NEXT_VERSION\"" >> prj_thingy91_nrf9160ns.conf
-          echo $NEXT_VERSION
+          echo "::set-env name=NEXT_VERSION::${NEXT_VERSION}"
 
       - name: Configure the AWS IoT broker hostname
         if: github.head_ref == ''
@@ -35,32 +33,41 @@ jobs:
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_thingy91_nrf9160ns.conf
 
-      - name: Build image
+      - name: Build Docker image
         run: docker build -t bifravst-firmware-docker .
 
-      - name: Build
+      - name: Build 9160 DK for NB-IoT
         run: |
-          # Print config
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-9160dk-nbiot\"" >> prj.conf
           cat prj.conf
-          cat prj_thingy91_nrf9160ns.conf
-          # NB-IoT
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-app_update.bin
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
-          # LTE-m
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj.conf
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj_thingy91_nrf9160ns.conf
+      - name: "Build Thingy:91 for NB-IoT"
+        run: |
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-nbiot\"" >> prj_thingy91_nrf9160ns.conf
+          cat prj_thingy91_nrf9160ns.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-app_update.bin
+      - name: Build 9160 DK for LTE-m
+        run: |
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-9160dk-ltem\"" >> prj.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj.conf
+          cat prj.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+      - name: "Build Thingy:91 for LTE-m"
+        run: |
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-ltem\"" >> prj_thingy91_nrf9160ns.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj_thingy91_nrf9160ns.conf
+          cat prj_thingy91_nrf9160ns.conf
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
