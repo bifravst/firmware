@@ -1,6 +1,10 @@
 name: ClangFormat
 
-on: pull_request
+on:
+  pull_request:
+    paths:
+      - "**.c"
+      - "**.h"
 
 jobs:
   clang-format:
