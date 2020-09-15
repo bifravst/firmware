@@ -22,7 +22,6 @@
 #include <math.h>
 
 /* Application specific modules. */
-#include "gps_controller.h"
 #include "ext_sensors.h"
 #include "watchdog.h"
 #include "cloud_codec.h"
@@ -42,6 +41,19 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define BATCH_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 6)
 #define MESSAGES_TOPIC "%s/messages"
 #define MESSAGES_TOPIC_LEN (AWS_CLOUD_CLIENT_ID_LEN + 9)
+
+/* Maximum GPS interval value. Dummy value, will not be used. Starting
+ * and stopping of GPS is done by the application.
+ */
+#define GPS_INTERVAL_MAX 1800
+
+/* Default device configuration values. */
+#define ACTIVE_TIMEOUT_SECONDS 60
+#define PASSIVE_TIMEOUT_SECONDS 60
+#define MOVEMENT_TIMEOUT_SECONDS 3600
+#define ACCELEROMETER_THRESHOLD 100
+#define GPS_TIMEOUT_SECONDS 60
+#define DEVICE_MODE true
 
 /* Timeout in seconds in which the application will wait for an initial event
  * from the date time library.
@@ -70,12 +82,12 @@ static int head_accel_buf;
 static int head_bat_buf;
 
 /* Default device configuration. */
-static struct cloud_data_cfg cfg = { .gpst = 60,
-				     .act = true,
-				     .actw = 60,
-				     .pasw = 60,
-				     .movt = 3600,
-				     .acct = 100 };
+static struct cloud_data_cfg cfg = { .gpst = GPS_TIMEOUT_SECONDS,
+				     .act = DEVICE_MODE,
+				     .actw = ACTIVE_TIMEOUT_SECONDS,
+				     .pasw = PASSIVE_TIMEOUT_SECONDS,
+				     .movt = MOVEMENT_TIMEOUT_SECONDS,
+				     .acct = ACCELEROMETER_THRESHOLD };
 
 static struct cloud_endpoint sub_ep_topics_sub[1];
 static struct cloud_endpoint pub_ep_topics_sub[2];
@@ -101,12 +113,28 @@ static struct k_delayed_work leds_set_work;
 static struct k_delayed_work mov_timeout_work;
 static struct k_delayed_work sample_data_work;
 
-K_SEM_DEFINE(accel_trig_sem, 0, 1);
-K_SEM_DEFINE(gps_timeout_sem, 0, 1);
-K_SEM_DEFINE(lte_conn_sem, 0, 1);
-K_SEM_DEFINE(date_time_sem, 0, 1);
+/* Depend on this semaphore when in passive mode. Release only if the movement
+ * of the subject breaks the set accelerometer threshold value. When the
+ * sempahore is released the application performs its normal publish cycle.
+ */
+static K_SEM_DEFINE(accel_trig_sem, 0, 1);
+/* Give this semaphore when the GPS either obtains a fix or times out. */
+static K_SEM_DEFINE(gps_timeout_sem, 0, 1);
+/* Give this semaphore when the device has a successful LTE connection. */
+static K_SEM_DEFINE(lte_conn_sem, 0, 1);
+/* Give this semaphore when the date time library has tried to obtain time. */
+static K_SEM_DEFINE(date_time_sem, 0, 1);
 
-void error_handler(int err_code)
+/* GPS device. Used to identify the GPS driver in the sensor API. */
+static struct device *gps_dev;
+
+/* nRF9160 GPS driver configuration. */
+static struct gps_config gps_cfg = { .nav_mode = GPS_NAV_MODE_PERIODIC,
+				     .power_mode = GPS_POWER_MODE_DISABLED,
+				     .interval = GPS_INTERVAL_MAX,
+				     .timeout = GPS_TIMEOUT_SECONDS };
+
+static void error_handler(int err_code)
 {
 	LOG_ERR("err_handler, error code: %d", err_code);
 	ui_led_set_pattern(UI_LED_ERROR_SYSTEM_FAULT);
@@ -167,7 +195,7 @@ static void gps_time_set(struct gps_pvt *gps_data)
 
 static void leds_set(void)
 {
-	if (!gps_control_is_active()) {
+	if (!k_sem_count_get(&gps_timeout_sem)) {
 		if (!cfg.act) {
 			ui_led_set_pattern(UI_LED_PASSIVE_MODE);
 		} else {
@@ -918,7 +946,6 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 		break;
 	case GPS_EVT_SEARCH_TIMEOUT:
 		LOG_INF("GPS_EVT_SEARCH_TIMEOUT");
-		gps_control_set_active(false);
 		k_sem_give(&gps_timeout_sem);
 		break;
 	case GPS_EVT_PVT:
@@ -926,7 +953,6 @@ static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
 		break;
 	case GPS_EVT_PVT_FIX:
 		LOG_INF("GPS_EVT_PVT_FIX");
-		gps_control_set_active(false);
 		gps_time_set(&evt->pvt);
 		gps_buffer_populate(&evt->pvt);
 		gps_fix = true;
@@ -1012,6 +1038,8 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		if (err) {
 			LOG_ERR("Could not decode response %d", err);
 		}
+		/* Set new accelerometer threshold and GPS timeout. */
+		gps_cfg.timeout = cfg.gpst;
 		ext_sensors_accelerometer_threshold_set(cfg.acct);
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
 		break;
@@ -1206,6 +1234,26 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 	k_sem_give(&date_time_sem);
 }
 
+static int gps_setup(void)
+{
+	int err;
+
+	gps_dev = device_get_binding(CONFIG_GPS_DEV_NAME);
+	if (gps_dev == NULL) {
+		LOG_ERR("Could not get %s device",
+			log_strdup(CONFIG_GPS_DEV_NAME));
+		return -ENODEV;
+	}
+
+	err = gps_init(gps_dev, gps_trigger_handler);
+	if (err) {
+		LOG_ERR("Could not initialize GPS, error: %d", err);
+		return err;
+	}
+
+	return 0;
+}
+
 void main(void)
 {
 	int err;
@@ -1254,9 +1302,9 @@ void main(void)
 		error_handler(err);
 	}
 
-	err = gps_control_init(gps_trigger_handler);
+	err = gps_setup();
 	if (err) {
-		LOG_INF("gps_control_init, error %d", err);
+		LOG_INF("gps_setup, error: %d", err);
 		error_handler(err);
 	}
 
@@ -1288,6 +1336,7 @@ void main(void)
 	k_delayed_work_submit(&mov_timeout_work, K_SECONDS(cfg.movt));
 
 	while (true) {
+
 		/*Check current device mode*/
 		if (!cfg.act) {
 			LOG_INF("Device in PASSIVE mode");
@@ -1301,10 +1350,20 @@ void main(void)
 
 		/** Start GPS search, disable GPS if gpst is set to 0. */
 		if (cfg.gpst > 0) {
-			gps_control_start(0, cfg.gpst);
+			gps_start(gps_dev, &gps_cfg);
+			if (err) {
+				LOG_ERR("Failed to enable GPS, error: %d", err);
+				error_handler(err);
+			}
 
 			/*Wait for GPS search timeout*/
 			k_sem_take(&gps_timeout_sem, K_FOREVER);
+		}
+
+		err = gps_stop(gps_dev);
+		if (err) {
+			LOG_ERR("Failed to stop GPS, error: %d", err);
+			error_handler(err);
 		}
 
 		/*Send update to cloud. */
