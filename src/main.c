@@ -572,7 +572,7 @@ static void device_config_send(void)
 
 	err = cloud_codec_encode_cfg_data(&msg, &cfg);
 	if (err == -EAGAIN) {
-		LOG_INF("No change in device configuration");
+		LOG_DBG("No change in device configuration");
 		return;
 	} else if (err) {
 		LOG_ERR("Device configuration not encoded, error: %d", err);
@@ -1034,10 +1034,10 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		sys_reboot(0);
 		break;
 	case CLOUD_EVT_DATA_SENT:
-		LOG_INF("CLOUD_EVT_DATA_SENT");
+		LOG_DBG("CLOUD_EVT_DATA_SENT");
 		break;
 	case CLOUD_EVT_DATA_RECEIVED:
-		LOG_INF("CLOUD_EVT_DATA_RECEIVED");
+		LOG_DBG("CLOUD_EVT_DATA_RECEIVED");
 		err = cloud_codec_decode_response(evt->data.msg.buf, &cfg);
 		if (err) {
 			LOG_ERR("Could not decode response %d", err);
@@ -1048,10 +1048,10 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
-		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
+		LOG_DBG("CLOUD_EVT_PAIR_REQUEST");
 		break;
 	case CLOUD_EVT_PAIR_DONE:
-		LOG_INF("CLOUD_EVT_PAIR_DONE");
+		LOG_DBG("CLOUD_EVT_PAIR_DONE");
 		break;
 	default:
 		LOG_ERR("Unknown cloud event type: %d", evt->type);
