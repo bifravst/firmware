@@ -1346,7 +1346,6 @@ void main(void)
 	k_delayed_work_submit(&mov_timeout_work, K_SECONDS(cfg.movt));
 
 	while (true) {
-
 		/*Check current device mode*/
 		if (!cfg.act) {
 			LOG_INF("Device in PASSIVE mode");
