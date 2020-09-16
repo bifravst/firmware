@@ -1272,16 +1272,16 @@ static void date_time_event_handler(const struct date_time_evt *evt)
 {
 	switch (evt->type) {
 	case DATE_TIME_OBTAINED_MODEM:
-		LOG_INF("DATE_TIME_OBTAINED_MODEM");
+		LOG_DBG("DATE_TIME_OBTAINED_MODEM");
 		break;
 	case DATE_TIME_OBTAINED_NTP:
-		LOG_INF("DATE_TIME_OBTAINED_NTP");
+		LOG_DBG("DATE_TIME_OBTAINED_NTP");
 		break;
 	case DATE_TIME_OBTAINED_EXT:
-		LOG_INF("DATE_TIME_OBTAINED_EXT");
+		LOG_DBG("DATE_TIME_OBTAINED_EXT");
 		break;
 	case DATE_TIME_NOT_OBTAINED:
-		LOG_INF("DATE_TIME_NOT_OBTAINED");
+		LOG_WRN("DATE_TIME_NOT_OBTAINED");
 		break;
 	default:
 		break;
