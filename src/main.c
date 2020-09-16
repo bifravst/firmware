@@ -221,7 +221,7 @@ static void battery_buffer_populate(void)
 	bat_buf[head_bat_buf].bat_ts = k_uptime_get();
 	bat_buf[head_bat_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in battery buffer filled", head_bat_buf,
+	LOG_DBG("Entry: %d of %d in battery buffer filled", head_bat_buf,
 		CONFIG_BAT_BUFFER_MAX - 1);
 }
 
@@ -242,7 +242,7 @@ static void gps_buffer_populate(struct gps_pvt *gps_data)
 	gps_buf[head_gps_buf].gps_ts = k_uptime_get();
 	gps_buf[head_gps_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in GPS buffer filled", head_gps_buf,
+	LOG_DBG("Entry: %d of %d in GPS buffer filled", head_gps_buf,
 		CONFIG_GPS_BUFFER_MAX - 1);
 }
 
@@ -335,7 +335,7 @@ populate_buffer:
 		accel_buf[head_accel_buf].ts = k_uptime_get();
 		accel_buf[head_accel_buf].queued = true;
 
-		LOG_INF("Entry: %d of %d in accelerometer buffer filled",
+		LOG_DBG("Entry: %d of %d in accelerometer buffer filled",
 			head_accel_buf, CONFIG_ACCEL_BUFFER_MAX - 1);
 
 		buf_entry_try_again_timeout = k_uptime_get();
@@ -389,7 +389,7 @@ static int modem_buffer_populate(void)
 	modem_buf[head_modem_buf].mod_ts_static = k_uptime_get();
 	modem_buf[head_modem_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in modem buffer filled", head_modem_buf,
+	LOG_DBG("Entry: %d of %d in modem buffer filled", head_modem_buf,
 		CONFIG_MODEM_BUFFER_MAX - 1);
 
 	return 0;
@@ -422,7 +422,7 @@ static int sensors_buffer_populate(void)
 	sensors_buf[head_sensor_buf].env_ts = k_uptime_get();
 	sensors_buf[head_sensor_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in sensor buffer filled", head_sensor_buf,
+	LOG_DBG("Entry: %d of %d in sensor buffer filled", head_sensor_buf,
 		CONFIG_SENSOR_BUFFER_MAX - 1);
 
 	return 0;
@@ -441,7 +441,7 @@ static void ui_buffer_populate(int btn_number)
 	ui_buf[head_ui_buf].btn_ts = k_uptime_get();
 	ui_buf[head_ui_buf].queued = true;
 
-	LOG_INF("Entry: %d of %d in UI buffer filled", head_ui_buf,
+	LOG_DBG("Entry: %d of %d in UI buffer filled", head_ui_buf,
 		CONFIG_UI_BUFFER_MAX - 1);
 }
 
