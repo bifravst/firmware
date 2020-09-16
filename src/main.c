@@ -352,6 +352,30 @@ populate_buffer:
 }
 #endif
 
+/* Produce a warning if modem firmware version is unexpected. */
+static void check_modem_fw_version(void)
+{
+	static bool modem_fw_version_checked;
+
+	if (modem_fw_version_checked) {
+		return;
+	}
+	if (strcmp(modem_param.device.modem_fw.value_string,
+		   CONFIG_EXPECTED_MODEM_FIRMWARE_VERSION) != 0) {
+		LOG_WRN("Unsupported modem firmware version: %s",
+			log_strdup(modem_param.device.modem_fw.value_string));
+		LOG_WRN("Expected firmware version: %s",
+			CONFIG_EXPECTED_MODEM_FIRMWARE_VERSION);
+		LOG_WRN("You can change the expected version through the");
+		LOG_WRN("EXPECTED_MODEM_FIRMWARE_VERSION setting.");
+		LOG_WRN("Please upgrade: http://bit.ly/nrf9160-mfw-update");
+	} else {
+		LOG_INF("Board is running expected modem firmware version: %s",
+			log_strdup(modem_param.device.modem_fw.value_string));
+	}
+	modem_fw_version_checked = true;
+}
+
 static int modem_buffer_populate(void)
 {
 	int err;
@@ -362,6 +386,8 @@ static int modem_buffer_populate(void)
 		LOG_ERR("modem_info_params_get, error: %d", err);
 		return err;
 	}
+
+	check_modem_fw_version();
 
 	/* Go to start of buffer if end is reached. */
 	head_modem_buf += 1;
