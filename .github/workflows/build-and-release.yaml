@@ -43,13 +43,31 @@ jobs:
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
-      - name: "Build Thingy:91 for NB-IoT"
+
+      - name: Publish 9160 DK NB-IoT firmware as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: 9160 DK NB-IoT firmware
+          path: |
+            cat-tracker-nrf9160_pca10090ns.hex
+            cat-tracker-nrf9160_pca10090ns-app_update.bin
+
+      - name: Build Thingy:91 for NB-IoT
         run: |
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-nbiot\"" >> prj_thingy91_nrf9160ns.conf
           cat prj_thingy91_nrf9160ns.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-app_update.bin
+
+      - name: Publish Thingy:91 NB-IoT firmware as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: Thingy 91 NB-IoT firmware
+          path: |
+            cat-tracker-thingy91_nrf9160ns.hex
+            cat-tracker-thingy91_nrf9160ns-app_update.bin
+
       - name: Build 9160 DK for LTE-m
         run: |
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-9160dk-ltem\"" >> prj.conf
@@ -59,7 +77,16 @@ jobs:
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
-      - name: "Build Thingy:91 for LTE-m"
+
+      - name: Publish 9160 DK LTE-m firmware as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: 9160 DK LTE-m firmware
+          path: |
+            cat-tracker-nrf9160_pca10090ns-ltem.hex
+            cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
+
+      - name: Build Thingy:91 for LTE-m
         run: |
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-ltem\"" >> prj_thingy91_nrf9160ns.conf
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
@@ -68,6 +95,14 @@ jobs:
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
+
+      - name: Publish Thingy:91 LTE-m firmware as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: Thingy 91 LTE-m firmware
+          path: |
+            cat-tracker-thingy91_nrf9160ns-ltem.hex
+            cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
