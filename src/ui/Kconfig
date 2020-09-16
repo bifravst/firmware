@@ -47,4 +47,4 @@ endmenu
 
 module = UI
 module-str = User Interface
-source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+source "subsys/logging/Kconfig.template.log_config"
