@@ -104,7 +104,7 @@ int cloud_codec_decode_response(char *input, struct cloud_data_cfg *data)
 		goto exit;
 	}
 
-	printk("Decoded message: %s\n", string);
+	LOG_DBG("Decoded message: %s", log_strdup(string));
 
 	group_obj = json_object_decode(root_obj, "cfg");
 	if (group_obj != NULL) {
@@ -182,7 +182,7 @@ static int cloud_codec_static_modem_data_add(cJSON *parent,
 	static const char gps_string[] = " GPS";
 
 	if (!data->queued) {
-		LOG_INF("Head of modem buffer not indexing a queued entry");
+		LOG_DBG("Head of modem buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -234,7 +234,7 @@ static int cloud_codec_dynamic_modem_data_add(cJSON *parent,
 	long mccmnc;
 
 	if (!data->queued) {
-		LOG_INF("Head of modem buffer not indexing a queued entry");
+		LOG_DBG("Head of modem buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -290,7 +290,7 @@ static int cloud_codec_sensor_data_add(cJSON *parent,
 	int err = 0;
 
 	if (!data->queued) {
-		LOG_INF("Head of sensor buffer not indexing a queued entry");
+		LOG_DBG("Head of sensor buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -335,7 +335,7 @@ static int cloud_codec_gps_data_add(cJSON *parent, struct cloud_data_gps *data,
 	int err = 0;
 
 	if (!data->queued) {
-		LOG_INF("Head of gps buffer not indexing a queued entry");
+		LOG_DBG("Head of gps buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -390,7 +390,7 @@ static int cloud_codec_accel_data_add(cJSON *parent,
 	int err = 0;
 
 	if (!data->queued) {
-		LOG_INF("Head of accel buffer not indexing a queued entry");
+		LOG_DBG("Head of accel buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -435,7 +435,7 @@ static int cloud_codec_ui_data_add(cJSON *parent, struct cloud_data_ui *data,
 	int err = 0;
 
 	if (!data->queued) {
-		LOG_INF("Head of UI buffer not indexing a queued entry");
+		LOG_DBG("Head of UI buffer not indexing a queued entry");
 		goto exit;
 	}
 
@@ -475,7 +475,7 @@ static int cloud_codec_bat_data_add(cJSON *parent,
 	int err = 0;
 
 	if (!data->queued) {
-		LOG_INF("Head of battery buffer not indexing a queued entry");
+		LOG_DBG("Head of battery buffer not indexing a queued entry");
 		goto exit;
 	}
 
