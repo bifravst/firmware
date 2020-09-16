@@ -22,6 +22,10 @@ config CAT_TRACKER_APP_VERSION
 	string "The version of the cat tracker firmware"
 	default "0.0.0-development"
 
+config EXPECTED_MODEM_FIRMWARE_VERSION
+	string "The expected modem firmware version"
+	default "0.0.0-development"
+
 endmenu # Firmware versioning
 
 menu "Cloud"
