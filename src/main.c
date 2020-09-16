@@ -113,6 +113,9 @@ static struct k_delayed_work leds_set_work;
 static struct k_delayed_work mov_timeout_work;
 static struct k_delayed_work sample_data_work;
 
+/* Value that always holds the latest RSRP value. */
+static uint16_t rsrp_value_latest;
+
 /* Depend on this semaphore when in passive mode. Release only if the movement
  * of the subject breaks the set accelerometer threshold value. When the
  * sempahore is released the application performs its normal publish cycle.
@@ -366,6 +369,7 @@ static int modem_buffer_populate(void)
 		head_modem_buf = 0;
 	}
 
+	modem_buf[head_modem_buf].rsrp = rsrp_value_latest;
 	modem_buf[head_modem_buf].ip =
 		modem_param.network.ip_address.value_string;
 	modem_buf[head_modem_buf].cell = modem_param.network.cellid_dec;
@@ -1065,10 +1069,16 @@ static void modem_rsrp_handler(char rsrp_value)
 		return;
 	}
 
-	modem_buf[head_modem_buf].rsrp = rsrp_value;
+	/* Set temporary variable to hold RSRP value. RSRP callbacks and other
+	 * data from the modem info module are retrieved separately.
+	 * This temporarily saves the latest value which are sent to cloud upon
+	 * a cloud publication.
+	 */
+
+	rsrp_value_latest = rsrp_value;
 
 	LOG_INF("Incoming RSRP status message, RSRP value is %d",
-		modem_buf[head_modem_buf].rsrp);
+		rsrp_value_latest);
 }
 
 static int modem_data_init(void)
