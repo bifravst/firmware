@@ -1098,7 +1098,7 @@ static void modem_rsrp_handler(char rsrp_value)
 
 	rsrp_value_latest = rsrp_value;
 
-	LOG_INF("Incoming RSRP status message, RSRP value is %d",
+	LOG_DBG("Incoming RSRP status message, RSRP value is %d",
 		rsrp_value_latest);
 }
 
