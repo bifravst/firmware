@@ -1363,7 +1363,6 @@ void main(void)
 	}
 
 	while (true) {
-
 		/*Check current device mode*/
 		if (!cfg.act) {
 			LOG_INF("Device in PASSIVE mode");
