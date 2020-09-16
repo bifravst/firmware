@@ -24,7 +24,7 @@ config CAT_TRACKER_APP_VERSION
 
 config EXPECTED_MODEM_FIRMWARE_VERSION
 	string "The expected modem firmware version"
-	default "0.0.0-development"
+	default "mfw_nrf9160_1.2.1"
 
 endmenu # Firmware versioning
 
