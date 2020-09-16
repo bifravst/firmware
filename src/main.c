@@ -846,6 +846,8 @@ static void config_get(void)
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
 		k_delayed_work_submit(&data_send_work, K_NO_WAIT);
 		k_delayed_work_submit(&buffered_data_send_work, K_NO_WAIT);
+	} else {
+		LOG_INF("Not connected to cloud!");
 	}
 }
 
@@ -861,6 +863,8 @@ static void data_publish(void)
 	if (cloud_connected) {
 		k_delayed_work_submit(&data_send_work, K_NO_WAIT);
 		k_delayed_work_submit(&buffered_data_send_work, K_NO_WAIT);
+	} else {
+		LOG_INF("Not connected to cloud!");
 	}
 }
 
@@ -992,6 +996,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	ARG_UNUSED(user_data);
 
 	int err;
+	static int mov_timeout_prev;
 
 	switch (evt->type) {
 	case CLOUD_EVT_CONNECTING:
@@ -1046,6 +1051,22 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		gps_cfg.timeout = cfg.gpst;
 		ext_sensors_accelerometer_threshold_set(cfg.acct);
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
+
+		/* Start movement timer which triggers every movement timeout.
+		 * Makes sure the device publishes every once and a while even
+		 * though the device is in passive mode and movement is not
+		 * detected. Schedule new timeout only if the movement timeout
+		 * has changed.
+		 */
+
+		if (cfg.movt != mov_timeout_prev) {
+			LOG_INF("Schedueling movement timeout in %d seconds",
+				cfg.movt);
+			k_delayed_work_submit(&mov_timeout_work,
+					      K_SECONDS(cfg.movt));
+			mov_timeout_prev = cfg.movt;
+		}
+
 		break;
 	case CLOUD_EVT_PAIR_REQUEST:
 		LOG_INF("CLOUD_EVT_PAIR_REQUEST");
@@ -1124,6 +1145,8 @@ static void button_handler(uint32_t button_states, uint32_t has_changed)
 		if (cloud_connected) {
 			k_delayed_work_submit(&ui_send_work, K_NO_WAIT);
 			k_delayed_work_submit(&leds_set_work, K_SECONDS(3));
+		} else {
+			LOG_INF("Not connected to cloud!");
 		}
 
 		try_again_timeout = k_uptime_get();
@@ -1338,12 +1361,6 @@ void main(void)
 	if (err) {
 		LOG_ERR("cloud_connect failed: %d", err);
 	}
-
-	/* Start movement timer which triggers every movement timeout.
-	 * Makes sure the device publishes every once and a while even
-	 * though the device is in passive mode and movement is not detected.
-	 */
-	k_delayed_work_submit(&mov_timeout_work, K_SECONDS(cfg.movt));
 
 	while (true) {
 
