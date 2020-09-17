@@ -109,15 +109,18 @@ jobs:
         run: |
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_${{ matrix.board }}.conf
 
+      - run: cat prj_${{ matrix.board }}.conf
+
       - name: Determine checksum for Docker image
         run: |
           DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
           echo ${DOCKER_CHECKSUM}
           echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
 
+      - run: docker pull bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+
       - name: Build
         run: |
-          cat prj_${{ matrix.board }}.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
@@ -137,6 +140,9 @@ jobs:
     needs: [build]
 
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v2
+      
       - name: Semantic release
         continue-on-error: true
         run: |

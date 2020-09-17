@@ -46,44 +46,84 @@
         {
           "assets": [
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns.hex",
-              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}.hex",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-nbiot-nodebug.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-nbiot-nodebug.hex",
               "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-app_update.bin",
-              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-app_update-nbiot-nodebug.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-app_update-nbiot-nodebug.bin",
               "label": "App update file for Thingy:91 (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns.hex",
-              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}.hex",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-nbiot-nodebug.hex",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-nbiot-nodebug.hex",
               "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-app_update.bin",
-              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-app_update-nbiot-nodebug.bin",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-app_update-nbiot-nodebug.bin",
               "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem.hex",
-              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem.hex",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-nodebug.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-nodebug.hex",
               "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) LTE-m"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin",
-              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-nodebug-app_update.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-nodebug-app_update.bin",
               "label": "App update file for Thingy:91 (${nextRelease.gitTag}) LTE-m"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem.hex",
-              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem.hex",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem-nodebug.hex",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-nodebug.hex",
               "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) LTE-m"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem-app_update.bin",
-              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem-nodebug-app_update.bin",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-nodebug-app_update.bin",
               "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) LTE-m"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-nbiot-debug.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-nbiot-debug.hex",
+              "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) NB-IoT (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-app_update-nbiot-debug.bin",
+              "label": "App update file for Thingy:91 (${nextRelease.gitTag}) NB-IoT (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-nbiot-debug.hex",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-nbiot-debug.hex",
+              "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-app_update-nbiot-debug.bin",
+              "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) NB-IoT (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-debug.hex",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-debug.hex",
+              "label": "Pre-build HEX file for Thingy:91 (${nextRelease.gitTag}) LTE-m (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-thingy91_nrf9160ns-ltem-debug-app_update.bin",
+              "name": "cat-tracker-Thingy52-${nextRelease.gitTag}-ltem-debug-app_update.bin",
+              "label": "App update file for Thingy:91 (${nextRelease.gitTag}) LTE-m (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem-debug.hex",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-debug.hex",
+              "label": "Pre-build HEX file for nRF9160 DK (${nextRelease.gitTag}) LTE-m (debug enabled)"
+            },
+            {
+              "path": "/home/runner/work/firmware/firmware/cat-tracker-nrf9160dk_nrf9160ns-ltem-debug-app_update.bin",
+              "name": "cat-tracker-nRF9160DK-${nextRelease.gitTag}-ltem-debug-app_update.bin",
+              "label": "App update file for nRF9160 DK (${nextRelease.gitTag}) LTE-m (debug enabled)"
             }
           ]
         }
