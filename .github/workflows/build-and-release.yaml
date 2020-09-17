@@ -6,9 +6,8 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  build:
+  version:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v1
 
@@ -16,93 +15,98 @@ jobs:
         run: |
           npm ci
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
+          echo $NEXT_VERSION > version.conf
+
+      - name: Publish version artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: version
+          path: version.conf
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Build Docker image
+        run: docker build -t bifravst-firmware-docker .
+
+      - run: docker save -o bifravst-firmware-docker.tar bifravst-firmware-docker
+
+      - name: Publish docker artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: docker
+          path: bifravst-firmware-docker.tar
+
+  build:
+    runs-on: ubuntu-latest
+
+    needs: [version, docker]
+
+    strategy:
+      matrix:
+        board: [thingy91_nrf9160ns, nrf9160_pca10090ns]
+        network: [nbiot, ltem]
+        flag: [debug, nodebug]
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Download version artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: version
+
+      - name: Configure Version
+        run: |
+          NEXT_VERSION=`cat version.conf`
           echo $NEXT_VERSION
-          echo "::set-env name=NEXT_VERSION::${NEXT_VERSION}"
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}\"" >> prj_${{ matrix.board }}.conf
+
+      - name: Enable debug logs
+        if: matrix.flag == 'debug'
+        run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_${{ matrix.board }}.conf
+
+      - name: Set network mode to LTE-m
+        if: matrix.network == 'ltem'
+        run: |
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_${{ matrix.board }}.conf
+          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj_${{ matrix.board }}.conf
 
       - name: Configure the AWS IoT broker hostname
         if: github.head_ref == ''
         env:
           BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
         run: |
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj.conf
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_${{ matrix.board }}.conf
 
       - name: Stub AWS IoT broker hostname (this is a PR)
         if: github.head_ref != ''
         run: |
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj.conf
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_${{ matrix.board }}.conf
 
-      - name: Build Docker image
-        run: docker build -t bifravst-firmware-docker .
+      - name: Download docker artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: docker
 
-      - name: Build 9160 DK for NB-IoT
+      - run: docker load -i bifravst-firmware-docker.tar
+
+      - name: Build
         run: |
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-9160dk-nbiot\"" >> prj.conf
-          cat prj.conf
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-app_update.bin
+          cat prj_${{ matrix.board }}.conf
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
+          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
+          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
 
-      - name: Publish 9160 DK NB-IoT firmware as artifacts
+      - name: Publish firmware as artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: 9160 DK NB-IoT firmware
+          name: ${{ matrix.board }} ${{ matrix.network }} ${{ matrix.flag }} firmware
           path: |
-            cat-tracker-nrf9160_pca10090ns.hex
-            cat-tracker-nrf9160_pca10090ns-app_update.bin
-
-      - name: Build Thingy:91 for NB-IoT
-        run: |
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-nbiot\"" >> prj_thingy91_nrf9160ns.conf
-          cat prj_thingy91_nrf9160ns.conf
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-app_update.bin
-
-      - name: Publish Thingy:91 NB-IoT firmware as artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: Thingy 91 NB-IoT firmware
-          path: |
-            cat-tracker-thingy91_nrf9160ns.hex
-            cat-tracker-thingy91_nrf9160ns-app_update.bin
-
-      - name: Build 9160 DK for LTE-m
-        run: |
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-9160dk-ltem\"" >> prj.conf
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj.conf
-          cat prj.conf
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b nrf9160_pca10090ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
-
-      - name: Publish 9160 DK LTE-m firmware as artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: 9160 DK LTE-m firmware
-          path: |
-            cat-tracker-nrf9160_pca10090ns-ltem.hex
-            cat-tracker-nrf9160_pca10090ns-ltem-app_update.bin
-
-      - name: Build Thingy:91 for LTE-m
-        run: |
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91-ltem\"" >> prj_thingy91_nrf9160ns.conf
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
-          sed -i s/CONFIG_LTE_LEGACY_PCO_MODE=y/CONFIG_LTE_LEGACY_PCO_MODE=n/ prj_thingy91_nrf9160ns.conf
-          cat prj_thingy91_nrf9160ns.conf
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b thingy91_nrf9160ns'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
-
-      - name: Publish Thingy:91 LTE-m firmware as artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: Thingy 91 LTE-m firmware
-          path: |
-            cat-tracker-thingy91_nrf9160ns-ltem.hex
-            cat-tracker-thingy91_nrf9160ns-ltem-app_update.bin
+            cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
+            cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
 
       - name: Semantic release
         continue-on-error: true
