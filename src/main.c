@@ -1178,7 +1178,7 @@ static void button_handler(uint32_t button_states, uint32_t has_changed)
 		try_again_timeout = k_uptime_get();
 	}
 
-#if defined(CONFIG_BOARD_NRF9160_PCA10090NS)
+#if defined(CONFIG_BOARD_nrf9160dk_nrf9160ns)
 	/* Fake motion. The nRF9160 DK does not have an accelerometer by
 	 * default. Reset accelerometer data.
 	 */

@@ -7,6 +7,7 @@ env:
 
 jobs:
   version:
+    name: Determine next release version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -24,6 +25,7 @@ jobs:
           path: version.conf
 
   docker:
+    name: Prepare Docker image
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -67,7 +69,7 @@ jobs:
 
     strategy:
       matrix:
-        board: [thingy91_nrf9160ns, nrf9160_pca10090ns]
+        board: [thingy91_nrf9160ns, nrf9160dk_nrf9160ns]
         network: [nbiot, ltem]
         flag: [debug, nodebug]
 
@@ -128,6 +130,13 @@ jobs:
             cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
             cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
 
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+
+    needs: [build]
+
+    steps:
       - name: Semantic release
         continue-on-error: true
         run: |
