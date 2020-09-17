@@ -91,7 +91,7 @@
               "label": "Pre-build HEX file for Thingy:91 NB-IoT (debug)"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-app_update-nbiot-debug/app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-debug/app_update.bin",
               "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-app_update-nbiot-debug.bin",
               "label": "App update file for Thingy:91 NB-IoT (debug)"
             },
@@ -101,7 +101,7 @@
               "label": "Pre-build HEX file for nRF9160 DK NB-IoT (debug)"
             },
             {
-              "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-app_update-nbiot-debug/app_update.bin",
+              "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-debug/app_update.bin",
               "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-app_update-nbiot-debug.bin",
               "label": "App update file for nRF9160 DK NB-IoT (debug)"
             },

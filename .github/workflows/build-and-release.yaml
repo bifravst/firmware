@@ -18,8 +18,7 @@ jobs:
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo ${NEXT_VERSION} > version.conf
 
-      - name: Publish version artifact
-        uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2
         with:
           name: version
           path: version.conf
@@ -76,8 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Download version artifact
-        uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v2
         with:
           name: version
 
@@ -123,8 +121,7 @@ jobs:
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
 
-      - name: Publish firmware as artifacts
-        uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v2
         with:
           name: ${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
           path: |
@@ -140,10 +137,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - name: Download artifacts
-        uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v2
 
-      - name: Semantic release
+      - run: npx semantic-release
         continue-on-error: true
-        run: |
-          npx semantic-release
