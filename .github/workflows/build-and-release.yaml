@@ -15,7 +15,7 @@ jobs:
         run: |
           npm ci
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
-          echo $NEXT_VERSION > version.conf
+          echo ${NEXT_VERSION} > version.conf
 
       - name: Publish version artifact
         uses: actions/upload-artifact@v2
@@ -28,16 +28,37 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
+      - name: Determine checksum for Docker image
+        run: |
+          DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
+          echo ${DOCKER_CHECKSUM}
+          echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
+
+      - name: Check if Docker image exists
+        id: check-docker-image
+        continue-on-error: true
+        env:
+          DOCKER_CLI_EXPERIMENTAL: enabled
+        run: docker manifest inspect bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+
       - name: Build Docker image
+        if: steps.check-docker-image.outcome == 'failure'
         run: docker build -t bifravst-firmware-docker .
 
-      - run: docker save -o bifravst-firmware-docker.tar bifravst-firmware-docker
+      - name: Tag Docker image
+        if: steps.check-docker-image.outcome == 'failure'
+        run: |
+          CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
+          docker tag bifravst-firmware-docker bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
 
-      - name: Publish docker artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: docker
-          path: bifravst-firmware-docker.tar
+      - name: Publish Docker image
+        if: steps.check-docker-image.outcome == 'failure'
+        env:
+          DOCKER_PASSWORD: ${{ secrets.CI_DOCKER_PASSWORD }}
+        run: |
+          docker login -u bifravst -p $DOCKER_PASSWORD
+          docker images
+          docker push bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
 
   build:
     runs-on: ubuntu-latest
@@ -86,17 +107,16 @@ jobs:
         run: |
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_${{ matrix.board }}.conf
 
-      - name: Download docker artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: docker
-
-      - run: docker load -i bifravst-firmware-docker.tar
+      - name: Determine checksum for Docker image
+        run: |
+          DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
+          echo ${DOCKER_CHECKSUM}
+          echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
 
       - name: Build
         run: |
           cat prj_${{ matrix.board }}.conf
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst-firmware-docker /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
           cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
           cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
 
