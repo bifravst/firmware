@@ -71,7 +71,7 @@ jobs:
       matrix:
         board: [thingy91_nrf9160ns, nrf9160dk_nrf9160ns]
         network: [nbiot, ltem]
-        flag: [debug, nodebug]
+        loglevel: [debug, nodebug]
 
     steps:
       - uses: actions/checkout@v1
@@ -85,10 +85,10 @@ jobs:
         run: |
           NEXT_VERSION=`cat version.conf`
           echo $NEXT_VERSION
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}\"" >> prj_${{ matrix.board }}.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}\"" >> prj_${{ matrix.board }}.conf
 
       - name: Enable debug logs
-        if: matrix.flag == 'debug'
+        if: matrix.loglevel == 'debug'
         run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_${{ matrix.board }}.conf
 
       - name: Set network mode to LTE-m
@@ -122,16 +122,14 @@ jobs:
       - name: Build
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
-          cp -v build/zephyr/merged.hex ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
-          cp -v build/zephyr/app_update.bin ${GITHUB_WORKSPACE}/cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
 
       - name: Publish firmware as artifacts
         uses: actions/upload-artifact@v2
         with:
-          name: ${{ matrix.board }} ${{ matrix.network }} ${{ matrix.flag }} firmware
+          name: ${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
           path: |
-            cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}.hex
-            cat-tracker-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.flag }}-app_update.bin
+            build/zephyr/merged.hex
+            build/zephyr/app_update.bin
 
   release:
     name: Release
@@ -140,9 +138,11 @@ jobs:
     needs: [build]
 
     steps:
+      - uses: actions/checkout@v1
+
       - name: Download artifacts
         uses: actions/download-artifact@v2
-      
+
       - name: Semantic release
         continue-on-error: true
         run: |
