@@ -47,82 +47,82 @@
           "assets": [
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-nodebug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-nbiot-nodebug.hex",
+              "name": "cat-tracker-Thingy52-nbiot-nodebug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for Thingy:91 NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-nodebug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-nbiot-nodebug-app_update.bin",
+              "name": "cat-tracker-Thingy52-nbiot-nodebug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for Thingy:91 NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-nodebug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-nbiot-nodebug.hex",
+              "name": "cat-tracker-nRF9160DK-nbiot-nodebug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for nRF9160 DK NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-nodebug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-nbiot-nodebug-app_update.bin",
+              "name": "cat-tracker-nRF9160DK-nbiot-nodebug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for nRF9160 DK NB-IoT"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-ltem-nodebug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-ltem-nodebug.hex",
+              "name": "cat-tracker-Thingy52-ltem-nodebug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for Thingy:91 LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-ltem-nodebug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-ltem-nodebug-app_update.bin",
+              "name": "cat-tracker-Thingy52-ltem-nodebug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for Thingy:91 LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-ltem-nodebug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-ltem-nodebug.hex",
+              "name": "cat-tracker-nRF9160DK-ltem-nodebug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for nRF9160 DK LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-ltem-nodebug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-ltem-nodebug-app_update.bin",
+              "name": "cat-tracker-nRF9160DK-ltem-nodebug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for nRF9160 DK LTE-m"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-debug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-nbiot-debug.hex",
+              "name": "cat-tracker-Thingy52-nbiot-debug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for Thingy:91 NB-IoT (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-debug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-Thingy52-app_update-nbiot-debug.bin",
               "label": "App update file for Thingy:91 NB-IoT (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-debug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-nbiot-debug.hex",
+              "name": "cat-tracker-nRF9160DK-nbiot-debug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for nRF9160 DK NB-IoT (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-debug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-nRF9160DK-app_update-nbiot-debug.bin",
               "label": "App update file for nRF9160 DK NB-IoT (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-ltem-debug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-ltem-debug.hex",
+              "name": "cat-tracker-Thingy52-ltem-debug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for Thingy:91 LTE-m (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-ltem-debug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-Thingy52-ltem-debug-app_update.bin",
+              "name": "cat-tracker-Thingy52-ltem-debug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for Thingy:91 LTE-m (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-ltem-debug/merged.hex",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-ltem-debug.hex",
+              "name": "cat-tracker-nRF9160DK-ltem-debug-${nextRelease.gitTag}.hex",
               "label": "Pre-build HEX file for nRF9160 DK LTE-m (debug)"
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-ltem-debug/app_update.bin",
-              "name": "cat-tracker-${nextRelease.gitTag}-nRF9160DK-ltem-debug-app_update.bin",
+              "name": "cat-tracker-nRF9160DK-ltem-debug-app_update-${nextRelease.gitTag}.bin",
               "label": "App update file for nRF9160 DK LTE-m (debug)"
             }
           ]
