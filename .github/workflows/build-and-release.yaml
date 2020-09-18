@@ -4,6 +4,7 @@ on: push
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CR_PAT: ${{ secrets.CR_PAT }}
 
 jobs:
   version:
@@ -35,12 +36,15 @@ jobs:
           echo ${DOCKER_CHECKSUM}
           echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
 
+      - name: Sign in to the GitHub Container Registry
+        run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
+
       - name: Check if Docker image exists
         id: check-docker-image
         continue-on-error: true
         env:
           DOCKER_CLI_EXPERIMENTAL: enabled
-        run: docker manifest inspect bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+        run: docker manifest inspect ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
 
       - name: Build Docker image
         if: steps.check-docker-image.outcome == 'failure'
@@ -50,16 +54,13 @@ jobs:
         if: steps.check-docker-image.outcome == 'failure'
         run: |
           CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
-          docker tag bifravst-firmware-docker bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+          docker tag bifravst-firmware-docker ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
 
       - name: Publish Docker image
         if: steps.check-docker-image.outcome == 'failure'
-        env:
-          DOCKER_PASSWORD: ${{ secrets.CI_DOCKER_PASSWORD }}
         run: |
-          docker login -u bifravst -p $DOCKER_PASSWORD
           docker images
-          docker push bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+          docker push ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
 
   build:
     runs-on: ubuntu-latest
@@ -115,11 +116,14 @@ jobs:
           echo ${DOCKER_CHECKSUM}
           echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
 
-      - run: docker pull bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }}
+      - name: Sign in to the GitHub Container Registry
+        run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
+
+      - run: docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
 
       - name: Build
         run: |
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware bifravst/firmware-build:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
 
       - uses: actions/upload-artifact@v2
         with:
