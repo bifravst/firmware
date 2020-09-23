@@ -1246,8 +1246,6 @@ static int cloud_setup(void)
 		return err;
 	}
 
-	LOG_INF("Device IMEI: %s", log_strdup(client_id_buf));
-
 	/* Fetch IMEI from modem data and set IMEI as cloud connection ID **/
 	cloud_backend->config->id = client_id_buf;
 	cloud_backend->config->id_len = sizeof(client_id_buf);
@@ -1317,9 +1315,6 @@ void main(void)
 {
 	int err;
 
-	LOG_INF("The cat tracker has started");
-	LOG_INF("Version: %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
-
 #if defined(CONFIG_WATCHDOG)
 	err = watchdog_init_and_start();
 	if (err) {
@@ -1354,6 +1349,13 @@ void main(void)
 		LOG_INF("cloud_setup, error %d", err);
 		error_handler(err);
 	}
+
+	LOG_INF("********************************************");
+	LOG_INF(" The cat tracker has started");
+	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
+	LOG_INF(" IMEI:        %s", log_strdup(client_id_buf));
+	LOG_INF(" Endpoint:    %s", log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
+	LOG_INF("********************************************");
 
 	err = ui_init();
 	if (err) {
