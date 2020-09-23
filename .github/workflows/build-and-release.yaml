@@ -122,7 +122,7 @@ jobs:
 
       - name: Build
         run: |
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware; west build -p always -b ${{ matrix.board }}'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b ${{ matrix.board }}'
 
       - uses: actions/upload-artifact@v2
         with:
