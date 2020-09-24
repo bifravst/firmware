@@ -98,7 +98,7 @@ menu "Watchdog"
 
 config CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC
 	int "Watchdog timeout in milliseconds"
-	default 10000
+	default 60000
 
 endmenu # Watchdog
 
