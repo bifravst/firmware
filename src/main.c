@@ -1354,7 +1354,8 @@ void main(void)
 	LOG_INF(" The cat tracker has started");
 	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
 	LOG_INF(" IMEI:        %s", log_strdup(client_id_buf));
-	LOG_INF(" Endpoint:    %s", log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
+	LOG_INF(" Endpoint:    %s",
+		log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
 	LOG_INF("********************************************");
 
 	err = ui_init();
