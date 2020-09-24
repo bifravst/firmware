@@ -96,9 +96,9 @@ endmenu # Cloud codec
 
 menu "Watchdog"
 
-config CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC
-	int "Watchdog timeout in milliseconds"
-	default 60000
+config CAT_TRACKER_WATCHDOG_TIMEOUT_SEC
+	int "Watchdog timeout in seconds"
+	default 60
 
 endmenu # Watchdog
 
