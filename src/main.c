@@ -32,7 +32,11 @@
 LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
 /* Application specific AWS topics. */
+#if !defined(CONFIG_USE_CUSTOM_MQTT_CLIENT_ID)
 #define AWS_CLOUD_CLIENT_ID_LEN 15
+#else
+#define AWS_CLOUD_CLIENT_ID_LEN (sizeof(CONFIG_MQTT_CLIENT_ID) - 1)
+#endif
 #define AWS "$aws/things/"
 #define AWS_LEN (sizeof(AWS) - 1)
 #define CFG_TOPIC AWS "%s/shadow/get/accepted/desired/cfg"
@@ -1239,14 +1243,18 @@ static int cloud_setup(void)
 	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
 		 CONFIG_CLOUD_BACKEND);
 
+#if !defined(CONFIG_USE_CUSTOM_MQTT_CLIENT_ID)
+	/* Fetch IMEI from modem data and set IMEI as cloud connection ID **/
 	err = modem_info_string_get(MODEM_INFO_IMEI, client_id_buf,
 				    sizeof(client_id_buf));
 	if (err != AWS_CLOUD_CLIENT_ID_LEN) {
 		LOG_ERR("modem_info_string_get, error: %d", err);
 		return err;
 	}
-
-	/* Fetch IMEI from modem data and set IMEI as cloud connection ID **/
+#else
+	snprintf(client_id_buf, sizeof(client_id_buf), "%s",
+		 CONFIG_MQTT_CLIENT_ID);
+#endif
 	cloud_backend->config->id = client_id_buf;
 	cloud_backend->config->id_len = sizeof(client_id_buf);
 
@@ -1353,7 +1361,7 @@ void main(void)
 	LOG_INF("********************************************");
 	LOG_INF(" The cat tracker has started");
 	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
-	LOG_INF(" IMEI:        %s", log_strdup(client_id_buf));
+	LOG_INF(" Client ID:   %s", log_strdup(client_id_buf));
 	LOG_INF(" Endpoint:    %s",
 		log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
 	LOG_INF("********************************************");

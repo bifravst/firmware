@@ -34,6 +34,22 @@ config CLOUD_BACKEND
 	string
 	default "AWS_IOT"
 
+config USE_CUSTOM_MQTT_CLIENT_ID
+	bool "Use custom MQTT client ID"
+	help
+	  By default the device's IMEI is used as the client ID
+	  for the MQTT connection. This allows to use a fixed
+	  value instead. This is mostly useful when providing
+	  firmware builds to continuous integration tests on
+	  real hardware.
+	  Note: you must only run this firmware build on one
+	  device at a time.
+
+config MQTT_CLIENT_ID
+	depends on USE_CUSTOM_MQTT_CLIENT_ID
+	string	"Configures the custom MQTT client ID"
+	default "yoghurt"
+
 endmenu # Cloud
 
 menu "External sensors"
