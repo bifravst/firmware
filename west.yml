@@ -2,11 +2,13 @@ manifest:
   remotes:
     - name: nordic
       url-base: https://github.com/nrfconnect
+    - name: sigvartmh
+      url-base: https://github.com/sigvartmh
   projects:
-    - name: sdk-nrf
+    - name: fw-nrfconnect-nrf-1
       path: nrf
-      remote: nordic
-      revision: ee6449b57f88d1ad829f8c280371ef95968c9874
+      remote: sigvartmh
+      revision: fix/aws-fota-failure
       import: true
   self:
     path: firmware
