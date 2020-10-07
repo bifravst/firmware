@@ -1,6 +1,8 @@
 name: Build and Release
 
-on: push
+on: 
+ - push
+ - pull_request
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,7 +74,7 @@ jobs:
         network: [nbiot, ltem]
         loglevel: [debug, nodebug]
 
-    environment:
+    env:
       PROD_ENV_BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
 
     steps:
@@ -129,7 +131,7 @@ jobs:
 
     needs: [version, docker]
 
-    environment:
+    env:
       FIRMWARE_CI_AWS_ACCESS_KEY_ID: ${{ secrets.FIRMWARE_CI_AWS_ACCESS_KEY_ID }}
       FIRMWARE_CI_AWS_SECRET_ACCESS_KEY: ${{ secrets.FIRMWARE_CI_AWS_SECRET_ACCESS_KEY }}
       FIRMWARE_CI_REGION: eu-central-1
