@@ -25,7 +25,7 @@
   "dependencies": {
     "@bifravst/aws": "^16.1.0-npm-release.5",
     "@bifravst/cloudformation-helpers": "^3.1.51",
-    "@bifravst/firmware-ci": "^1.2.0-npm-release.7",
+    "@bifravst/firmware-ci": "^1.2.0-npm-release.8",
     "aws-sdk": "^2.769.0",
     "node-fetch": "^2.6.1",
     "uuid": "^8.3.1"
