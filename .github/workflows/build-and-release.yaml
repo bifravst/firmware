@@ -133,6 +133,19 @@ jobs:
 
     needs: [version, docker]
 
+    env:
+      FIRMWARECI_AWS_ACCESS_KEY_ID: ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
+      FIRMWARECI_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
+      FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
+      FIRMWARECI_REGION: eu-central-1
+      FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
+      TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+      TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+      TESTENV_AWS_DEFAULT_REGION: eu-central-1
+      STACK_NAME: firmware-ci-runner
+      CI: 1
+      FORCE_COLOR: 3
+
     steps:
       - uses: actions/checkout@v1
 
@@ -154,7 +167,9 @@ jobs:
 
       - name: Configure the AWS IoT broker hostname
         run: |
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${TEST_ENV_BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
+          BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_DEFAULT_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
+          echo "TEST_ENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
 
       - run: cat prj_thingy91_nrf9160ns.conf
 
@@ -177,18 +192,6 @@ jobs:
           node-version: "14.x"
 
       - name: Run on Firmware CI
-        env:
-          FIRMWARECI_AWS_ACCESS_KEY_ID: ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
-          FIRMWARECI_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
-          FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
-          FIRMWARECI_REGION: eu-central-1
-          FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
-          TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-          TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
-          TESTENV_AWS_DEFAULT_REGION: eu-central-1
-          STACK_NAME: firmware-ci-runner
-          CI: 1
-          FORCE_COLOR: 3
         run: |
           npm ci
           npm run test:e2e

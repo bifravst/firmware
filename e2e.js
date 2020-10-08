@@ -2,7 +2,6 @@ const chalk = require("chalk");
 const { promises: fs } = require("fs");
 const {
   certsDir: provideCertsDir,
-  getIotEndpoint,
   deviceFileLocations,
   caFileLocations,
   createCA,
@@ -39,6 +38,7 @@ const testEnv = {
   secretAccessKey: process.env.TESTENV_AWS_SECRET_ACCESS_KEY,
   region: process.env.TESTENV_AWS_DEFAULT_REGION,
   stackName: process.env.STACK_NAME,
+  endpoint: process.env.TEST_ENV_BROKER_HOSTNAME,
 };
 
 const testEnvSDKConfig = {
@@ -60,8 +60,6 @@ const testEnvSDKConfig = {
 */
 
 const e2e = async () => {
-  const endpoint = await getIotEndpoint(new Iot(testEnvSDKConfig));
-
   const { Account: TestAccount } = await new STS(testEnvSDKConfig)
     .getCallerIdentity()
     .promise();
