@@ -176,7 +176,7 @@ jobs:
           JOB_ID=`uuidgen`
           echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
           echo "CONFIG_USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_thingy91_nrf9160ns.conf
-          echo "CONFIG_MQTT_CLIENT_ID=${JOB_ID}" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_MQTT_CLIENT_ID=\"${JOB_ID}\"" >> prj_thingy91_nrf9160ns.conf
 
       - run: cat prj_thingy91_nrf9160ns.conf
 
