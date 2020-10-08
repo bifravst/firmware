@@ -194,6 +194,12 @@ jobs:
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
 
+      - name: Keep certificates around
+        uses: actions/cache@v2
+        with:
+          path: ./certificates
+          key: certificates
+
       - uses: actions/setup-node@v1
         with:
           node-version: "14.x"
@@ -202,6 +208,9 @@ jobs:
         run: |
           npm ci
           npm run test:e2e
+
+      - name: Remove device certificates
+        run: rm -v ./certificates/*/device-*
 
   release:
     name: Release
