@@ -129,14 +129,6 @@ jobs:
 
     needs: [version, docker]
 
-    env:
-      FIRMWARE_CI_AWS_ACCESS_KEY_ID: ${{ secrets.FIRMWARE_CI_AWS_ACCESS_KEY_ID }}
-      FIRMWARE_CI_AWS_SECRET_ACCESS_KEY: ${{ secrets.FIRMWARE_CI_AWS_SECRET_ACCESS_KEY }}
-      FIRMWARE_CI_REGION: eu-central-1
-      FIRMWARE_CI_BUCKET_NAME: ${{ secrets.FIRMWARE_CI_BUCKET_NAME }}
-      TEST_ENV_BROKER_HOSTNAME: ${{ secrets.TEST_ENV_BROKER_HOSTNAME }}
-      TEST_ENV_CA_CERT: ${{ secrets.TEST_ENV_CA_CERT }}
-
     steps:
       - uses: actions/checkout@v1
 
@@ -177,10 +169,21 @@ jobs:
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
 
       - name: Run on Firmware CI
+        env:
+          FIRMWARECI_AWS_ACCESS_KEY_ID: ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
+          FIRMWARECI_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
+          FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
+          FIRMWARECI_REGION: eu-central-1
+          FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
+          TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+          TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+          TESTENV_AWS_DEFAULT_REGION: eu-central-1
+          STACK_NAME: firmware-ci-runner
+          CI: 1
+          FORCE_COLOR: 3
         run: |
           npm ci
-          npx tsc
-          npm run test:firmware-ci
+          npm run test:e2e
 
   release:
     name: Release

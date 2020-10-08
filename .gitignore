@@ -30,3 +30,4 @@ node_modules/
 .checkpatch.conf
 run-clang-format.py
 .clang-format
+certificates

@@ -2,6 +2,9 @@
   "name": "@bifravst/firmware",
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
+  "scripts": {
+    "test:e2e": "node e2e.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/bifravst/firmware.git"
@@ -19,10 +22,19 @@
   ],
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
+  "dependencies": {
+    "@bifravst/aws": "^16.1.0-npm-release.5",
+    "@bifravst/cloudformation-helpers": "^3.1.51",
+    "@bifravst/firmware-ci": "^1.2.0-npm-release.6",
+    "aws-sdk": "^2.769.0",
+    "node-fetch": "^2.6.1",
+    "uuid": "^8.3.1"
+  },
   "devDependencies": {
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
     "@semantic-release/commit-analyzer": "8.0.1",
+    "chalk": "^4.1.0",
     "husky": "4.3.0",
     "semantic-release": "17.2.1",
     "standard": "15.0.1",
