@@ -171,6 +171,13 @@ jobs:
           echo "TEST_ENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
 
+      - name: Set MQTT client ID to test device
+        run: |
+          JOB_ID=`uuidgen`
+          echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
+          echo "USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_MQTT_CLIENT_ID=${JOB_ID}" >> prj_thingy91_nrf9160ns.conf
+
       - run: cat prj_thingy91_nrf9160ns.conf
 
       - name: Determine checksum for Docker image

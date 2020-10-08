@@ -8,7 +8,6 @@ const {
   createDeviceCertificate,
 } = require("@bifravst/aws");
 const { Iot, STS, S3, CloudFormation } = require("aws-sdk");
-const { v4 } = require("uuid");
 const { schedule, wait } = require("@bifravst/firmware-ci");
 const path = require("path");
 const fetch = require("node-fetch");
@@ -16,6 +15,8 @@ const fetch = require("node-fetch");
 const target = "thingy91_nrf9160ns";
 const network = "ltem";
 const secTag = 42;
+
+const jobId = process.env.JOB_ID;
 
 const firmwareCI = {
   accessKeyId: process.env.FIRMWARECI_AWS_ACCESS_KEY_ID,
@@ -111,8 +112,6 @@ const e2e = async () => {
     chalk.yellow("Firmware CI / Device Arn: "),
     chalk.blue(ciDeviceArn)
   );
-
-  const jobId = v4();
 
   console.error(chalk.yellow("Job / ID:                 "), chalk.blue(jobId));
 
