@@ -66,7 +66,7 @@ const e2e = async () => {
 
   const certsDir = await provideCertsDir({
     accountId: TestAccount,
-    iotEndpoint: endpoint,
+    iotEndpoint: testEnv.endpoint,
   });
 
   console.error(
@@ -83,7 +83,7 @@ const e2e = async () => {
   );
   console.error(
     chalk.yellow("Test Env / IoT Endpoint:  "),
-    chalk.blue(endpoint)
+    chalk.blue(testEnv.endpoint)
   );
   console.error(
     chalk.yellow("Test Env / Certificates:  "),
@@ -166,7 +166,7 @@ const e2e = async () => {
         clientCert: await fs.readFile(deviceCert.certWithCA, "utf-8"),
         privateKey: await fs.readFile(deviceCert.key, "utf-8"),
         clientId: jobId,
-        brokerHostname: endpoint,
+        brokerHostname: testEnv.endpoint,
       },
       null,
       2
