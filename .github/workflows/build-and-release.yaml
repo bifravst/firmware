@@ -13,6 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "14.x"
+
       - name: Determine next release version
         run: |
           npm ci
@@ -167,6 +171,10 @@ jobs:
       - name: Build
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "14.x"
 
       - name: Run on Firmware CI
         env:
