@@ -11,7 +11,7 @@ jobs:
     name: Determine next release version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - name: Determine next release version
         run: |
@@ -28,7 +28,7 @@ jobs:
     name: Prepare Docker image
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - name: Determine checksum for Docker image
         run: |
@@ -74,7 +74,7 @@ jobs:
         loglevel: [debug, nodebug]
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - uses: actions/download-artifact@v2
         with:
@@ -138,7 +138,7 @@ jobs:
     needs: [build]
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - uses: actions/download-artifact@v2
 
