@@ -26,6 +26,7 @@
     "@bifravst/cloudformation-helpers": "^3.1.51",
     "@bifravst/firmware-ci": "^1.2.0-npm-release.8",
     "aws-sdk": "^2.769.0",
+    "check-node-version": "^4.0.3",
     "node-fetch": "^2.6.1"
   },
   "devDependencies": {
