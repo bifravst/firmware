@@ -139,8 +139,8 @@ jobs:
       FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
       FIRMWARECI_REGION: eu-central-1
       FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
-      TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
-      TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+      TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_TESTENV_AWS_ACCESS_KEY_ID }}
+      TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
       TESTENV_AWS_DEFAULT_REGION: eu-central-1
       STACK_NAME: firmware-ci-runner
       CI: 1
@@ -156,7 +156,10 @@ jobs:
       - name: Configure Version
         run: |
           NEXT_VERSION=`cat version.conf`
+          echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91_nrf9160ns-ltem\"" >> prj_thingy91_nrf9160ns.conf
+
+      - run: echo "# Firmware CI settings" >> prj_thingy91_nrf9160ns.conf
 
       - name: Enable debug logs
         run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_thingy91_nrf9160ns.conf
@@ -205,10 +208,11 @@ jobs:
         with:
           node-version: "14.x"
 
-      - name: Run on Firmware CI
-        run: |
-          npm ci
-          npm run test:e2e
+      - run: npm ci
+
+      - run: npx tsc
+
+      - run: npm run test:e2e
 
       - name: Remove device certificates
         run: rm -v ./certificates/*/device-*
