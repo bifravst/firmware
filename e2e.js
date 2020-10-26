@@ -18,6 +18,9 @@ const secTag = 42;
 
 const jobId = process.env.JOB_ID;
 
+const hexFile =
+  process.env.HEX_FILE ?? path.join(process.cwd(), "build/zephyr/merged.hex");
+
 const firmwareCI = {
   accessKeyId: process.env.FIRMWARECI_AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.FIRMWARECI_AWS_SECRET_ACCESS_KEY,
@@ -38,8 +41,8 @@ const testEnv = {
   accessKeyId: process.env.TESTENV_AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.TESTENV_AWS_SECRET_ACCESS_KEY,
   region: process.env.TESTENV_AWS_DEFAULT_REGION,
-  stackName: process.env.STACK_NAME,
   endpoint: process.env.TEST_ENV_BROKER_HOSTNAME,
+  stackName: process.env.TESTENV_STACK_NAME,
 };
 
 const testEnvSDKConfig = {
@@ -121,9 +124,7 @@ const e2e = async () => {
     .putObject({
       Bucket: firmwareCI.bucketName,
       Key: `${jobId}.hex`,
-      Body: await fs.readFile(
-        path.join(process.cwd(), "build/zephyr/merged.hex")
-      ),
+      Body: await fs.readFile(hexFile),
       ContentType: "text/octet-stream",
     })
     .promise();
@@ -138,6 +139,8 @@ const e2e = async () => {
       certsDir,
       iot: new Iot(testEnvSDKConfig),
       cf: new CloudFormation(testEnvSDKConfig),
+      stack: testEnv.stackName,
+      subject: "firmware-ci",
       log: console.error,
       debug: console.debug,
     });

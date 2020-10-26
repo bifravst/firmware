@@ -142,7 +142,7 @@ jobs:
       TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_TESTENV_AWS_ACCESS_KEY_ID }}
       TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
       TESTENV_AWS_DEFAULT_REGION: eu-central-1
-      STACK_NAME: firmware-ci-runner
+      TEST_ENV_STACK_NAME: bifravst
       CI: 1
       FORCE_COLOR: 3
 
