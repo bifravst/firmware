@@ -3,7 +3,8 @@
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
   "scripts": {
-    "test:e2e": "node --unhandled-rejections=strict e2e.js"
+    "test:e2e": "node --unhandled-rejections=strict e2e.js",
+    "postinstall": "check-node-version --package"
   },
   "repository": {
     "type": "git",
@@ -47,6 +48,10 @@
     "hooks": {
       "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
     }
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
   },
   "release": {
     "branches": [
