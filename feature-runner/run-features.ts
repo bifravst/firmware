@@ -66,7 +66,7 @@ program
 				env__TESTENV_AWS_ACCESS_KEY_ID: process.env.TESTENV_AWS_ACCESS_KEY_ID,
 				env__TESTENV_AWS_SECRET_ACCESS_KEY:
 					process.env.TESTENV_AWS_SECRET_ACCESS_KEY,
-				env__NEXT_VERSION: process.env.NEXT_VERSION,
+				env__CAT_TRACKER_APP_VERSION: process.env.CAT_TRACKER_APP_VERSION,
 			}
 
 			console.log(chalk.yellow.bold(' World:'))
