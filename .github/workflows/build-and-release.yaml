@@ -210,6 +210,14 @@ jobs:
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
 
+      - uses: actions/upload-artifact@v2
+        with:
+          name: thingy91_nrf9160ns-ltem-debug-e2e
+          path: |
+            build/zephyr/merged.hex
+            build/zephyr/app_update.bin
+            certificates/*/device-*
+
       - name: Keep certificates around
         uses: actions/cache@v2
         with:
