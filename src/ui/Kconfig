@@ -6,7 +6,6 @@
 
 config USE_UI_MODULE
 	bool "Enable UI module"
-	default y
 	help
 		Enable the User Interface module for user interaction on
 		development kit / Thingy91 hardware.

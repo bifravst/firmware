@@ -1,122 +1,14 @@
 #
-# Copyright (c) 2018 Nordic Semiconductor ASA
+# Copyright (c) 2019-2020 Nordic Semiconductor ASA
 #
 # SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
 #
 
-menu "Cat Tracker sample"
+menu "Cat Tracker application"
 
-rsource "src/ui/Kconfig"
-
-menu "GPS"
-
-config GPS_DEV_NAME
-	string "GPS device name"
-	default "NRF9160_GPS"
-
-endmenu # GPS
-
-menu "Firmware versioning"
-
-config CAT_TRACKER_APP_VERSION
-	string "The version of the cat tracker firmware"
-	default "0.0.0-development"
-
-config EXPECTED_MODEM_FIRMWARE_VERSION
-	string "The expected modem firmware version"
-	default "mfw_nrf9160_1.2.1"
-
-endmenu # Firmware versioning
-
-menu "Cloud"
-
-config CLOUD_BACKEND
-	string
-	default "AWS_IOT"
-
-config USE_CUSTOM_MQTT_CLIENT_ID
-	bool "Use custom MQTT client ID"
-	help
-	  By default the device's IMEI is used as the client ID
-	  for the MQTT connection. This allows to use a fixed
-	  value instead. This is mostly useful when providing
-	  firmware builds to continuous integration tests on
-	  real hardware.
-	  Note: you must only run this firmware build on one
-	  device at a time.
-
-config MQTT_CLIENT_ID
-	depends on USE_CUSTOM_MQTT_CLIENT_ID
-	string	"Configures the custom MQTT client ID"
-	default "yoghurt"
-
-endmenu # Cloud
-
-menu "External sensors"
-
-config EXTERNAL_SENSORS
-	bool "Enable external sensors"
-	default y if BOARD_THINGY91_NRF9160NS || BOARD_NRF9160_PCA10015NS
-
-config ACCELEROMETER_DEV_NAME
-	string "Accelerometer device name"
-
-config MULTISENSOR_DEV_NAME
-	string "Multisensor device name"
-
-config ACCELEROMETER_TRIGGER
-	bool "Accelerometer trigger"
-
-endmenu # External sensors
-
-menu "Cloud codec"
-
-config SERIALIZATION_JSON
-	bool "Cloud communication enconding"
-	default y
-	select CJSON_LIB
-
-config GPS_BUFFER_MAX
-	int "Sets the number of entries in the GPS buffer"
-	default 20
-
-config SENSOR_BUFFER_MAX
-	int "Sets the number of entries in the sensor buffer"
-	default 20
-
-config MODEM_BUFFER_MAX
-	int "Sets the number of entries in the modem buffer"
-	default 20
-
-config UI_BUFFER_MAX
-	int "Sets the number of entries in the UI buffer"
-	default 20
-
-config ACCEL_BUFFER_MAX
-	int "Sets the number of entries in the accelerometer buffer"
-	default 20
-
-config BAT_BUFFER_MAX
-	int "Sets the number of entries in the battery buffer"
-	default 20
-
-config ENCODED_BUFFER_ENTRIES_MAX
-	int "Maximum amount of encoded and published sensor buffer entries"
-	default 7
-
-config TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC
-	int "Time in between accelerometer buffer updates"
-	default 10
-
-endmenu # Cloud codec
-
-menu "Watchdog"
-
-config CAT_TRACKER_WATCHDOG_TIMEOUT_SEC
-	int "Watchdog timeout in seconds"
-	default 60
-
-endmenu # Watchdog
+rsource "src/events/Kconfig"
+rsource "src/managers/Kconfig"
+rsource "src/watchdog/Kconfig"
 
 endmenu
 

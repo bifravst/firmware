@@ -162,23 +162,19 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 int cloud_codec_encode_ui_data(struct cloud_codec_data *output,
 			       struct cloud_data_ui *ui_buf);
 
-int cloud_codec_encode_gps_buffer(struct cloud_codec_data *output,
-				  struct cloud_data_gps *data);
-
-int cloud_codec_encode_modem_buffer(struct cloud_codec_data *output,
-				    struct cloud_data_modem *data);
-
-int cloud_codec_encode_sensor_buffer(struct cloud_codec_data *output,
-				     struct cloud_data_sensors *data);
-
-int cloud_codec_encode_ui_buffer(struct cloud_codec_data *output,
-				 struct cloud_data_ui *data);
-
-int cloud_codec_encode_accel_buffer(struct cloud_codec_data *output,
-				    struct cloud_data_accelerometer *data);
-
-int cloud_codec_encode_bat_buffer(struct cloud_codec_data *output,
-				  struct cloud_data_battery *data);
+int cloud_codec_encode_batch_data(struct cloud_codec_data *output,
+				  struct cloud_data_gps *gps_buf,
+				  struct cloud_data_sensors *sensor_buf,
+				  struct cloud_data_modem *modem_buf,
+				  struct cloud_data_ui *ui_buf,
+				  struct cloud_data_accelerometer *accel_buf,
+				  struct cloud_data_battery *bat_buf,
+				  size_t gps_buf_count,
+				  size_t sensor_buf_count,
+				  size_t modem_buf_count,
+				  size_t ui_buf_count,
+				  size_t accel_buf_count,
+				  size_t bat_buf_count);
 
 void cloud_codec_populate_sensor_buffer(
 				struct cloud_data_sensors *sensor_buffer,

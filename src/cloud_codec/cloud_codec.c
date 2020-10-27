@@ -133,35 +133,28 @@ get_data:
 	movt = cJSON_GetObjectItem(subgroup_obj, "mvt");
 	acc_thres = cJSON_GetObjectItem(subgroup_obj, "acct");
 
-	if (gpst != NULL && data->gpst != gpst->valueint) {
+	if (gpst != NULL) {
 		data->gpst = gpst->valueint;
-		LOG_DBG("SETTING GPST TO: %d", gpst->valueint);
 	}
 
-	if (active != NULL && data->act != active->valueint) {
+	if (active != NULL) {
 		data->act = active->valueint;
-		LOG_DBG("SETTING ACTIVE TO: %d", active->valueint);
 	}
 
-	if (active_wait != NULL && data->actw != active_wait->valueint) {
+	if (active_wait != NULL) {
 		data->actw = active_wait->valueint;
-		LOG_DBG("SETTING ACTIVE WAIT TO: %d", active_wait->valueint);
 	}
 
-	if (passive_wait != NULL && data->pasw != passive_wait->valueint) {
+	if (passive_wait != NULL) {
 		data->pasw = passive_wait->valueint;
-		LOG_DBG("SETTING PASSIVE_WAIT TO: %d", passive_wait->valueint);
 	}
 
-	if (movt != NULL && data->movt != movt->valueint) {
+	if (movt != NULL) {
 		data->movt = movt->valueint;
-		LOG_DBG("SETTING MOVEMENT TIMEOUT TO: %d", movt->valueint);
 	}
 
-	if (acc_thres != NULL && data->acct != acc_thres->valueint) {
+	if (acc_thres != NULL) {
 		data->acct = acc_thres->valueint;
-		LOG_DBG("SETTING ACCEL THRESHOLD TIMEOUT TO: %d",
-			acc_thres->valueint);
 	}
 exit:
 	cJSON_Delete(root_obj);
@@ -671,258 +664,142 @@ exit:
 	return err;
 }
 
-int cloud_codec_encode_gps_buffer(struct cloud_codec_data *output,
-				  struct cloud_data_gps *data)
+int cloud_codec_encode_batch_data(struct cloud_codec_data *output,
+				  struct cloud_data_gps *gps_buf,
+				  struct cloud_data_sensors *sensor_buf,
+				  struct cloud_data_modem *modem_buf,
+				  struct cloud_data_ui *ui_buf,
+				  struct cloud_data_accelerometer *accel_buf,
+				  struct cloud_data_battery *bat_buf,
+				  size_t gps_buf_count,
+				  size_t sensor_buf_count,
+				  size_t modem_buf_count,
+				  size_t ui_buf_count,
+				  size_t accel_buf_count,
+				  size_t bat_buf_count)
 {
 	int err = 0;
-	int encoded_counter = 0;
 	char *buffer;
+	bool data_encoded = false;
 
 	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *gps_obj = cJSON_CreateArray();
-
-	if (root_obj == NULL || gps_obj == NULL) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(gps_obj);
-		return -ENOMEM;
-	}
-
-	for (int i = 0; i < CONFIG_GPS_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_gps_data_add(gps_obj, &data[i],
-							true);
-			encoded_counter++;
-		}
-	}
-
-	err += json_add_obj(root_obj, "gps", gps_obj);
-
-	if (err) {
-		goto exit;
-	}
-
-	buffer = cJSON_Print(root_obj);
-
-	printk("Encoded batch message: %s\n", buffer);
-
-	output->buf = buffer;
-	output->len = strlen(buffer);
-
-exit:
-
-	cJSON_Delete(root_obj);
-
-	return 0;
-}
-
-int cloud_codec_encode_modem_buffer(struct cloud_codec_data *output,
-				    struct cloud_data_modem *data)
-{
-	int err = 0;
-	int encoded_counter = 0;
-	char *buffer;
-
-	cJSON *root_obj = cJSON_CreateObject();
-	cJSON *modem_obj = cJSON_CreateArray();
-
-	if (root_obj == NULL || modem_obj == NULL) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(modem_obj);
-		return -ENOMEM;
-	}
-
-	for (int i = 0; i < CONFIG_MODEM_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_dynamic_modem_data_add(
-				modem_obj, &data[i], true);
-			encoded_counter++;
-		}
-	}
-
-	err += json_add_obj(root_obj, "roam", modem_obj);
-
-	if (err) {
-		goto exit;
-	}
-
-	buffer = cJSON_Print(root_obj);
-
-	printk("Encoded batch message: %s\n", buffer);
-
-	output->buf = buffer;
-	output->len = strlen(buffer);
-
-exit:
-
-	cJSON_Delete(root_obj);
-
-	return 0;
-}
-
-int cloud_codec_encode_sensor_buffer(struct cloud_codec_data *output,
-				     struct cloud_data_sensors *data)
-{
-	int err = 0;
-	int encoded_counter = 0;
-	char *buffer;
-
-	cJSON *root_obj = cJSON_CreateObject();
 	cJSON *sensor_obj = cJSON_CreateArray();
-
-	if (root_obj == NULL || sensor_obj == NULL) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(sensor_obj);
-		return -ENOMEM;
-	}
-
-	for (int i = 0; i < CONFIG_SENSOR_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_sensor_data_add(sensor_obj, &data[i],
-							   true);
-			encoded_counter++;
-		}
-	}
-
-	err += json_add_obj(root_obj, "env", sensor_obj);
-
-	if (err) {
-		goto exit;
-	}
-
-	buffer = cJSON_Print(root_obj);
-
-	printk("Encoded batch message: %s\n", buffer);
-
-	output->buf = buffer;
-	output->len = strlen(buffer);
-
-exit:
-
-	cJSON_Delete(root_obj);
-
-	return 0;
-}
-
-int cloud_codec_encode_ui_buffer(struct cloud_codec_data *output,
-				 struct cloud_data_ui *data)
-{
-	int err = 0;
-	int encoded_counter = 0;
-	char *buffer;
-
-	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *modem_obj = cJSON_CreateArray();
 	cJSON *ui_obj = cJSON_CreateArray();
-
-	if (root_obj == NULL || ui_obj == NULL) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(ui_obj);
-		return -ENOMEM;
-	}
-
-	for (int i = 0; i < CONFIG_UI_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_ui_data_add(ui_obj, &data[i], true);
-			encoded_counter++;
-		}
-	}
-
-	err += json_add_obj(root_obj, "btn", ui_obj);
-
-	if (err) {
-		goto exit;
-	}
-
-	buffer = cJSON_Print(root_obj);
-
-	printk("Encoded batch message: %s\n", buffer);
-
-	output->buf = buffer;
-	output->len = strlen(buffer);
-
-exit:
-
-	cJSON_Delete(root_obj);
-
-	return 0;
-}
-
-int cloud_codec_encode_accel_buffer(struct cloud_codec_data *output,
-				    struct cloud_data_accelerometer *data)
-{
-	int err = 0;
-	int encoded_counter = 0;
-	char *buffer;
-
-	cJSON *root_obj = cJSON_CreateObject();
-	cJSON *acc_obj = cJSON_CreateArray();
-
-	if (root_obj == NULL || acc_obj == NULL) {
-		cJSON_Delete(root_obj);
-		cJSON_Delete(acc_obj);
-		return -ENOMEM;
-	}
-
-	for (int i = 0; i < CONFIG_ACCEL_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_accel_data_add(acc_obj, &data[i],
-							  true);
-			encoded_counter++;
-		}
-	}
-
-	err += json_add_obj(root_obj, "acc", acc_obj);
-
-	if (err) {
-		goto exit;
-	}
-
-	buffer = cJSON_Print(root_obj);
-
-	printk("Encoded batch message: %s\n", buffer);
-
-	output->buf = buffer;
-	output->len = strlen(buffer);
-
-exit:
-
-	cJSON_Delete(root_obj);
-
-	return 0;
-}
-
-int cloud_codec_encode_bat_buffer(struct cloud_codec_data *output,
-				  struct cloud_data_battery *data)
-{
-	int err = 0;
-	int encoded_counter = 0;
-	char *buffer;
-
-	cJSON *root_obj = cJSON_CreateObject();
+	cJSON *accel_obj = cJSON_CreateArray();
 	cJSON *bat_obj = cJSON_CreateArray();
 
-	if (root_obj == NULL || bat_obj == NULL) {
+	if (root_obj == NULL || gps_obj == NULL || sensor_obj == NULL ||
+	    modem_obj == NULL || ui_obj == NULL || accel_obj == NULL ||
+	    bat_obj == NULL) {
 		cJSON_Delete(root_obj);
+		cJSON_Delete(gps_obj);
+		cJSON_Delete(sensor_obj);
+		cJSON_Delete(modem_obj);
+		cJSON_Delete(ui_obj);
+		cJSON_Delete(accel_obj);
 		cJSON_Delete(bat_obj);
 		return -ENOMEM;
 	}
 
-	for (int i = 0; i < CONFIG_BAT_BUFFER_MAX; i++) {
-		if (data[i].queued &&
-		    (encoded_counter < CONFIG_ENCODED_BUFFER_ENTRIES_MAX)) {
-			err += cloud_codec_bat_data_add(bat_obj, &data[i],
+	/* GPS data */
+	for (int i = 0; i < gps_buf_count; i++) {
+		if (gps_buf[i].queued) {
+			err += cloud_codec_gps_data_add(gps_obj,
+							&gps_buf[i],
 							true);
-			encoded_counter++;
 		}
 	}
 
-	err += json_add_obj(root_obj, "bat", bat_obj);
+	if (cJSON_GetArraySize(gps_obj) > 0) {
+		err += json_add_obj(root_obj, "gps", gps_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(gps_obj);
+	}
 
-	if (err) {
+	/* Environmental sensor data */
+	for (int i = 0; i < sensor_buf_count; i++) {
+		if (sensor_buf[i].queued) {
+			err += cloud_codec_sensor_data_add(sensor_obj,
+							   &sensor_buf[i],
+							   true);
+		}
+	}
+
+	if (cJSON_GetArraySize(sensor_obj) > 0) {
+		err += json_add_obj(root_obj, "env", sensor_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(sensor_obj);
+	}
+
+	/* UI data */
+	for (int i = 0; i < ui_buf_count; i++) {
+		if (ui_buf[i].queued) {
+			err += cloud_codec_ui_data_add(ui_obj,
+						       &ui_buf[i],
+						       true);
+		}
+	}
+
+	if (cJSON_GetArraySize(ui_obj) > 0) {
+		err += json_add_obj(root_obj, "btn", ui_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(ui_obj);
+	}
+
+	/* Movement data */
+	for (int i = 0; i < accel_buf_count; i++) {
+		if (accel_buf[i].queued) {
+			err += cloud_codec_accel_data_add(accel_obj,
+							  &accel_buf[i],
+							  true);
+		}
+	}
+
+	if (cJSON_GetArraySize(accel_obj) > 0) {
+		err += json_add_obj(root_obj, "acc", accel_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(accel_obj);
+	}
+
+	/* Battery data */
+	for (int i = 0; i < bat_buf_count; i++) {
+		if (bat_buf[i].queued) {
+			err += cloud_codec_bat_data_add(bat_obj,
+							&bat_buf[i],
+							true);
+		}
+	}
+
+	if (cJSON_GetArraySize(bat_obj) > 0) {
+		err += json_add_obj(root_obj, "bat", bat_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(bat_obj);
+	}
+
+	/* Dynamic modem data */
+	for (int i = 0; i < modem_buf_count; i++) {
+		if (modem_buf[i].queued) {
+			err += cloud_codec_dynamic_modem_data_add(modem_obj,
+								  &modem_buf[i],
+								  true);
+		}
+	}
+
+	if (cJSON_GetArraySize(modem_obj) > 0) {
+		err += json_add_obj(root_obj, "roam", modem_obj);
+		data_encoded = true;
+	} else {
+		cJSON_Delete(modem_obj);
+	}
+
+	if (err || !data_encoded) {
 		goto exit;
 	}
 
@@ -937,7 +814,7 @@ exit:
 
 	cJSON_Delete(root_obj);
 
-	return 0;
+	return err;
 }
 
 void cloud_codec_populate_sensor_buffer(

@@ -1,0 +1,42 @@
+#
+# Copyright (c) 2020 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menu "Cloud codec"
+
+config SERIALIZATION_JSON
+	bool "Cloud communication enconding"
+	default y
+	select CJSON_LIB
+
+config GPS_BUFFER_MAX
+	int "Sets the number of entries in the GPS buffer"
+	default 10
+
+config SENSOR_BUFFER_MAX
+	int "Sets the number of entries in the sensor buffer"
+	default 10
+
+config MODEM_BUFFER_MAX
+	int "Sets the number of entries in the modem buffer"
+	default 10
+
+config UI_BUFFER_MAX
+	int "Sets the number of entries in the UI buffer"
+	default 10
+
+config ACCEL_BUFFER_MAX
+	int "Sets the number of entries in the accelerometer buffer"
+	default 10
+
+config BAT_BUFFER_MAX
+	int "Sets the number of entries in the battery buffer"
+	default 10
+
+config TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC
+	int "Time in between accelerometer buffer updates"
+	default 10
+
+endmenu # Cloud codec

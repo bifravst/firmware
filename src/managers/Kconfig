@@ -1,0 +1,184 @@
+#
+# Copyright (c) 2020 Nordic Semiconductor
+#
+# SPDX-License-Identifier: LicenseRef-BSD-5-Clause-Nordic
+#
+
+menu "GPS manager"
+
+config GPS_MANAGER
+	bool ""
+	default y
+
+if GPS_MANAGER
+
+config GPS_MGR_THREAD_STACK_SIZE
+	int ""
+	default 1024
+
+config GPS_DEV_NAME
+	string "GPS device name"
+	default "NRF9160_GPS"
+
+endif
+
+endmenu # GPS manager
+
+menu "Modem manager"
+
+config MODEM_MANAGER
+	bool
+	default y
+
+if MODEM_MANAGER
+
+config MODEM_MGR_THREAD_STACK_SIZE
+	int ""
+	default 1024
+
+config EXPECTED_MODEM_FIRMWARE_VERSION
+	string "The expected modem firmware version"
+	default "mfw_nrf9160_1.2.1"
+
+config CAT_TRACKER_APP_VERSION
+	string "The version of the cat tracker firmware"
+	default "0.0.0-development"
+
+endif
+
+endmenu # Modem manager
+
+menu "Cloud manager"
+
+config CLOUD_MANAGER
+	bool ""
+	default y
+
+if CLOUD_MANAGER
+
+config CLOUD_MGR_THREAD_STACK_SIZE
+	int ""
+	default 4096
+
+config CLOUD_BACKEND
+	string
+	default "AWS_IOT"
+
+config USE_CUSTOM_MQTT_CLIENT_ID
+	bool "Use custom MQTT client ID"
+	help
+	  By default the device's IMEI is used as the client ID
+	  for the MQTT connection. This allows to use a fixed
+	  value instead. This is mostly useful when providing
+	  firmware builds to continuous integration tests on
+	  real hardware.
+	  Note: you must only run this firmware build on one
+	  device at a time.
+
+config MQTT_CLIENT_ID
+	depends on USE_CUSTOM_MQTT_CLIENT_ID
+	string	"Configures the custom MQTT client ID"
+	default "yoghurt"
+
+config CLOUD_CONNECT_RETRIES
+	int "Number of times the device will try to reconnect to cloud"
+	default 10
+
+endif
+
+endmenu # Cloud manager
+
+menu "UI manager"
+
+config UI_MANAGER
+	bool ""
+	default y
+
+if UI_MANAGER
+
+config UI_MGR_THREAD_STACK_SIZE
+	int ""
+	default 256
+
+endif
+
+endmenu # UI manager
+
+menu "OUTPUT manager"
+
+config OUTPUT_MANAGER
+	bool ""
+	select USE_UI_MODULE
+	default y
+
+if OUTPUT_MANAGER
+
+config OUTPUT_MGR_THREAD_STACK_SIZE
+	int ""
+	default 512
+
+rsource "../ui/Kconfig"
+
+endif
+
+endmenu # OUTPUT manager
+
+menu "Data manager"
+
+config DATA_MANAGER
+	bool ""
+	default y
+
+if DATA_MANAGER
+
+config DATA_MGR_THREAD_STACK_SIZE
+	int ""
+	default 2048
+
+rsource "../cloud_codec/Kconfig"
+
+endif
+
+endmenu # Data manager
+
+menu "Sensor manager"
+
+config SENSOR_MANAGER
+	bool ""
+	default y
+
+if SENSOR_MANAGER
+
+config SENSOR_MGR_THREAD_STACK_SIZE
+	int ""
+	default 1024
+
+rsource "../ext_sensors/Kconfig"
+
+endif
+
+endmenu # Sensor manager
+
+menu "Utility Manager"
+
+config UTIL_MANAGER
+	bool ""
+	default y
+
+if UTIL_MANAGER
+
+config UTIL_MGR_THREAD_STACK_SIZE
+	int ""
+	default 1024
+
+config REBOOT_TIMEOUT
+	int "Sets the time from a fatal error or reboot request to reboot"
+	default 30
+	help
+	  This option specifies the timeout that the utility manager will
+	  initiate a reboot regardless if the other managers has reported
+	  that they are ready for a reboot or not.
+
+endif
+
+endmenu # Utility Manager

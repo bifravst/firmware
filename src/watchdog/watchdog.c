@@ -12,9 +12,9 @@
 LOG_MODULE_REGISTER(watchdog, CONFIG_CAT_TRACKER_LOG_LEVEL);
 
 #define WDT_FEED_WORKER_DELAY_MS                                               \
-	((CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_SEC * 1000) / 2)
+	((CONFIG_WATCHDOG_TIMEOUT_SEC * 1000) / 2)
 #define CAT_TRACKER_WATCHDOG_TIMEOUT_MSEC                                      \
-	(CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_SEC * 1000)
+	(CONFIG_WATCHDOG_TIMEOUT_SEC * 1000)
 
 struct wdt_data_storage {
 	const struct device *wdt_drv;
@@ -61,7 +61,7 @@ static int watchdog_timeout_install(struct wdt_data_storage *data)
 	}
 
 	LOG_DBG("Watchdog timeout installed. Timeout: %d",
-		CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_SEC);
+		CONFIG_WATCHDOG_TIMEOUT_SEC);
 	return 0;
 }
 
