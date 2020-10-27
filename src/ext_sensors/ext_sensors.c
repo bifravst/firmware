@@ -10,7 +10,7 @@ LOG_MODULE_REGISTER(ext_sensors, CONFIG_CAT_TRACKER_LOG_LEVEL);
 struct env_sensor {
 	enum sensor_channel channel;
 	uint8_t *dev_name;
-	struct device *dev;
+	const struct device *dev;
 	struct k_spinlock lock;
 };
 
@@ -30,7 +30,7 @@ static struct env_sensor accel_sensor = {
 static ext_sensor_handler_t m_evt_handler;
 static double accelerometer_threshold;
 
-static void accelerometer_trigger_handler(struct device *dev,
+static void accelerometer_trigger_handler(const struct device *dev,
 					  struct sensor_trigger *trig)
 {
 	int err = 0;

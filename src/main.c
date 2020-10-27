@@ -132,7 +132,7 @@ static K_SEM_DEFINE(lte_conn_sem, 0, 1);
 static K_SEM_DEFINE(date_time_sem, 0, 1);
 
 /* GPS device. Used to identify the GPS driver in the sensor API. */
-static struct device *gps_dev;
+static const struct device *gps_dev;
 
 /* nRF9160 GPS driver configuration. */
 static struct gps_config gps_cfg = { .nav_mode = GPS_NAV_MODE_PERIODIC,
@@ -971,7 +971,7 @@ static void work_init(void)
 	k_delayed_work_init(&sample_data_work, sample_data_work_fn);
 }
 
-static void gps_trigger_handler(struct device *dev, struct gps_event *evt)
+static void gps_trigger_handler(const struct device *dev, struct gps_event *evt)
 {
 	switch (evt->type) {
 	case GPS_EVT_SEARCH_STARTED:

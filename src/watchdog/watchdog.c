@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(watchdog, CONFIG_CAT_TRACKER_LOG_LEVEL);
 	(CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_SEC * 1000)
 
 struct wdt_data_storage {
-	struct device *wdt_drv;
+	const struct device *wdt_drv;
 	int wdt_channel_id;
 	struct k_delayed_work system_workqueue_work;
 };
