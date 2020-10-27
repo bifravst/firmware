@@ -228,14 +228,6 @@ jobs:
 
       - run: npm run test:e2e
 
-      - uses: actions/upload-artifact@v2
-        with:
-          name: thingy91_nrf9160ns-ltem-debug-e2e
-          path: |
-            build/zephyr/merged.hex
-            build/zephyr/app_update.bin
-            certificates/*/device-*
-
       - name: Remove device certificates
         run: rm -v ./certificates/*/device-*
 
