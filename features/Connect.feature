@@ -24,7 +24,7 @@ Feature: Connect
                 "v": {
                     "modV": "mfw_nrf9160_1.2.0",
                     "brdV": "thingy91_nrf9160",
-                    "appV": "{env__NEXT_VERSION}"
+                    "appV": "{env__NEXT_VERSION}-{env__JOB_ID}"
                 }
             }
         }

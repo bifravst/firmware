@@ -160,11 +160,16 @@ jobs:
         with:
           name: version
 
+      - name: Generate Job ID
+        run: |
+          JOB_ID=`uuidgen`
+          echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
+
       - name: Configure Version
         run: |
           NEXT_VERSION=`cat version.conf`
           echo "NEXT_VERSION=${NEXT_VERSION}" >> $GITHUB_ENV
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91_nrf9160ns-ltem\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-thingy91_nrf9160ns-ltem-${JOB_ID}\"" >> prj_thingy91_nrf9160ns.conf
 
       - run: echo "# Firmware CI settings" >> prj_thingy91_nrf9160ns.conf
 
@@ -183,8 +188,6 @@ jobs:
 
       - name: Set MQTT client ID to test device
         run: |
-          JOB_ID=`uuidgen`
-          echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
           echo "CONFIG_USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_thingy91_nrf9160ns.conf
           echo "CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN=40" >> prj_thingy91_nrf9160ns.conf
           echo "CONFIG_MQTT_CLIENT_ID=\"${JOB_ID}\"" >> prj_thingy91_nrf9160ns.conf
