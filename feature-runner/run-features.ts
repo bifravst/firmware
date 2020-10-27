@@ -16,7 +16,7 @@ let ran = false
 
 const stackName = process.env.TESTENV_STACK_NAME as string
 const region = process.env.TESTENV_AWS_DEFAULT_REGION as string
-const mqttEndpoint = process.env.TEST_ENV_BROKER_HOSTNAME as string
+const mqttEndpoint = process.env.TESTENV_BROKER_HOSTNAME as string
 const testEnvCredentials = {
 	accessKeyId: process.env.TESTENV_AWS_ACCESS_KEY_ID as string,
 	secretAccessKey: process.env.TESTENV_AWS_SECRET_ACCESS_KEY as string,

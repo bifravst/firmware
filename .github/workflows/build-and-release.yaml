@@ -149,7 +149,7 @@ jobs:
       TESTENV_AWS_SECRET_ACCESS_KEY:
         ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
       TESTENV_AWS_DEFAULT_REGION: eu-central-1
-      TEST_ENV_STACK_NAME: bifravst
+      TESTENV_STACK_NAME: bifravst
       CI: 1
       FORCE_COLOR: 3
 
@@ -178,7 +178,7 @@ jobs:
       - name: Configure the AWS IoT broker hostname
         run: |
           BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_DEFAULT_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
-          echo "TEST_ENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
+          echo "TESTENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
 
       - name: Set MQTT client ID to test device
