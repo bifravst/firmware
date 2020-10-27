@@ -60,7 +60,7 @@ static int watchdog_timeout_install(struct wdt_data_storage *data)
 		return -EFAULT;
 	}
 
-	LOG_INF("Watchdog timeout installed. Timeout: %ds",
+	LOG_DBG("Watchdog timeout installed. Timeout: %d",
 		CONFIG_CAT_TRACKER_WATCHDOG_TIMEOUT_SEC);
 	return 0;
 }
@@ -74,7 +74,7 @@ static int watchdog_start(struct wdt_data_storage *data)
 	if (err) {
 		LOG_ERR("Cannot start watchdog! Error code: %d", err);
 	} else {
-		LOG_INF("Watchdog started");
+		LOG_DBG("Watchdog started");
 	}
 	return err;
 }
@@ -99,7 +99,7 @@ static int watchdog_feed_enable(struct wdt_data_storage *data)
 			" Error code: %d",
 			err);
 	} else {
-		LOG_INF("Watchdog feed enabled. Timeout: %d",
+		LOG_DBG("Watchdog feed enabled. Timeout: %d",
 			WDT_FEED_WORKER_DELAY_MS);
 	}
 	return err;
