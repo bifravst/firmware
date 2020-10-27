@@ -118,98 +118,114 @@ const e2e = async () => {
 
   console.error(chalk.yellow("Job / ID:                 "), chalk.blue(jobId));
 
-  console.error(chalk.magenta("Uploading firmware..."));
-  const s3 = new S3(firmwareCISDKConfig);
-  await s3
-    .putObject({
-      Bucket: firmwareCI.bucketName,
-      Key: `${jobId}.hex`,
-      Body: await fs.readFile(hexFile),
-      ContentType: "text/octet-stream",
-    })
-    .promise();
+  const iot = new Iot(firmwareCISDKConfig);
 
-  const ca = caFileLocations(certsDir);
-
+  let jobInfo;
+  // Job exists?
   try {
-    await fs.stat(ca.id);
+    jobInfo = await wait({
+      iot,
+      jobId,
+      interval: 10,
+    });
   } catch {
-    console.error(chalk.magenta("Generating CA certificate..."));
-    await createCA({
+    console.error(chalk.magenta("Uploading firmware..."));
+    const s3 = new S3(firmwareCISDKConfig);
+    await s3
+      .putObject({
+        Bucket: firmwareCI.bucketName,
+        Key: `${jobId}.hex`,
+        Body: await fs.readFile(hexFile),
+        ContentType: "text/octet-stream",
+      })
+      .promise();
+
+    const ca = caFileLocations(certsDir);
+
+    try {
+      await fs.stat(ca.id);
+    } catch {
+      console.error(chalk.magenta("Generating CA certificate..."));
+      await createCA({
+        certsDir,
+        iot: new Iot(testEnvSDKConfig),
+        cf: new CloudFormation(testEnvSDKConfig),
+        stack: testEnv.stackName,
+        subject: "firmware-ci",
+        log: console.error,
+        debug: console.debug,
+      });
+    }
+
+    await createDeviceCertificate({
       certsDir,
-      iot: new Iot(testEnvSDKConfig),
-      cf: new CloudFormation(testEnvSDKConfig),
-      stack: testEnv.stackName,
-      subject: "firmware-ci",
-      log: console.error,
-      debug: console.debug,
+      deviceId: jobId,
+    });
+
+    const deviceCert = deviceFileLocations({
+      certsDir,
+      deviceId: jobId,
+    });
+
+    // Writes the JSON file which works with the Certificate Manager of the LTA Link Monitor
+    await fs.writeFile(
+      deviceCert.json,
+      JSON.stringify(
+        {
+          caCert: await fs.readFile(
+            path.resolve(process.cwd(), "data", "AmazonRootCA1.pem"),
+            "utf-8"
+          ),
+          clientCert: await fs.readFile(deviceCert.certWithCA, "utf-8"),
+          privateKey: await fs.readFile(deviceCert.key, "utf-8"),
+          clientId: jobId,
+          brokerHostname: testEnv.endpoint,
+        },
+        null,
+        2
+      ),
+      "utf-8"
+    );
+
+    await schedule({
+      bucketName: firmwareCI.bucketName,
+      certificateJSON: deviceCert.json,
+      ciDeviceArn,
+      firmwareUrl: `https://${firmwareCI.bucketName}.s3.${firmwareCI.region}.amazonaws.com/${jobId}.hex`,
+      network,
+      secTag,
+      region: firmwareCI.region,
+      s3,
+      target,
+      iot,
+      jobId,
+    });
+
+    jobInfo = await wait({
+      iot,
+      jobId,
+      interval: 10,
     });
   }
 
-  await createDeviceCertificate({
-    certsDir,
-    deviceId: jobId,
-  });
-
-  const deviceCert = deviceFileLocations({
-    certsDir,
-    deviceId: jobId,
-  });
-
-  // Writes the JSON file which works with the Certificate Manager of the LTA Link Monitor
-  await fs.writeFile(
-    deviceCert.json,
-    JSON.stringify(
-      {
-        caCert: await fs.readFile(
-          path.resolve(process.cwd(), "data", "AmazonRootCA1.pem"),
-          "utf-8"
-        ),
-        clientCert: await fs.readFile(deviceCert.certWithCA, "utf-8"),
-        privateKey: await fs.readFile(deviceCert.key, "utf-8"),
-        clientId: jobId,
-        brokerHostname: testEnv.endpoint,
-      },
-      null,
-      2
-    ),
-    "utf-8"
-  );
-
-  const job = await schedule({
-    bucketName: firmwareCI.bucketName,
-    certificateJSON: deviceCert.json,
-    ciDeviceArn,
-    firmwareUrl: `https://${firmwareCI.bucketName}.s3.${firmwareCI.region}.amazonaws.com/${jobId}.hex`,
-    network,
-    secTag,
-    region: firmwareCI.region,
-    s3,
-    target,
-    iot: new Iot(firmwareCISDKConfig),
-    jobId,
-  });
-
-  await wait({
-    iot: new Iot(firmwareCISDKConfig),
-    jobId,
-    interval: 10,
-  });
-
   const { result, flashLog, deviceLog, connections } = JSON.parse(
-    await (await fetch(job.reportUrl)).text()
+    await (await fetch(jobInfo.jobDocument.reportUrl)).text()
   );
   console.log();
   console.log("** Result **");
+  console.log();
   console.log(result);
   console.log();
   console.log("** Connections **");
+  console.log();
   console.log(connections);
   console.log();
   console.log("** Flash Log **");
+  console.log();
   console.log(flashLog.join("\n"));
   console.log();
   console.log("** Device Log **");
+  console.log();
   console.log(deviceLog.join("\n"));
 };
 

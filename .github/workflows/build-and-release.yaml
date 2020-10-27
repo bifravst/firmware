@@ -47,7 +47,9 @@ jobs:
         continue-on-error: true
         env:
           DOCKER_CLI_EXPERIMENTAL: enabled
-        run: docker manifest inspect ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
+        run:
+          docker manifest inspect ghcr.io/bifravst/firmware-builder:${{
+          env.DOCKER_CHECKSUM }}
 
       - name: Build Docker image
         if: steps.check-docker-image.outcome == 'failure'
@@ -114,7 +116,9 @@ jobs:
       - name: Sign in to the GitHub Container Registry
         run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
 
-      - run: docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
+      - run:
+          docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM
+          }}
 
       - name: Build
         run: |
@@ -134,13 +138,16 @@ jobs:
     needs: [version, docker]
 
     env:
-      FIRMWARECI_AWS_ACCESS_KEY_ID: ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
-      FIRMWARECI_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
+      FIRMWARECI_AWS_ACCESS_KEY_ID:
+        ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
+      FIRMWARECI_AWS_SECRET_ACCESS_KEY:
+        ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
       FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
       FIRMWARECI_REGION: eu-central-1
       FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
       TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_TESTENV_AWS_ACCESS_KEY_ID }}
-      TESTENV_AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
+      TESTENV_AWS_SECRET_ACCESS_KEY:
+        ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
       TESTENV_AWS_DEFAULT_REGION: eu-central-1
       TEST_ENV_STACK_NAME: bifravst
       CI: 1
@@ -192,7 +199,9 @@ jobs:
       - name: Sign in to the GitHub Container Registry
         run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
 
-      - run: docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
+      - run:
+          docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM
+          }}
 
       - name: Build
         run: |
@@ -211,6 +220,8 @@ jobs:
       - run: npm ci
 
       - run: npx tsc
+
+      - run: node --unhandled-rejections=strict schedule.js
 
       - run: npm run test:e2e
 

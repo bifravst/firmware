@@ -4,15 +4,16 @@ Feature: Connect
 
     Background:
         
-        Given I connect the cat tracker {env.JOB_ID}
-        Given I am authenticated with AWS key "{env.TESTENV_AWS_ACCESS_KEY_ID}" and secret "{env.TESTENV_AWS_SECRET_ACCESS_KEY}"
+        Given I am run after the "Run the firmware" feature
+        Given I connect the cat tracker {env__JOB_ID}
+        Given I am authenticated with AWS key "{env__TESTENV_AWS_ACCESS_KEY_ID}" and secret "{env__TESTENV_AWS_SECRET_ACCESS_KEY}"
 
     Scenario: Read reported and desired state
 
         When I execute "getThingShadow" of the AWS IotData SDK with
         """
         {
-            "thingName": "{env.JOB_ID}"
+            "thingName": "{env__JOB_ID}"
         }
         """
         And I parse "awsSdk.res.payload" into "shadow"
@@ -23,7 +24,7 @@ Feature: Connect
                 "v": {
                     "modV": "mfw_nrf9160_1.2.0",
                     "brdV": "thingy91_nrf9160",
-                    "appV": "{env.NEXT_VERSION}"
+                    "appV": "{env__NEXT_VERSION}"
                 }
             }
         }
