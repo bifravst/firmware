@@ -27,7 +27,7 @@ static struct env_sensor accel_sensor = {
 	.dev_name = CONFIG_ACCELEROMETER_DEV_NAME
 };
 
-static ext_sensors_evt_handler_t m_evt_handler;
+static ext_sensor_handler_t m_evt_handler;
 static double accelerometer_threshold;
 
 static void accelerometer_trigger_handler(struct device *dev,
@@ -71,7 +71,7 @@ static void accelerometer_trigger_handler(struct device *dev,
 	}
 }
 
-int ext_sensors_init(ext_sensors_evt_handler_t handler)
+int ext_sensors_init(ext_sensor_handler_t handler)
 {
 	if (handler == NULL) {
 		LOG_INF("External sensor handler NULL!");
@@ -168,7 +168,7 @@ int ext_sensors_humidity_get(double *ext_hum)
 	return 0;
 }
 
-void ext_sensors_accelerometer_threshold_set(int acc_thres)
+void ext_sensors_mov_thres_set(int acc_thres)
 {
 	if (acc_thres == 0) {
 		accelerometer_threshold = 0;

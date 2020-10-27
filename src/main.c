@@ -1079,7 +1079,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		}
 		/* Set new accelerometer threshold and GPS timeout. */
 		gps_cfg.timeout = cfg.gpst;
-		ext_sensors_accelerometer_threshold_set(cfg.acct);
+		ext_sensors_mov_thres_set(cfg.acct);
 		k_delayed_work_submit(&device_config_send_work, K_NO_WAIT);
 
 		/* Start movement timer which triggers every movement timeout.

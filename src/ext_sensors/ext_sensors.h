@@ -49,7 +49,7 @@ struct ext_sensor_evt {
  *
  *  @param[in] evt The event and any associated parameters.
  */
-typedef void (*ext_sensors_evt_handler_t)(
+typedef void (*ext_sensor_handler_t)(
 	const struct ext_sensor_evt *const evt);
 
 /**
@@ -59,7 +59,7 @@ typedef void (*ext_sensors_evt_handler_t)(
  *
  * @return 0 on success or negative error value on failure.
  */
-int ext_sensors_init(ext_sensors_evt_handler_t handler);
+int ext_sensors_init(ext_sensor_handler_t handler);
 
 /**
  * @brief Get temperature from library.
@@ -86,7 +86,7 @@ int ext_sensors_humidity_get(double *ext_hum);
  *
  * @return 0 on success or negative error value on failure.
  */
-void ext_sensors_accelerometer_threshold_set(int acc_thresh);
+void ext_sensors_mov_thres_set(int acc_thresh);
 
 #ifdef __cplusplus
 }
