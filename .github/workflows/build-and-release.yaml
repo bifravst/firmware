@@ -167,7 +167,7 @@ jobs:
 
       - name: Configure Version
         run: |
-        CAT_TRACKER_APP_VERSION=`cat version.conf`-thingy91_nrf9160ns-ltem-${JOB_ID}
+          CAT_TRACKER_APP_VERSION=`cat version.conf`-thingy91_nrf9160ns-ltem-${JOB_ID}
           echo "CAT_TRACKER_APP_VERSION=${CAT_TRACKER_APP_VERSION}" >> $GITHUB_ENV
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_thingy91_nrf9160ns.conf
 
