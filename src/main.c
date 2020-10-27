@@ -573,12 +573,9 @@ static void ui_send(void)
 
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
-	err = cloud_codec_encode_data(
-		&codec, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
-		&modem_buf[head_modem_buf], &ui_buf[head_ui_buf],
-		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf]);
+	err = cloud_codec_encode_ui_data(&codec, &ui_buf[head_ui_buf]);
 	if (err) {
-		LOG_ERR("cloud_encode_button_message_data, error: %d", err);
+		LOG_ERR("cloud_codec_encode_ui_data, error: %d", err);
 		return;
 	}
 
