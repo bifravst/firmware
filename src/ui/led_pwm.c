@@ -13,7 +13,7 @@
 #include "led_effect.h"
 
 struct led {
-	struct device *pwm_dev;
+	const struct device *pwm_dev;
 
 	size_t id;
 	struct led_color color;
