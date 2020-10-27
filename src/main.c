@@ -106,7 +106,6 @@ static struct cloud_backend *cloud_backend;
 
 static bool gps_fix;
 static bool cloud_connected;
-static bool initial_cloud_connection;
 
 static struct k_delayed_work device_config_get_work;
 static struct k_delayed_work device_config_send_work;
@@ -570,24 +569,26 @@ static void device_config_get(void)
 static void ui_send(void)
 {
 	int err;
+	struct cloud_codec_data codec;
 
 	ui_led_set_pattern(UI_CLOUD_PUBLISHING);
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
-				 .endpoint = pub_ep_topics_sub[1] };
-
 	err = cloud_codec_encode_data(
-		&msg, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
+		&codec, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
 		&modem_buf[head_modem_buf], &ui_buf[head_ui_buf],
-		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf],
-		CLOUD_DATA_ENCODE_UI);
+		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf]);
 	if (err) {
 		LOG_ERR("cloud_encode_button_message_data, error: %d", err);
 		return;
 	}
 
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint = pub_ep_topics_sub[1],
+				 .buf = codec.buf,
+				 .len = codec.len };
+
 	err = cloud_send(cloud_backend, &msg);
-	cloud_codec_release_data(&msg);
+	cloud_codec_release_data(&codec);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 	}
@@ -596,11 +597,9 @@ static void ui_send(void)
 static void device_config_send(void)
 {
 	int err;
+	struct cloud_codec_data codec;
 
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
-
-	err = cloud_codec_encode_cfg_data(&msg, &cfg);
+	err = cloud_codec_encode_cfg_data(&codec, &cfg);
 	if (err == -EAGAIN) {
 		LOG_DBG("No change in device configuration");
 		return;
@@ -609,8 +608,13 @@ static void device_config_send(void)
 		return;
 	}
 
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG,
+				 .buf = codec.buf,
+				 .len = codec.len };
+
 	err = cloud_send(cloud_backend, &msg);
-	cloud_codec_release_data(&msg);
+	cloud_codec_release_data(&codec);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 	}
@@ -619,59 +623,35 @@ static void device_config_send(void)
 static void data_send(void)
 {
 	int err;
-	enum cloud_data_encode_schema pub_schema;
-
-	/* Data encoded depending on mode, obtained gps fix and
-	 * accelerometer trigger.
-	 */
-
-	if (!initial_cloud_connection) {
-		pub_schema = CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT;
-	} else {
-		if (cfg.act && !gps_fix) {
-			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT;
-		}
-
-		if (cfg.act && gps_fix) {
-			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS;
-		}
-
-		if (!cfg.act && !gps_fix) {
-			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_ACCEL;
-		}
-
-		if (!cfg.act && gps_fix) {
-			pub_schema = CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS_ACCEL;
-		}
-	}
-
-	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
-				 .endpoint.type = CLOUD_EP_TOPIC_MSG };
+	struct cloud_codec_data codec;
 
 	err = cloud_codec_encode_data(
-		&msg, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
+		&codec, &gps_buf[head_gps_buf], &sensors_buf[head_sensor_buf],
 		&modem_buf[head_modem_buf], &ui_buf[head_ui_buf],
-		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf], pub_schema);
+		&accel_buf[head_accel_buf], &bat_buf[head_bat_buf]);
 	if (err) {
 		LOG_ERR("Error enconding message %d", err);
 		return;
 	}
 
+	struct cloud_msg msg = { .qos = CLOUD_QOS_AT_MOST_ONCE,
+				 .endpoint.type = CLOUD_EP_TOPIC_MSG,
+				 .buf = codec.buf,
+				 .len = codec.len };
+
 	err = cloud_send(cloud_backend, &msg);
-	cloud_codec_release_data(&msg);
+	cloud_codec_release_data(&codec);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 		return;
 	}
-
-	gps_fix = false;
-	initial_cloud_connection = true;
 }
 
 static void buffered_data_send(void)
 {
 	int err;
 	bool queued_entries = false;
+	struct cloud_codec_data codec;
 
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
@@ -692,14 +672,17 @@ check_gps_buffer:
 
 	if (queued_entries) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_gps_buffer(&msg, gps_buf);
+		err = cloud_codec_encode_gps_buffer(&codec, gps_buf);
 		if (err) {
 			LOG_ERR("Error encoding GPS buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;
@@ -722,14 +705,17 @@ check_sensors_buffer:
 
 	if (queued_entries) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_sensor_buffer(&msg, sensors_buf);
+		err = cloud_codec_encode_sensor_buffer(&codec, sensors_buf);
 		if (err) {
 			LOG_ERR("Error encoding sensors buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;
@@ -752,14 +738,17 @@ check_modem_buffer:
 
 	if (queued_entries) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_modem_buffer(&msg, modem_buf);
+		err = cloud_codec_encode_modem_buffer(&codec, modem_buf);
 		if (err) {
 			LOG_ERR("Error encoding modem buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;
@@ -782,14 +771,17 @@ check_ui_buffer:
 
 	if (queued_entries) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_ui_buffer(&msg, ui_buf);
+		err = cloud_codec_encode_ui_buffer(&codec, ui_buf);
 		if (err) {
 			LOG_ERR("Error encoding modem buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;
@@ -815,14 +807,17 @@ check_accel_buffer:
 	 */
 	if (queued_entries && !cfg.act) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_accel_buffer(&msg, accel_buf);
+		err = cloud_codec_encode_accel_buffer(&codec, accel_buf);
 		if (err) {
 			LOG_ERR("Error encoding accelerometer buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;
@@ -845,14 +840,17 @@ check_battery_buffer:
 
 	if (queued_entries) {
 		/* Encode and send queued entries in batches. */
-		err = cloud_codec_encode_bat_buffer(&msg, bat_buf);
+		err = cloud_codec_encode_bat_buffer(&codec, bat_buf);
 		if (err) {
 			LOG_ERR("Error encoding accelerometer buffer: %d", err);
 			return;
 		}
 
+		msg.buf = codec.buf;
+		msg.len = codec.len;
+
 		err = cloud_send(cloud_backend, &msg);
-		cloud_codec_release_data(&msg);
+		cloud_codec_release_data(&codec);
 		if (err) {
 			LOG_ERR("Cloud send failed, err: %d", err);
 			return;

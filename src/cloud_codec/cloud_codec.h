@@ -30,25 +30,13 @@
 extern "C" {
 #endif
 
-/** @brief Combinations of data entries to be encoded. */
-enum cloud_data_encode_schema {
-	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT,
-	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_GPS,
-	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_GPS_ACCEL,
-	CLOUD_DATA_ENCODE_MSTAT_MDYN_SENS_BAT_ACCEL,
-	CLOUD_DATA_ENCODE_MDYN_SENS_BAT,
-	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS,
-	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_GPS_ACCEL,
-	CLOUD_DATA_ENCODE_MDYN_SENS_BAT_ACCEL,
-	CLOUD_DATA_ENCODE_UI
-};
-
 /** @brief Structure containing battery data published to cloud. */
 struct cloud_data_battery {
+	/** Battery voltage level. */
 	uint16_t bat;
-
+	/** Battery data timestamp. UNIX milliseconds. */
 	int64_t bat_ts;
-
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
 };
 
@@ -68,7 +56,7 @@ struct cloud_data_gps {
 	float spd;
 	/** Heading of movement in degrees. */
 	float hdg;
-	/** Flag signifying if the GPS fix is to be published, aux variable. */
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
 };
 
@@ -92,7 +80,7 @@ struct cloud_data_accelerometer {
 	int64_t ts;
 	/** Accelerometer readings. */
 	double values[3];
-
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
 };
 
@@ -103,69 +91,122 @@ struct cloud_data_sensors {
 	double temp;
 	/** Humidity level in percentage */
 	double hum;
-
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
 };
 
 struct cloud_data_modem {
-	/** Modem data timestamp. UNIX milliseconds. */
+	/** Dynamic modem data timestamp. UNIX milliseconds. */
 	int64_t mod_ts;
+	/** Static modem data timestamp. UNIX milliseconds. */
 	int64_t mod_ts_static;
+	/** Area code. */
 	uint16_t area;
+	/** Cell id. */
 	uint16_t cell;
+	/** Band number. */
 	uint16_t bnd;
+	/** Network mode GPS. */
 	uint16_t nw_gps;
+	/** Network mode LTE-M. */
 	uint16_t nw_lte_m;
+	/** Network mode NB-IoT. */
 	uint16_t nw_nb_iot;
+	/** Reference Signal Received Power. */
 	uint16_t rsrp;
+	/** Internet Protocol Address. */
 	char *ip;
+	/* Mobile Country Code*/
 	char *mccmnc;
+	/** Application version and Mobile Network Code. */
 	char *appv;
+	/** Device board version. */
 	const char *brdv;
+	/** Modem firmware. */
 	char *fw;
+	/** Integrated Circuit Card Identifier. */
 	char *iccid;
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
 };
 
 struct cloud_data_ui {
-	int64_t btn_ts;
+	/** Button number. */
 	int btn;
+	/** Button data timestamp. UNIX milliseconds. */
+	int64_t btn_ts;
+	/** Flag signifying that the data entry is to be published. */
 	bool queued;
+};
+
+struct cloud_codec_data {
+	/** Encoded output. */
+	char *buf;
+	/** Length of encoded output. */
+	size_t len;
 };
 
 int cloud_codec_decode_response(char *input, struct cloud_data_cfg *cfg);
 
-int cloud_codec_encode_cfg_data(struct cloud_msg *output,
+int cloud_codec_encode_cfg_data(struct cloud_codec_data *output,
 				struct cloud_data_cfg *cfg_buffer);
 
-int cloud_codec_encode_data(struct cloud_msg *output,
+int cloud_codec_encode_data(struct cloud_codec_data *output,
 			    struct cloud_data_gps *gps_buf,
 			    struct cloud_data_sensors *sensor_buf,
 			    struct cloud_data_modem *modem_buf,
 			    struct cloud_data_ui *ui_buf,
 			    struct cloud_data_accelerometer *accel_buf,
-			    struct cloud_data_battery *bat_buf,
-			    enum cloud_data_encode_schema encode_schema);
+			    struct cloud_data_battery *bat_buf);
 
-int cloud_codec_encode_gps_buffer(struct cloud_msg *output,
+int cloud_codec_encode_ui_data(struct cloud_codec_data *output,
+			       struct cloud_data_ui *ui_buf);
+
+int cloud_codec_encode_gps_buffer(struct cloud_codec_data *output,
 				  struct cloud_data_gps *data);
 
-int cloud_codec_encode_modem_buffer(struct cloud_msg *output,
+int cloud_codec_encode_modem_buffer(struct cloud_codec_data *output,
 				    struct cloud_data_modem *data);
 
-int cloud_codec_encode_sensor_buffer(struct cloud_msg *output,
+int cloud_codec_encode_sensor_buffer(struct cloud_codec_data *output,
 				     struct cloud_data_sensors *data);
 
-int cloud_codec_encode_ui_buffer(struct cloud_msg *output,
+int cloud_codec_encode_ui_buffer(struct cloud_codec_data *output,
 				 struct cloud_data_ui *data);
 
-int cloud_codec_encode_accel_buffer(struct cloud_msg *output,
+int cloud_codec_encode_accel_buffer(struct cloud_codec_data *output,
 				    struct cloud_data_accelerometer *data);
 
-int cloud_codec_encode_bat_buffer(struct cloud_msg *output,
+int cloud_codec_encode_bat_buffer(struct cloud_codec_data *output,
 				  struct cloud_data_battery *data);
 
-static inline void cloud_codec_release_data(struct cloud_msg *output)
+void cloud_codec_populate_sensor_buffer(
+				struct cloud_data_sensors *sensor_buffer,
+				struct cloud_data_sensors *new_sensor_data,
+				int *head_sensor_buf);
+
+void cloud_codec_populate_ui_buffer(struct cloud_data_ui *ui_buffer,
+				    struct cloud_data_ui *new_ui_data,
+				    int *head_ui_buf);
+
+void cloud_codec_populate_accel_buffer(
+				struct cloud_data_accelerometer *accel_buf,
+				struct cloud_data_accelerometer *new_accel_data,
+				int *head_accel_buf);
+
+void cloud_codec_populate_bat_buffer(struct cloud_data_battery *bat_buffer,
+				     struct cloud_data_battery *new_bat_data,
+				     int *head_bat_buf);
+
+void cloud_codec_populate_gps_buffer(struct cloud_data_gps *gps_buffer,
+				     struct cloud_data_gps *new_gps_data,
+				     int *head_gps_buf);
+
+void cloud_codec_populate_modem_buffer(struct cloud_data_modem *modem_buffer,
+				       struct cloud_data_modem *new_modem_data,
+				       int *head_modem_buf);
+
+static inline void cloud_codec_release_data(struct cloud_codec_data *output)
 {
 	free(output->buf);
 }
