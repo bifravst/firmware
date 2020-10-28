@@ -1,6 +1,12 @@
 name: Build and Release
 
-on: push
+on:
+  push:
+    paths:
+      - "**.c"
+      - "**.h"
+      - .github/workflows/build-and-release.yaml
+      - Dockerfile
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
