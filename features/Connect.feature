@@ -1,6 +1,9 @@
+@Skip
 Feature: Connect
 
     The Cat Tracker should connect to the AWS IoT broker
+
+    FIXME: Blocked until https://github.com/bifravst/firmware/issues/81 is fixed
 
     Background:
         
