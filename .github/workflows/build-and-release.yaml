@@ -227,6 +227,8 @@ jobs:
       - run: node --unhandled-rejections=strict schedule.js
 
       - run: npm run test:e2e
+        # For now, ignore test failures until we get more experience running these tests
+        continue-on-error: true
 
       - name: Remove device certificates
         run: rm -v ./certificates/*/device-*
