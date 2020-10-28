@@ -31,8 +31,8 @@
     "node-fetch": "2.6.1"
   },
   "devDependencies": {
-    "@bifravst/aws": "^16.4.1-slim-npm.3",
-    "@bifravst/code-style": "^8.0.134",
+    "@bifravst/aws": "16.4.1-slim-npm.3",
+    "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.6",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
@@ -44,7 +44,7 @@
     "semantic-release": "17.2.1",
     "standard": "15.0.1",
     "stream-buffers": "3.0.2",
-    "typescript": "^4.0.5"
+    "typescript": "4.0.5"
   },
   "husky": {
     "hooks": {
