@@ -13,6 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "14.x"
+
       - name: Determine next release version
         run: |
           npm ci
@@ -33,8 +37,7 @@ jobs:
       - name: Determine checksum for Docker image
         run: |
           DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
-          echo ${DOCKER_CHECKSUM}
-          echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
+          echo "DOCKER_CHECKSUM=${DOCKER_CHECKSUM}" >> $GITHUB_ENV
 
       - name: Sign in to the GitHub Container Registry
         run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
@@ -44,7 +47,9 @@ jobs:
         continue-on-error: true
         env:
           DOCKER_CLI_EXPERIMENTAL: enabled
-        run: docker manifest inspect ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
+        run:
+          docker manifest inspect ghcr.io/bifravst/firmware-builder:${{
+          env.DOCKER_CHECKSUM }}
 
       - name: Build Docker image
         if: steps.check-docker-image.outcome == 'failure'
@@ -73,6 +78,9 @@ jobs:
         network: [nbiot, ltem]
         loglevel: [debug, nodebug]
 
+    env:
+      PROD_ENV_BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
+
     steps:
       - uses: actions/checkout@v2
 
@@ -82,9 +90,8 @@ jobs:
 
       - name: Configure Version
         run: |
-          NEXT_VERSION=`cat version.conf`
-          echo $NEXT_VERSION
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${NEXT_VERSION}-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}\"" >> prj_${{ matrix.board }}.conf
+          CAT_TRACKER_APP_VERSION=`cat version.conf`-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_${{ matrix.board }}.conf
 
       - name: Enable debug logs
         if: matrix.loglevel == 'debug'
@@ -96,29 +103,22 @@ jobs:
           sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_${{ matrix.board }}.conf
 
       - name: Configure the AWS IoT broker hostname
-        if: github.head_ref == ''
-        env:
-          BROKER_HOSTNAME: ${{ secrets.BROKER_HOSTNAME }}
         run: |
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_${{ matrix.board }}.conf
-
-      - name: Stub AWS IoT broker hostname (this is a PR)
-        if: github.head_ref != ''
-        run: |
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"example.com\"" >> prj_${{ matrix.board }}.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${PROD_ENV_BROKER_HOSTNAME}\"" >> prj_${{ matrix.board }}.conf
 
       - run: cat prj_${{ matrix.board }}.conf
 
       - name: Determine checksum for Docker image
         run: |
           DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
-          echo ${DOCKER_CHECKSUM}
-          echo "::set-env name=DOCKER_CHECKSUM::${DOCKER_CHECKSUM}"
+          echo "DOCKER_CHECKSUM=${DOCKER_CHECKSUM}" >> $GITHUB_ENV
 
       - name: Sign in to the GitHub Container Registry
         run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
 
-      - run: docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }}
+      - run:
+          docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM
+          }}
 
       - name: Build
         run: |
@@ -131,11 +131,113 @@ jobs:
             build/zephyr/merged.hex
             build/zephyr/app_update.bin
 
+  e2e:
+    name: End to End tests
+    runs-on: ubuntu-latest
+
+    needs: [version, docker]
+
+    env:
+      FIRMWARECI_AWS_ACCESS_KEY_ID:
+        ${{ secrets.CI_FIRMWARECI_AWS_ACCESS_KEY_ID }}
+      FIRMWARECI_AWS_SECRET_ACCESS_KEY:
+        ${{ secrets.CI_FIRMWARECI_AWS_SECRET_ACCESS_KEY }}
+      FIRMWARECI_BUCKET_NAME: ${{ secrets.CI_FIRMWARECI_BUCKET_NAME }}
+      FIRMWARECI_REGION: eu-central-1
+      FIRMWARECI_DEVICE_ID: ${{ secrets.CI_FIRMWARECI_DEVICE_ID }}
+      TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_TESTENV_AWS_ACCESS_KEY_ID }}
+      TESTENV_AWS_SECRET_ACCESS_KEY:
+        ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
+      TESTENV_AWS_DEFAULT_REGION: eu-central-1
+      TESTENV_STACK_NAME: bifravst
+      CI: 1
+      FORCE_COLOR: 3
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: version
+
+      - name: Generate Job ID
+        run: |
+          JOB_ID=`uuidgen`
+          echo "JOB_ID=${JOB_ID}" >> $GITHUB_ENV
+
+      - name: Configure Version
+        run: |
+          CAT_TRACKER_APP_VERSION=`cat version.conf`-thingy91_nrf9160ns-ltem-${JOB_ID}
+          echo "CAT_TRACKER_APP_VERSION=${CAT_TRACKER_APP_VERSION}" >> $GITHUB_ENV
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_thingy91_nrf9160ns.conf
+
+      - run: echo "# Firmware CI settings" >> prj_thingy91_nrf9160ns.conf
+
+      - name: Enable debug logs
+        run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_thingy91_nrf9160ns.conf
+
+      - name: Set network mode to LTE-m
+        run: |
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
+
+      - name: Configure the AWS IoT broker hostname
+        run: |
+          BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_DEFAULT_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
+          echo "TESTENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
+
+      - name: Set MQTT client ID to test device
+        run: |
+          echo "CONFIG_USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN=40" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_MQTT_CLIENT_ID=\"${JOB_ID}\"" >> prj_thingy91_nrf9160ns.conf
+
+      - run: cat prj_thingy91_nrf9160ns.conf
+
+      - name: Determine checksum for Docker image
+        run: |
+          DOCKER_CHECKSUM=`cat Dockerfile west.yml | sha256sum | awk '{ print $1 }' | tr -d '\n'`
+          echo "DOCKER_CHECKSUM=${DOCKER_CHECKSUM}" >> $GITHUB_ENV
+
+      - name: Sign in to the GitHub Container Registry
+        run: echo ${CR_PAT} | docker login ghcr.io -u USERNAME --password-stdin
+
+      - run:
+          docker pull ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM
+          }}
+
+      - name: Build
+        run: |
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
+
+      - name: Keep certificates around
+        uses: actions/cache@v2
+        with:
+          path: ./certificates
+          key: certificates
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "14.x"
+
+      - run: npm ci
+
+      - run: npx tsc
+
+      - run: node --unhandled-rejections=strict schedule.js
+
+      - run: npm run test:e2e
+        # For now, ignore test failures until we get more experience running these tests
+        continue-on-error: true
+
+      - name: Remove device certificates
+        run: rm -v ./certificates/*/device-*
+
   release:
     name: Release
     runs-on: ubuntu-latest
 
-    needs: [build]
+    needs: [build, e2e]
 
     steps:
       - uses: actions/checkout@v2

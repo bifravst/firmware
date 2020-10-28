@@ -2,6 +2,10 @@
   "name": "@bifravst/firmware",
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
+  "scripts": {
+    "postinstall": "check-node-version --package",
+    "test:e2e": "node --unhandled-rejections=strict dist/run-features.js ./features --print-results --progress"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/bifravst/firmware.git"
@@ -19,19 +23,37 @@
   ],
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
+  "dependencies": {
+    "@bifravst/cloudformation-helpers": "3.1.51",
+    "@bifravst/firmware-ci": "1.4.2",
+    "aws-sdk": "2.769.0",
+    "check-node-version": "4.0.3",
+    "node-fetch": "2.6.1"
+  },
   "devDependencies": {
+    "@bifravst/aws": "^16.4.1-slim-npm.3",
+    "@bifravst/code-style": "^8.0.134",
+    "@bifravst/e2e-bdd-test-runner": "4.0.6",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
     "@semantic-release/commit-analyzer": "8.0.1",
+    "@types/commander": "2.12.2",
+    "chalk": "4.1.0",
+    "commander": "6.2.0",
     "husky": "4.3.0",
     "semantic-release": "17.2.1",
     "standard": "15.0.1",
-    "stream-buffers": "3.0.2"
+    "stream-buffers": "3.0.2",
+    "typescript": "^4.0.5"
   },
   "husky": {
     "hooks": {
       "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
     }
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
   },
   "release": {
     "branches": [
