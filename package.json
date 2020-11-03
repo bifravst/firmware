@@ -31,7 +31,7 @@
     "node-fetch": "2.6.1"
   },
   "devDependencies": {
-    "@bifravst/aws": "16.5.9",
+    "@bifravst/aws": "16.5.10",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.11",
     "@commitlint/cli": "11.0.0",
