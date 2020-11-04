@@ -33,7 +33,7 @@
   "devDependencies": {
     "@bifravst/aws": "16.5.10",
     "@bifravst/code-style": "8.0.134",
-    "@bifravst/e2e-bdd-test-runner": "4.0.11",
+    "@bifravst/e2e-bdd-test-runner": "4.0.12",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
     "@semantic-release/commit-analyzer": "8.0.1",
