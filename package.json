@@ -114,7 +114,7 @@
             },
             {
               "path": "/home/runner/work/firmware/firmware/thingy91_nrf9160ns-nbiot-debug/app_update.bin",
-              "name": "cat-tracker-Thingy91-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-Thingy91-app_update-nbiot-debug-${nextRelease.gitTag}.bin",
               "label": "App update file for Thingy:91 NB-IoT (debug)"
             },
             {
@@ -124,7 +124,7 @@
             },
             {
               "path": "/home/runner/work/firmware/firmware/nrf9160dk_nrf9160ns-nbiot-debug/app_update.bin",
-              "name": "cat-tracker-nRF9160DK-app_update-nbiot-debug.bin",
+              "name": "cat-tracker-nRF9160DK-app_update-nbiot-debug-${nextRelease.gitTag}.bin",
               "label": "App update file for nRF9160 DK NB-IoT (debug)"
             },
             {
