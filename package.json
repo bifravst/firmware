@@ -24,7 +24,7 @@
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
   "dependencies": {
-    "@bifravst/cloudformation-helpers": "4.0.1",
+    "@bifravst/cloudformation-helpers": "4.0.2",
     "@bifravst/firmware-ci": "1.6.10",
     "aws-sdk": "2.789.0",
     "check-node-version": "4.0.3",
