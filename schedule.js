@@ -206,6 +206,14 @@ const e2e = async () => {
 			jobId,
 			interval: 10,
 		})
+
+		// Delete
+		await s3
+			.deleteObject({
+				Bucket: firmwareCI.bucketName,
+				Key: `${jobId}.hex`,
+			})
+			.promise()
 	}
 
 	const { result, flashLog, deviceLog, connections } = JSON.parse(

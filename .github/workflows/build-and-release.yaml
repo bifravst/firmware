@@ -9,6 +9,7 @@ on:
       - Kconfig
       - .github/workflows/build-and-release.yaml
       - Dockerfile
+      - schedule.js
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
