@@ -5,6 +5,8 @@ on:
     paths:
       - "**.c"
       - "**.h"
+      - "**.feature"
+      - Kconfig
       - .github/workflows/build-and-release.yaml
       - Dockerfile
 
