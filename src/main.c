@@ -59,6 +59,9 @@ LOG_MODULE_REGISTER(cat_tracker, CONFIG_CAT_TRACKER_LOG_LEVEL);
 #define GPS_TIMEOUT_SECONDS 60
 #define DEVICE_MODE true
 
+/* Time between cloud re-connection attempts. */
+#define CLOUD_RECONNECTION_INTERVAL 30
+
 /* Timeout in seconds in which the application will wait for an initial event
  * from the date time library.
  */
@@ -115,6 +118,7 @@ static struct k_delayed_work ui_send_work;
 static struct k_delayed_work leds_set_work;
 static struct k_delayed_work mov_timeout_work;
 static struct k_delayed_work sample_data_work;
+static struct k_delayed_work cloud_connect_work;
 
 /* Value that always holds the latest RSRP value. */
 static uint16_t rsrp_value_latest;
@@ -893,6 +897,24 @@ static void data_publish(void)
 	}
 }
 
+static void cloud_connect_work_fn(struct k_work *work)
+{
+	int err;
+
+	err = cloud_connect(cloud_backend);
+	if (err) {
+		LOG_ERR("cloud_connect failed: %d", err);
+	}
+
+	LOG_DBG("Re-connection to cloud in progress");
+	LOG_DBG("New reconnection attempt in %d seconds",
+		CLOUD_RECONNECTION_INTERVAL);
+
+	/* Try to reconnect to cloud every 30 seconds. */
+	k_delayed_work_submit(&cloud_connect_work,
+			      K_SECONDS(CLOUD_RECONNECTION_INTERVAL));
+}
+
 static void sample_data_work_fn(struct k_work *work)
 {
 	int err;
@@ -966,6 +988,7 @@ static void work_init(void)
 	k_delayed_work_init(&mov_timeout_work, mov_timeout_work_fn);
 	k_delayed_work_init(&ui_send_work, ui_send_work_fn);
 	k_delayed_work_init(&sample_data_work, sample_data_work_fn);
+	k_delayed_work_init(&cloud_connect_work, cloud_connect_work_fn);
 }
 
 static void gps_trigger_handler(const struct device *dev, struct gps_event *evt)
@@ -1032,6 +1055,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		cloud_connected = true;
 		config_get();
 		boot_write_img_confirmed();
+		k_delayed_work_cancel(&cloud_connect_work);
 		break;
 	case CLOUD_EVT_READY:
 		LOG_INF("CLOUD_EVT_READY");
@@ -1045,6 +1069,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	case CLOUD_EVT_DISCONNECTED:
 		LOG_INF("CLOUD_EVT_DISCONNECTED");
 		cloud_connected = false;
+		k_delayed_work_submit(&cloud_connect_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_ERROR:
 		LOG_ERR("CLOUD_EVT_ERROR");
@@ -1389,10 +1414,7 @@ void main(void)
 			DATE_TIME_TIMEOUT_S);
 	}
 
-	err = cloud_connect(cloud_backend);
-	if (err) {
-		LOG_ERR("cloud_connect failed: %d", err);
-	}
+	k_delayed_work_submit(&cloud_connect_work, K_NO_WAIT);
 
 	while (true) {
 		/*Check current device mode*/
