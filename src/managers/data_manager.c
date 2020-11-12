@@ -121,6 +121,13 @@ static int affirmed_data_types;
  */
 static int data_cnt;
 
+/* Forward declarations */
+static int config_settings_handler(const char *key, size_t len,
+				   settings_read_cb read_cb, void *cb_arg);
+
+SETTINGS_STATIC_HANDLER_DEFINE(MODULE, DEVICE_SETTINGS_KEY, NULL,
+			       config_settings_handler, NULL, NULL);
+
 K_MSGQ_DEFINE(msgq_data, sizeof(struct data_msg_data), 10, 4);
 
 static void notify_data_manager(struct data_msg_data *data)
@@ -171,20 +178,9 @@ static int data_manager_setup(void)
 {
 	int err;
 
-	struct settings_handler settings_cfg = {
-		.name = DEVICE_SETTINGS_KEY,
-		.h_set = config_settings_handler
-	};
-
 	err = settings_subsys_init();
 	if (err) {
 		LOG_ERR("settings_subsys_init, error: %d", err);
-		return err;
-	}
-
-	err = settings_register(&settings_cfg);
-	if (err) {
-		LOG_ERR("settings_register, error: %d", err);
 		return err;
 	}
 

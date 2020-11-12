@@ -14,8 +14,6 @@
 #include <zephyr.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <net/cloud.h>
-#include <modem/modem_info.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -146,10 +144,12 @@ struct cloud_codec_data {
 	size_t len;
 };
 
-int cloud_codec_decode_response(char *input, struct cloud_data_cfg *cfg);
+void cloud_codec_init(void);
 
-int cloud_codec_encode_cfg_data(struct cloud_codec_data *output,
-				struct cloud_data_cfg *cfg_buffer);
+int cloud_codec_decode_config(char *input, struct cloud_data_cfg *cfg);
+
+int cloud_codec_encode_config(struct cloud_codec_data *output,
+			      struct cloud_data_cfg *cfg);
 
 int cloud_codec_encode_data(struct cloud_codec_data *output,
 			    struct cloud_data_gps *gps_buf,
@@ -204,7 +204,7 @@ void cloud_codec_populate_modem_buffer(struct cloud_data_modem *modem_buffer,
 
 static inline void cloud_codec_release_data(struct cloud_codec_data *output)
 {
-	free(output->buf);
+	k_free(output->buf);
 }
 
 #ifdef __cplusplus

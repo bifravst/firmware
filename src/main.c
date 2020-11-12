@@ -348,10 +348,9 @@ static void on_sub_state_active(struct app_msg_data *app_msg)
 
 static void on_state_running(struct app_msg_data *app_msg)
 {
-	if (is_cloud_mgr_event(&app_msg->manager.cloud.header) &&
-	    app_msg->manager.cloud.type == CLOUD_MGR_EVT_CONNECTED) {
-		config_get();
-	}
+	/* Initial configuration is fetched automatically by the different
+	 * backends.
+	 */
 
 	if (is_modem_mgr_event(&app_msg->manager.modem.header) &&
 	    app_msg->manager.modem.type == MODEM_MGR_EVT_DATE_TIME_OBTAINED) {

@@ -32,6 +32,7 @@ extern atomic_t manager_count;
 BUILD_ASSERT(CONFIG_CLOUD_CONNECT_RETRIES < 14,
 	    "Cloud connect retries too large");
 
+#if defined(CONFIG_AWS_IOT)
 /* Application specific AWS topics. */
 #if !defined(CONFIG_USE_CUSTOM_MQTT_CLIENT_ID)
 #define AWS_CLOUD_CLIENT_ID_LEN 15
@@ -56,6 +57,19 @@ static char client_id_buf[AWS_CLOUD_CLIENT_ID_LEN + 1];
 static char batch_topic[BATCH_TOPIC_LEN + 1];
 static char cfg_topic[CFG_TOPIC_LEN + 1];
 static char messages_topic[MESSAGES_TOPIC_LEN + 1];
+#elif defined(CONFIG_NRF_CLOUD)
+#define NRF_CLOUD_SERVICE_INFO "{\"state\":{\"reported\":{\"device\": \
+		{\"serviceInfo\":{\"ui\":[\"GPS\",\"HUMID\",\"TEMP\"]}}}}}"
+#elif defined(CONFIG_AZURE_IOT_HUB)
+#define AZURE_IOT_HUB_CLIENT_ID_LEN 15
+#define AZURE_IOT_HUB_PROP_BAG_COUNT 1
+#define AZURE_IOT_PROP_BAG_BATCH "batch"
+static struct cloud_prop_bag prop_bag_batch[AZURE_IOT_HUB_PROP_BAG_COUNT] = {
+		[0].key = AZURE_IOT_PROP_BAG_BATCH,
+		[0].value = NULL
+};
+static char client_id_buf[AZURE_IOT_HUB_CLIENT_ID_LEN + 1];
+#endif
 
 struct cloud_msg_data {
 	union {
@@ -130,15 +144,20 @@ static void cloud_manager_config_send(struct data_mgr_event *data)
 	struct cloud_codec_data codec;
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG
 	};
 
-	err = cloud_codec_encode_cfg_data(&codec, &data->data.cfg);
+	err = cloud_codec_encode_config(&codec, &data->data.cfg);
 	if (err) {
 		LOG_ERR("Error encoding configuration, error: %d", err);
 		signal_error(err);
 		return;
 	}
+
+#if defined(CONFIG_AZURE_IOT_HUB)
+	msg.endpoint.type = CLOUD_EP_TOPIC_STATE;
+#else
+	msg.endpoint.type = CLOUD_EP_TOPIC_MSG;
+#endif
 
 	msg.buf = codec.buf;
 	msg.len = codec.len;
@@ -154,12 +173,21 @@ static void cloud_manager_config_send(struct data_mgr_event *data)
 static void cloud_manager_config_get(void)
 {
 	int err;
+
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_STATE,
 		.buf = "",
 		.len = 0
 	};
+
+#if defined(CONFIG_AZURE_IOT_HUB)
+	msg.endpoint.type = CLOUD_EP_TOPIC_CONFIG;
+#elif defined(CONFIG_AWS_IOT)
+	msg.endpoint.type = CLOUD_EP_TOPIC_STATE;
+#else
+	/* nRF Cloud does not support fetching device configuration. */
+	return;
+#endif
 
 	err = cloud_send(cloud_backend, &msg);
 	if (err) {
@@ -173,7 +201,6 @@ static void cloud_manager_data_send(struct data_mgr_event *data)
 	struct cloud_codec_data codec;
 	struct cloud_msg msg = {
 		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint.type = CLOUD_EP_TOPIC_MSG
 	};
 
 	/* Check if there exists a "fresh" entry at the head of the buffers.
@@ -200,6 +227,12 @@ static void cloud_manager_data_send(struct data_mgr_event *data)
 		return;
 	}
 
+#if defined(CONFIG_AZURE_IOT_HUB)
+	msg.endpoint.type = CLOUD_EP_TOPIC_STATE;
+#else
+	msg.endpoint.type = CLOUD_EP_TOPIC_MSG;
+#endif
+
 	msg.buf = codec.buf;
 	msg.len = codec.len;
 
@@ -218,8 +251,7 @@ static void cloud_manager_batch_data_send(struct data_mgr_event *data)
 
 	/* Publish batched data in one chunk to the batch endpoint. */
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint = pub_ep_topics_sub[0],
+		.qos = CLOUD_QOS_AT_MOST_ONCE
 	};
 
 	/* Check if the ringbuffers contain queued entries. If so they will
@@ -238,20 +270,34 @@ static void cloud_manager_batch_data_send(struct data_mgr_event *data)
 					data->data.buffer.ui_count,
 					data->data.buffer.accel_count,
 					data->data.buffer.bat_count);
-	if (err) {
+	if (err == -ENODATA) {
+		LOG_WRN("No queued data present in ringbuffers");
+		return;
+	} else if (err) {
 		LOG_ERR("Error batch-enconding data: %d", err);
 		signal_error(err);
 		return;
 	}
 
+#if defined(CONFIG_AWS_IOT)
+	msg.endpoint = pub_ep_topics_sub[0];
+#elif defined(CONFIG_NRF_CLOUD)
+	msg.endpoint.type = CLOUD_EP_TOPIC_MSG;
+#elif defined(CONFIG_AZURE_IOT_HUB)
+	msg.endpoint.type = CLOUD_EP_TOPIC_MSG;
+	msg.endpoint.prop_bag = prop_bag_batch;
+	msg.endpoint.prop_bag_count = ARRAY_SIZE(prop_bag_batch);
+#endif
+
 	msg.buf = codec.buf;
 	msg.len = codec.len;
 
 	err = cloud_send(cloud_backend, &msg);
-	cloud_codec_release_data(&codec);
 	if (err) {
 		LOG_ERR("Cloud send failed, err: %d", err);
 	}
+
+	cloud_codec_release_data(&codec);
 }
 
 static void cloud_manager_ui_data_send(struct data_mgr_event *data)
@@ -259,8 +305,7 @@ static void cloud_manager_ui_data_send(struct data_mgr_event *data)
 	int err;
 	struct cloud_codec_data codec;
 	struct cloud_msg msg = {
-		.qos = CLOUD_QOS_AT_MOST_ONCE,
-		.endpoint = pub_ep_topics_sub[1],
+		.qos = CLOUD_QOS_AT_MOST_ONCE
 	};
 
 	err = cloud_codec_encode_ui_data(&codec, &data->data.ui);
@@ -269,6 +314,15 @@ static void cloud_manager_ui_data_send(struct data_mgr_event *data)
 		signal_error(err);
 		return;
 	}
+
+#if defined(CONFIG_AWS_IOT)
+	msg.endpoint = pub_ep_topics_sub[1];
+#else
+	/* Azure does not have a designated property bag for button messages.
+	 * Button presses published to messages/events/
+	 */
+	msg.endpoint.type = CLOUD_EP_TOPIC_MSG;
+#endif
 
 	msg.buf = codec.buf;
 	msg.len = codec.len;
@@ -307,7 +361,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		 * CLOUD_EVT_READY event for every MQTT SUBACK. The current
 		 * implementation is bad practice and should be fixed
 		 */
-		k_delayed_work_submit(&ready_work, K_SECONDS(1));
+		k_delayed_work_submit(&ready_work, K_NO_WAIT);
 		break;
 	case CLOUD_EVT_DISCONNECTED:
 		LOG_DBG("CLOUD_EVT_DISCONNECTED");
@@ -343,7 +397,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 		 * before it is sent to the data manager. This way we avoid
 		 * sending uninitialized variables to the data manager.
 		 */
-		err = cloud_codec_decode_response(
+		err = cloud_codec_decode_config(
 					evt->data.msg.buf,
 					&copy_cfg);
 		if (err == 0) {
@@ -378,6 +432,7 @@ void cloud_event_handler(const struct cloud_backend *const backend,
 	}
 }
 
+#if defined(CONFIG_AWS_IOT)
 static int populate_app_endpoint_topics(void)
 {
 	int err;
@@ -425,9 +480,9 @@ static int cloud_manager_setup(void)
 {
 	int err;
 
-	cloud_backend = cloud_get_binding(CONFIG_CLOUD_BACKEND);
+	cloud_backend = cloud_get_binding("AWS_IOT");
 	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
-		 CONFIG_CLOUD_BACKEND);
+		 "AWS_IOT");
 
 #if !defined(CONFIG_USE_CUSTOM_MQTT_CLIENT_ID)
 	char imei_buf[50];
@@ -466,8 +521,93 @@ static int cloud_manager_setup(void)
 		return err;
 	}
 
+	LOG_INF("********************************************");
+	LOG_INF(" The cat tracker has started");
+	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
+	LOG_INF(" Client ID:   %s", log_strdup(client_id_buf));
+	LOG_INF(" Cloud:       %s", log_strdup("AWS IoT"));
+	LOG_INF(" Endpoint:    %s",
+		log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
+	LOG_INF("********************************************");
+
 	return 0;
 }
+#elif defined(CONFIG_NRF_CLOUD)
+static int cloud_manager_setup(void)
+{
+	int err;
+
+	cloud_backend = cloud_get_binding("NRF_CLOUD");
+	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
+		 "NRF_CLOUD");
+
+	err = cloud_init(cloud_backend, cloud_event_handler);
+	if (err) {
+		LOG_ERR("cloud_init, error: %d", err);
+		return err;
+	}
+
+	LOG_INF("********************************************");
+	LOG_INF(" The cat tracker has started");
+	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
+	LOG_INF(" Cloud:       %s", log_strdup("nRF Cloud"));
+	LOG_INF(" Endpoint:    %s",
+		log_strdup(CONFIG_NRF_CLOUD_HOST_NAME));
+	LOG_INF("********************************************");
+
+	return 0;
+}
+#elif defined(CONFIG_AZURE_IOT_HUB)
+static int cloud_manager_setup(void)
+{
+	int err;
+
+	cloud_backend = cloud_get_binding("AZURE_IOT_HUB");
+	__ASSERT(cloud_backend != NULL, "%s cloud backend not found",
+		 "AZURE_IOT_HUB");
+
+#if !defined(CONFIG_USE_CUSTOM_MQTT_CLIENT_ID)
+	char imei_buf[50];
+
+	/* Retrieve device IMEI from modem. */
+	err = at_cmd_write("AT+CGSN", imei_buf, sizeof(imei_buf), NULL);
+	if (err) {
+		LOG_ERR("Not able to retrieve device IMEI from modem");
+		return err;
+	}
+
+	/* Set null character at the end of the device IMEI. */
+	imei_buf[AZURE_IOT_HUB_CLIENT_ID_LEN] = 0;
+
+	memcpy(client_id_buf, imei_buf, AZURE_IOT_HUB_CLIENT_ID_LEN + 1);
+
+#else
+	snprintf(client_id_buf, sizeof(client_id_buf), "%s",
+		 CONFIG_MQTT_CLIENT_ID);
+#endif
+
+	/* Fetch IMEI from modem data and set IMEI as cloud connection ID **/
+	cloud_backend->config->id = client_id_buf;
+	cloud_backend->config->id_len = sizeof(client_id_buf);
+
+	err = cloud_init(cloud_backend, cloud_event_handler);
+	if (err) {
+		LOG_ERR("cloud_init, error: %d", err);
+		return err;
+	}
+
+	LOG_INF("********************************************");
+	LOG_INF(" The cat tracker has started");
+	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
+	LOG_INF(" Client ID:   %s", log_strdup(client_id_buf));
+	LOG_INF(" Cloud:       %s", log_strdup("Azure IoT Hub"));
+	LOG_INF(" Endpoint:    %s",
+		log_strdup(CONFIG_AZURE_IOT_HUB_DPS_HOSTNAME));
+	LOG_INF("********************************************");
+
+	return 0;
+}
+#endif /* CONFIG_AWS_IOT */
 
 static void connect_work_fn(struct k_work *work)
 {
@@ -574,6 +714,19 @@ static void on_state_lte_connected(struct cloud_msg_data *cloud_msg)
 		connect_retries = 0;
 		k_delayed_work_cancel(&connect_work);
 	}
+
+#if defined(CONFIG_AGPS) && defined(CONFIG_AGPS_SRC_SUPL)
+	if (is_gps_mgr_event(&cloud_msg->manager.gps.header) &&
+	    cloud_msg->manager.gps.type == GPS_MGR_EVT_AGPS_NEEDED) {
+		int err;
+
+		err = gps_agps_request(cloud_msg->manager.gps.data.agps_request,
+				       GPS_SOCKET_NOT_PROVIDED);
+		if (err) {
+			LOG_WRN("Failed to request A-GPS data, error: %d", err);
+		}
+	}
+#endif /* CONFIG_AGPS && CONFIG_AGPS_SRC_SUPL*/
 }
 
 static void on_state_lte_disconnected(struct cloud_msg_data *cloud_msg)
@@ -598,7 +751,7 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *cloud_msg)
 		cloud_manager_config_get();
 	}
 
-#if defined(CONFIG_AGPS)
+#if defined(CONFIG_AGPS) && defined(CONFIG_AGPS_SRC_NRF_CLOUD)
 	if (is_gps_mgr_event(&cloud_msg->manager.gps.header) &&
 	    cloud_msg->manager.gps.type == GPS_MGR_EVT_AGPS_NEEDED) {
 		int err;
@@ -609,7 +762,7 @@ static void on_sub_state_cloud_connected(struct cloud_msg_data *cloud_msg)
 			LOG_WRN("Failed to request A-GPS data, error: %d", err);
 		}
 	}
-#endif /* CONFIG_AGPS */
+#endif /* CONFIG_AGPS && CONFIG_AGPS_SRC_NRF_CLOUD */
 
 	if (is_data_mgr_event(&cloud_msg->manager.data.header)) {
 
@@ -683,6 +836,8 @@ static void cloud_manager(void)
 
 	atomic_inc(&manager_count);
 
+	cloud_codec_init();
+
 	err = cloud_manager_setup();
 	if (err) {
 		LOG_ERR("cloud_manager_setup, error %d", err);
@@ -691,14 +846,6 @@ static void cloud_manager(void)
 
 	k_delayed_work_init(&connect_work, connect_work_fn);
 	k_delayed_work_init(&ready_work, ready_work_fn);
-
-	LOG_INF("********************************************");
-	LOG_INF(" The cat tracker has started");
-	LOG_INF(" Version:     %s", log_strdup(CONFIG_CAT_TRACKER_APP_VERSION));
-	LOG_INF(" Client ID:   %s", log_strdup(client_id_buf));
-	LOG_INF(" Endpoint:    %s",
-		log_strdup(CONFIG_AWS_IOT_BROKER_HOST_NAME));
-	LOG_INF("********************************************");
 
 	while (true) {
 		k_msgq_get(&msgq_cloud, &cloud_msg, K_FOREVER);

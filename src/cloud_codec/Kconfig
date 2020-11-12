@@ -13,27 +13,27 @@ config SERIALIZATION_JSON
 
 config GPS_BUFFER_MAX
 	int "Sets the number of entries in the GPS buffer"
-	default 10
+	default 20
 
 config SENSOR_BUFFER_MAX
 	int "Sets the number of entries in the sensor buffer"
-	default 10
+	default 20
 
 config MODEM_BUFFER_MAX
 	int "Sets the number of entries in the modem buffer"
-	default 10
+	default 20
 
 config UI_BUFFER_MAX
 	int "Sets the number of entries in the UI buffer"
-	default 10
+	default 20
 
 config ACCEL_BUFFER_MAX
 	int "Sets the number of entries in the accelerometer buffer"
-	default 10
+	default 20
 
 config BAT_BUFFER_MAX
 	int "Sets the number of entries in the battery buffer"
-	default 10
+	default 20
 
 config TIME_BETWEEN_ACCELEROMETER_BUFFER_STORE_SEC
 	int "Time in between accelerometer buffer updates"

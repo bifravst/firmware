@@ -58,7 +58,7 @@ if CLOUD_MANAGER
 
 config CLOUD_MGR_THREAD_STACK_SIZE
 	int ""
-	default 4096
+	default 6000
 
 config CLOUD_BACKEND
 	string
