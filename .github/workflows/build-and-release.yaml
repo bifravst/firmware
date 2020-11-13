@@ -176,32 +176,32 @@ jobs:
 
       - name: Configure Version
         run: |
-          CAT_TRACKER_APP_VERSION=`cat version.conf`-thingy91_nrf9160ns-ltem-${JOB_ID}
+          CAT_TRACKER_APP_VERSION=`cat version.conf`-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
           echo "CAT_TRACKER_APP_VERSION=${CAT_TRACKER_APP_VERSION}" >> $GITHUB_ENV
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_nrf9160dk_nrf9160ns.conf
 
-      - run: echo "# Firmware CI settings" >> prj_thingy91_nrf9160ns.conf
+      - run: echo "# Firmware CI settings" >> prj_nrf9160dk_nrf9160ns.conf
 
       - name: Enable debug logs
-        run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_thingy91_nrf9160ns.conf
+        run: echo "CONFIG_LOG_MAX_LEVEL=4" >> prj_nrf9160dk_nrf9160ns.conf
 
       - name: Set network mode to LTE-m
         run: |
-          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_thingy91_nrf9160ns.conf
+          sed -i s/CONFIG_LTE_NETWORK_MODE_NBIOT_GPS=y/CONFIG_LTE_NETWORK_MODE_LTE_M_GPS=y/ prj_nrf9160dk_nrf9160ns.conf
 
       - name: Configure the AWS IoT broker hostname
         run: |
           BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_DEFAULT_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
           echo "TESTENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
-          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_nrf9160dk_nrf9160ns.conf
 
       - name: Set MQTT client ID to test device
         run: |
-          echo "CONFIG_USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_thingy91_nrf9160ns.conf
-          echo "CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN=40" >> prj_thingy91_nrf9160ns.conf
-          echo "CONFIG_MQTT_CLIENT_ID=\"${JOB_ID}\"" >> prj_thingy91_nrf9160ns.conf
+          echo "CONFIG_USE_CUSTOM_MQTT_CLIENT_ID=y" >> prj_nrf9160dk_nrf9160ns.conf
+          echo "CONFIG_AWS_IOT_CLIENT_ID_MAX_LEN=40" >> prj_nrf9160dk_nrf9160ns.conf
+          echo "CONFIG_MQTT_CLIENT_ID=\"${JOB_ID}\"" >> prj_nrf9160dk_nrf9160ns.conf
 
-      - run: cat prj_thingy91_nrf9160ns.conf
+      - run: cat prj_nrf9160dk_nrf9160ns.conf
 
       - name: Determine checksum for Docker image
         run: |
@@ -217,7 +217,7 @@ jobs:
 
       - name: Build
         run: |
-          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b thingy91_nrf9160ns'
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b nrf9160dk_nrf9160ns'
 
       - name: Keep certificates around
         uses: actions/cache@v2
