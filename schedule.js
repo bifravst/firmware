@@ -11,6 +11,7 @@ const { Iot, STS, S3, CloudFormation } = require('aws-sdk')
 const { schedule, wait } = require('@bifravst/firmware-ci')
 const path = require('path')
 const fetch = require('node-fetch')
+const { v4 } = require('uuid')
 
 const target = 'thingy91_nrf9160ns'
 const network = 'ltem'
@@ -151,7 +152,7 @@ const e2e = async () => {
 				iot: new Iot(testEnvSDKConfig),
 				cf: new CloudFormation(testEnvSDKConfig),
 				stack: testEnv.stackName,
-				subject: 'firmware-ci',
+				subject: `firmware-ci-${v4()}`,
 				log: console.error,
 				debug: console.debug,
 			})
