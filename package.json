@@ -25,7 +25,7 @@
   "license": "BSD-5-Clause-Nordic",
   "dependencies": {
     "@bifravst/cloudformation-helpers": "4.0.4",
-    "@bifravst/firmware-ci": "1.7.1",
+    "@bifravst/firmware-ci": "1.8.0",
     "aws-sdk": "2.791.0",
     "check-node-version": "4.0.3",
     "node-fetch": "2.6.1"
