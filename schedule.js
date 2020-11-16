@@ -7,20 +7,22 @@ const {
 	createCA,
 	createDeviceCertificate,
 } = require('@bifravst/aws')
-const { Iot, STS, S3, CloudFormation } = require('aws-sdk')
+const { Iot, STS, S3, CloudFormation, IotData } = require('aws-sdk')
 const { schedule, wait } = require('@bifravst/firmware-ci')
 const path = require('path')
 const fetch = require('node-fetch')
 const { v4 } = require('uuid')
 
-const target = 'thingy91_nrf9160ns'
+const target = 'nrf9160dk_nrf9160ns'
 const network = 'ltem'
 const secTag = 42
+const timeoutInMinutes = 10
 
 const jobId = process.env.JOB_ID
 
-const hexFile =
-	process.env.HEX_FILE ?? path.join(process.cwd(), 'build/zephyr/merged.hex')
+const hexFile = process.env.HEX_FILE ?? path.join(process.cwd(), 'firmware.hex')
+const fotaFile =
+	process.env.FOTA_FILE ?? path.join(process.cwd(), 'fota-update.bin')
 
 const firmwareCI = {
 	accessKeyId: process.env.FIRMWARECI_AWS_ACCESS_KEY_ID,
@@ -53,16 +55,6 @@ const testEnvSDKConfig = {
 		secretAccessKey: testEnv.secretAccessKey,
 	},
 }
-
-/*
-
-- Create credentials for the test device
-- Schedule a Firmware CI run
-- Wait for the completion of the CI run
-- Download the logs
-- Check for the correct device behaviour
-- Delete the test device
-*/
 
 const e2e = async () => {
 	const { Account: TestAccount } = await new STS(testEnvSDKConfig)
@@ -132,14 +124,25 @@ const e2e = async () => {
 	} catch {
 		console.error(chalk.magenta('Uploading firmware...'))
 		const s3 = new S3(firmwareCISDKConfig)
-		await s3
-			.putObject({
-				Bucket: firmwareCI.bucketName,
-				Key: `${jobId}.hex`,
-				Body: await fs.readFile(hexFile),
-				ContentType: 'text/octet-stream',
-			})
-			.promise()
+		const fotaFilename = `${jobId.substr(0, 8)}.bin`
+		await Promise.all([
+			s3
+				.putObject({
+					Bucket: firmwareCI.bucketName,
+					Key: `${jobId}.hex`,
+					Body: await fs.readFile(hexFile),
+					ContentType: 'text/octet-stream',
+				})
+				.promise(),
+			s3
+				.putObject({
+					Bucket: firmwareCI.bucketName,
+					Key: fotaFilename,
+					Body: await fs.readFile(fotaFile),
+					ContentType: 'text/octet-stream',
+				})
+				.promise(),
+		])
 
 		const ca = caFileLocations(certsDir)
 
@@ -188,7 +191,7 @@ const e2e = async () => {
 			'utf-8',
 		)
 
-		await schedule({
+		const jobDocument = await schedule({
 			bucketName: firmwareCI.bucketName,
 			certificateJSON: deviceCert.json,
 			ciDeviceArn,
@@ -200,34 +203,149 @@ const e2e = async () => {
 			target,
 			iot,
 			jobId,
+			timeoutInMinutes: Math.round(timeoutInSeconds / 60),
+			abortOn: [`aws_fota: Error (-7) when trying to start firmware download`],
+			endOn: [`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-updated`],
 		})
 
+		await fs.writeFile(
+			'jobDocument.json',
+			JSON.stringify(jobDocument, null, 2),
+			'utf-8',
+		)
+		console.error(
+			chalk.magenta('Stored job document in'),
+			chalk.blueBright('jobDocument.json'),
+		)
+
+		// Inject behaviour once the device connects
+		const iotDataTestEnv = new IotData({
+			...testEnvSDKConfig,
+			endpoint: testEnv.endpoint,
+		})
+		const iotTestEnv = new Iot(testEnvSDKConfig)
+		let timeLeft = timeoutInSeconds - 60
+		const scheduleFOTA = async () => {
+			process.stderr.write(
+				chalk.magenta(`Checking if device has connected ... `),
+			)
+
+			const reschedule = () => {
+				timeLeft -= 10
+				if (timeLeft > 0) {
+					setTimeout(scheduleFOTA, 10 * 1000)
+				} else {
+					console.error(
+						chalk.red(
+							'Device did not connect within ${timeoutInSeconds} seconds.',
+						),
+					)
+				}
+			}
+
+			try {
+				const shadow = await iotDataTestEnv
+					.getThingShadow({
+						thingName: jobId,
+					})
+					.promise()
+				const { state } = JSON.parse(shadow.payload)
+				console.error(chalk.green(`Device has connected.`))
+				if (state?.reported?.dev === undefined) {
+					console.error(
+						chalk.red(`Device has not reported device information, yet.`),
+					)
+					reschedule()
+					return
+				}
+				// Schedule FOTA job
+				const { thingArn } = await iotTestEnv
+					.describeThing({
+						thingName: jobId,
+					})
+					.promise()
+
+				const stat = await fs.stat(fotaFile)
+				const fotaJobDocument = {
+					operation: 'app_fw_update',
+					size: stat.size,
+					filename: fotaFilename,
+					location: {
+						protocol: 'https',
+						host: `${firmwareCI.bucketName}.s3.amazonaws.com`,
+						path: fotaFilename,
+					},
+					fwversion: `${process.env.CAT_TRACKER_APP_VERSION}-updated`,
+					targetBoard: '9160DK',
+				}
+				await fs.writeFile(
+					'fotaJobDocument.json',
+					JSON.stringify(fotaJobDocument, null, 2),
+					'utf-8',
+				)
+				console.error(
+					chalk.magenta('Stored FOTA job document in'),
+					chalk.blueBright('fotaJobDocument.json'),
+				)
+				const job = await iotTestEnv
+					.createJob({
+						jobId,
+						targets: [thingArn],
+						document: JSON.stringify(fotaJobDocument),
+						description: `Update ${thingArn.split('/')[1]} to version ${
+							process.env.CAT_TRACKER_APP_VERSION
+						}-updated.`,
+						targetSelection: 'SNAPSHOT',
+					})
+					.promise()
+				console.error(chalk.green(`FOTA job created.`))
+				console.log({ job })
+			} catch (err) {
+				console.error(chalk.red(`Device has not connected, yet.`))
+				console.error(chalk.red(err.message))
+				reschedule()
+			}
+		}
+		setTimeout(scheduleFOTA, 60 * 1000)
+
+		// Wait for the job to complete
 		jobInfo = await wait({
 			iot,
 			jobId,
 			interval: 10,
+			timeoutInMinutes: timeoutInMinutes * 2,
 		})
 
 		// Delete
-		await s3
-			.deleteObject({
-				Bucket: firmwareCI.bucketName,
-				Key: `${jobId}.hex`,
-			})
-			.promise()
+		await Promise.all([
+			s3
+				.deleteObject({
+					Bucket: firmwareCI.bucketName,
+					Key: `${jobId}.hex`,
+				})
+				.promise(),
+			s3
+				.deleteObject({
+					Bucket: firmwareCI.bucketName,
+					Key: fotaFilename,
+				})
+				.promise(),
+		])
 	}
 
-	const { result, flashLog, deviceLog, connections } = JSON.parse(
+	const report = JSON.parse(
 		await (await fetch(jobInfo.jobDocument.reportUrl)).text(),
 	)
+	await fs.writeFile('report.json', JSON.stringify(report, null, 2), 'utf-8')
+	console.error(
+		chalk.magenta('Stored report in'),
+		chalk.blueBright('report.json'),
+	)
+	const { result, flashLog, deviceLog } = report
 	console.log()
 	console.log('** Result **')
 	console.log()
 	console.log(result)
-	console.log()
-	console.log('** Connections **')
-	console.log()
-	console.log(connections)
 	console.log()
 	console.log('** Flash Log **')
 	console.log()

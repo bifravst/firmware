@@ -10,6 +10,8 @@ on:
       - .github/workflows/build-and-release.yaml
       - Dockerfile
       - schedule.js
+      - west.yml
+      - "*.conf"
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -178,7 +180,7 @@ jobs:
         run: |
           CAT_TRACKER_APP_VERSION=`cat version.conf`-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
           echo "CAT_TRACKER_APP_VERSION=${CAT_TRACKER_APP_VERSION}" >> $GITHUB_ENV
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_nrf9160dk_nrf9160ns.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}-original\"" >> prj_nrf9160dk_nrf9160ns.conf
 
       - run: echo "# Firmware CI settings" >> prj_nrf9160dk_nrf9160ns.conf
 
@@ -218,6 +220,15 @@ jobs:
       - name: Build
         run: |
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b nrf9160dk_nrf9160ns'
+          cp build/zephyr/merged.hex firmware.hex
+          cp prj_nrf9160dk_nrf9160ns.conf firmware.conf
+
+      - name: Build with changed version for FOTA test
+        run: |
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}-updated\"" >> prj_nrf9160dk_nrf9160ns.conf
+          docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b nrf9160dk_nrf9160ns'
+          cp build/zephyr/app_update.bin fota-update.bin
+          cp prj_nrf9160dk_nrf9160ns.conf fota-update.conf
 
       - name: Keep certificates around
         uses: actions/cache@v2
@@ -229,15 +240,31 @@ jobs:
         with:
           node-version: "14.x"
 
-      - run: npm ci
+      - name: Set up test runner
+        run: |
+          npm ci
+          npx tsc
 
-      - run: npx tsc
+      - name: Schedule Firmware CI job
+        run: node --unhandled-rejections=strict schedule.js
 
-      - run: node --unhandled-rejections=strict schedule.js
-
-      - run: npm run test:e2e
+      - name: Verify run
+        run: npm run test:e2e
         # For now, ignore test failures until we get more experience running these tests
         continue-on-error: true
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: end-to-end-test
+          path: |
+            firmware.hex
+            firmware.conf
+            fota-update.bin
+            fota-update.conf
+            certificates/*/device-${JOB_ID}*
+            fotaJobDocument.json
+            jobDocument.json
+            report.json
 
       - name: Remove device certificates
         run: rm -v ./certificates/*/device-*
