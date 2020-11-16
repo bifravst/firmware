@@ -11,6 +11,7 @@ import { Iot, STS } from 'aws-sdk'
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import { firmwareCIStepRunners } from './steps/firmwareCI'
+import { downloadDeviceCredentials } from './lib/downloadDeviceCredentials'
 
 let ran = false
 
@@ -49,6 +50,13 @@ program
 				.getCallerIdentity()
 				.promise()
 
+			const c = await certsDir({
+				iotEndpoint: mqttEndpoint,
+				accountId: accountId as string,
+			})
+
+			const iot = new Iot({ region, credentials: firmwareCICredentials })
+
 			const world = {
 				region,
 				accountId: accountId as string,
@@ -56,10 +64,7 @@ program
 					path.join(process.cwd(), 'data', 'AmazonRootCA1.pem'),
 					'utf-8',
 				),
-				certsDir: await certsDir({
-					iotEndpoint: mqttEndpoint,
-					accountId: accountId as string,
-				}),
+				certsDir: c,
 				mqttEndpoint,
 				stackName,
 				env__JOB_ID: process.env.JOB_ID,
@@ -72,6 +77,14 @@ program
 			console.log(chalk.yellow.bold(' World:'))
 			console.log()
 			console.log(world)
+			console.log()
+
+			await downloadDeviceCredentials({
+				certsDir: c,
+				deviceId: process.env.JOB_ID as string,
+				iot,
+				brokerHostname: mqttEndpoint,
+			})
 			console.log()
 
 			const runner = new FeatureRunner<typeof world>(world, {
@@ -90,7 +103,7 @@ program
 				const { success } = await runner
 					.addStepRunners(
 						firmwareCIStepRunners({
-							iot: new Iot({ region, credentials: firmwareCICredentials }),
+							iot,
 						}),
 					)
 					.addStepRunners(
