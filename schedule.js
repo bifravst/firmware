@@ -203,7 +203,7 @@ const e2e = async () => {
 			target,
 			iot,
 			jobId,
-			timeoutInMinutes: Math.round(timeoutInSeconds / 60),
+			timeoutInMinutes,
 			abortOn: [`aws_fota: Error (-7) when trying to start firmware download`],
 			endOn: [`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-updated`],
 		})
@@ -224,7 +224,7 @@ const e2e = async () => {
 			endpoint: testEnv.endpoint,
 		})
 		const iotTestEnv = new Iot(testEnvSDKConfig)
-		let timeLeft = timeoutInSeconds - 60
+		let timeLeft = timeoutInMinutes * 60 - 60
 		const scheduleFOTA = async () => {
 			process.stderr.write(
 				chalk.magenta(`Checking if device has connected ... `),
@@ -237,7 +237,7 @@ const e2e = async () => {
 				} else {
 					console.error(
 						chalk.red(
-							'Device did not connect within ${timeoutInSeconds} seconds.',
+							'Device did not connect within ${timeoutInMinutes} minutes.',
 						),
 					)
 				}
