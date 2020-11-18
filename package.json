@@ -27,7 +27,7 @@
     "@bifravst/aws": "17.1.1",
     "@bifravst/cloudformation-helpers": "4.0.7",
     "@bifravst/code-style": "8.0.134",
-    "@bifravst/e2e-bdd-test-runner": "4.0.22",
+    "@bifravst/e2e-bdd-test-runner": "4.0.23",
     "@bifravst/firmware-ci": "2.3.4",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
