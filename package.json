@@ -24,7 +24,7 @@
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
   "devDependencies": {
-    "@bifravst/aws": "17.1.0",
+    "@bifravst/aws": "17.1.1",
     "@bifravst/cloudformation-helpers": "4.0.7",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.22",
