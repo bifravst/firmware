@@ -25,7 +25,7 @@
   "license": "BSD-5-Clause-Nordic",
   "devDependencies": {
     "@bifravst/aws": "18.3.1",
-    "@bifravst/cloudformation-helpers": "4.0.15",
+    "@bifravst/cloudformation-helpers": "4.0.16",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.31",
     "@bifravst/firmware-ci": "4.1.5",
