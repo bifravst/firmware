@@ -3,7 +3,6 @@
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
   "scripts": {
-    "postinstall": "check-node-version --package",
     "test:e2e": "node --unhandled-rejections=strict dist/run-features.js ./features --print-results --progress"
   },
   "repository": {
@@ -23,6 +22,7 @@
   ],
   "author": "Nordic Semiconductor ASA | nordicsemi.no",
   "license": "BSD-5-Clause-Nordic",
+  "dependencies": {},
   "devDependencies": {
     "@bifravst/aws": "18.3.1",
     "@bifravst/cloudformation-helpers": "4.0.16",
@@ -35,7 +35,6 @@
     "@types/commander": "2.12.2",
     "aws-sdk": "2.802.0",
     "chalk": "4.1.0",
-    "check-node-version": "4.0.3",
     "commander": "6.2.0",
     "husky": "4.3.0",
     "node-fetch": "2.6.1",
