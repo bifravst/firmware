@@ -22,7 +22,7 @@ const jobId = process.env.JOB_ID
 
 const hexFile = process.env.HEX_FILE ?? path.join(process.cwd(), 'firmware.hex')
 const fotaFile =
-	process.env.FOTA_FILE ?? path.join(process.cwd(), 'fota-update.bin')
+	process.env.FOTA_FILE ?? path.join(process.cwd(), 'fota-upgrade.bin')
 
 const firmwareCI = {
 	accessKeyId: process.env.FIRMWARECI_AWS_ACCESS_KEY_ID,
@@ -205,7 +205,7 @@ const e2e = async () => {
 			jobId,
 			timeoutInMinutes,
 			abortOn: [`aws_fota: Error (-7) when trying to start firmware download`],
-			endOn: [`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-updated`],
+			endOn: [`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-upgraded`],
 		})
 
 		await fs.writeFile(
@@ -275,7 +275,7 @@ const e2e = async () => {
 						host: `${firmwareCI.bucketName}.s3.amazonaws.com`,
 						path: fotaFilename,
 					},
-					fwversion: `${process.env.CAT_TRACKER_APP_VERSION}-updated`,
+					fwversion: `${process.env.CAT_TRACKER_APP_VERSION}-upgraded`,
 					targetBoard: '9160DK',
 				}
 				await fs.writeFile(
@@ -292,9 +292,9 @@ const e2e = async () => {
 						jobId,
 						targets: [thingArn],
 						document: JSON.stringify(fotaJobDocument),
-						description: `Update ${thingArn.split('/')[1]} to version ${
+						description: `Upgrade ${thingArn.split('/')[1]} to version ${
 							process.env.CAT_TRACKER_APP_VERSION
-						}-updated.`,
+						}-upgraded.`,
 						targetSelection: 'SNAPSHOT',
 					})
 					.promise()

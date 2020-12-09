@@ -24,7 +24,7 @@ Feature: Connect
                 "v": {
                     "modV": "mfw_nrf9160_1.2.2",
                     "brdV": "nrf9160dk_nrf9160",
-                    "appV": "{env__CAT_TRACKER_APP_VERSION}-updated"
+                    "appV": "{env__CAT_TRACKER_APP_VERSION}-upgraded"
                 }
             },
             "cfg": {
