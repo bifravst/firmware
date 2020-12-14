@@ -28,7 +28,7 @@
     "@bifravst/cloudformation-helpers": "4.0.23",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.41",
-    "@bifravst/firmware-ci": "4.1.17",
+    "@bifravst/firmware-ci": "4.1.18",
     "@bifravst/random-words": "4.2.1",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
