@@ -3,7 +3,7 @@ import {
 	StepRunnerFunc,
 	InterpolatedStep,
 } from '@bifravst/e2e-bdd-test-runner'
-import { wait, FirmwareCIJobDocument } from '@bifravst/firmware-ci'
+import { wait, FirmwareCIJobDocument } from '@bifravst/firmware-ci-aws'
 import { Iot } from 'aws-sdk'
 import fetch from 'node-fetch'
 

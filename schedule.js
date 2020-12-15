@@ -8,7 +8,7 @@ const {
 	createDeviceCertificate,
 } = require('@bifravst/aws')
 const { Iot, STS, S3, CloudFormation, IotData } = require('aws-sdk')
-const { schedule, wait } = require('@bifravst/firmware-ci')
+const { schedule, wait } = require('@bifravst/firmware-ci-aws')
 const path = require('path')
 const fetch = require('node-fetch')
 const { v4 } = require('uuid')
