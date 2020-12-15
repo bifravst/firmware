@@ -289,7 +289,7 @@ const e2e = async () => {
 				)
 				const job = await iotTestEnv
 					.createJob({
-						jobId,
+						jobId: v4(),
 						targets: [thingArn],
 						document: JSON.stringify(fotaJobDocument),
 						description: `Upgrade ${thingArn.split('/')[1]} to version ${

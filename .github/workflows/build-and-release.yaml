@@ -228,7 +228,7 @@ jobs:
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}-updated\"" >> prj_nrf9160dk_nrf9160ns.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b nrf9160dk_nrf9160ns'
           cp build/zephyr/app_update.bin fota-upgrade.bin
-          cp prj_nrf9160dk_nrf9160ns.conf fota-update.conf
+          cp prj_nrf9160dk_nrf9160ns.conf fota-upgrade.conf
 
       - name: Keep certificates around
         uses: actions/cache@v2
@@ -260,7 +260,7 @@ jobs:
             firmware.hex
             firmware.conf
             fota-upgrade.bin
-            fota-update.conf
+            fota-upgrade.conf
             certificates/*/device-${JOB_ID}*
             fotaJobDocument.json
             jobDocument.json
