@@ -25,7 +25,7 @@
   "dependencies": {},
   "devDependencies": {
     "@bifravst/aws": "19.0.4",
-    "@bifravst/cloudformation-helpers": "4.0.24",
+    "@bifravst/cloudformation-helpers": "4.0.25",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "4.0.43",
     "@bifravst/firmware-ci-aws": "1.1.0",
