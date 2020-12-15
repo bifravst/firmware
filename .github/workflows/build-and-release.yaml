@@ -142,8 +142,8 @@ jobs:
             build/zephyr/merged.hex
             build/zephyr/app_update.bin
 
-  e2e:
-    name: End to End tests
+  e2e-aws:
+    name: End to End tests (AWS)
     runs-on: ubuntu-latest
 
     needs: [version, docker]
@@ -160,7 +160,7 @@ jobs:
       TESTENV_AWS_SECRET_ACCESS_KEY:
         ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
       TESTENV_AWS_DEFAULT_REGION: eu-west-1
-      TESTENV_STACK_NAME: bifravst
+      TESTENV_STACK_NAME: firmware-ci
       CI: 1
       FORCE_COLOR: 3
 
@@ -249,7 +249,7 @@ jobs:
         run: node --unhandled-rejections=strict schedule.js
 
       - name: Verify run
-        run: npm run test:e2e
+        run: npm run test:e2e:aws
         # For now, ignore test failures until we get more experience running these tests
         continue-on-error: true
 
@@ -273,7 +273,7 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
 
-    needs: [build, e2e]
+    needs: [build, e2e-aws]
 
     steps:
       - uses: actions/checkout@v2
