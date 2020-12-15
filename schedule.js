@@ -272,7 +272,7 @@ const e2e = async () => {
 					filename: fotaFilename,
 					location: {
 						protocol: 'https',
-						host: `${firmwareCI.bucketName}.s3.amazonaws.com`,
+						host: `${firmwareCI.bucketName}.s3-${firmwareCI.region}.amazonaws.com`,
 						path: fotaFilename,
 					},
 					fwversion: `${process.env.CAT_TRACKER_APP_VERSION}-upgraded`,
