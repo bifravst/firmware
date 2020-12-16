@@ -34,7 +34,7 @@
     "@commitlint/config-angular": "11.0.0",
     "@semantic-release/commit-analyzer": "8.0.1",
     "@types/commander": "2.12.2",
-    "aws-sdk": "2.811.0",
+    "aws-sdk": "2.812.0",
     "chalk": "4.1.0",
     "commander": "6.2.1",
     "husky": "4.3.6",
