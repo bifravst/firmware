@@ -205,7 +205,12 @@ const e2e = async () => {
 			jobId,
 			timeoutInMinutes,
 			abortOn: [`aws_fota: Error (-7) when trying to start firmware download`],
-			endOn: [`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-upgraded`],
+			endOn: [
+				`Version:     ${process.env.CAT_TRACKER_APP_VERSION}-upgraded`,
+				// Wait for the shadow update
+				`"appV": "${process.env.CAT_TRACKER_APP_VERSION}-upgraded"`,
+				'MQTT_EVT_SUBACK',
+			],
 		})
 
 		await fs.writeFile(
