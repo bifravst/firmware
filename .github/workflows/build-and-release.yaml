@@ -159,7 +159,7 @@ jobs:
       TESTENV_AWS_ACCESS_KEY_ID: ${{ secrets.CI_TESTENV_AWS_ACCESS_KEY_ID }}
       TESTENV_AWS_SECRET_ACCESS_KEY:
         ${{ secrets.CI_TESTENV_AWS_SECRET_ACCESS_KEY }}
-      TESTENV_AWS_DEFAULT_REGION: eu-west-1
+      TESTENV_AWS_REGION: eu-west-1
       TESTENV_STACK_NAME: firmware-ci
       CI: 1
       FORCE_COLOR: 3
@@ -193,7 +193,7 @@ jobs:
 
       - name: Configure the AWS IoT broker hostname
         run: |
-          BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_DEFAULT_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
+          BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.TESTENV_AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.TESTENV_AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.TESTENV_AWS_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
           echo "TESTENV_BROKER_HOSTNAME=${BROKER_HOSTNAME}" >> $GITHUB_ENV
           echo "CONFIG_AWS_IOT_BROKER_HOST_NAME=\"${BROKER_HOSTNAME}\"" >> prj_nrf9160dk_nrf9160ns.conf
 
@@ -246,7 +246,7 @@ jobs:
           npx tsc
 
       - name: Schedule Firmware CI job
-        run: node --unhandled-rejections=strict schedule.js
+        run: node --unhandled-rejections=strict dist/schedule.js
 
       - name: Verify run
         run: npm run test:e2e:aws

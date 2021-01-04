@@ -4,18 +4,18 @@ import {
 	InterpolatedStep,
 } from '@bifravst/e2e-bdd-test-runner'
 import { wait, FirmwareCIJobDocument } from '@bifravst/firmware-ci-aws'
-import { Iot } from 'aws-sdk'
+import { IoTClient, Job } from '@aws-sdk/client-iot'
 import fetch from 'node-fetch'
 
 export const firmwareCIStepRunners = ({
 	iot,
 }: {
-	iot: Iot
+	iot: IoTClient
 }): ((step: InterpolatedStep) => StepRunnerFunc<any> | false)[] => {
 	const jobs: Record<
 		string,
 		Promise<{
-			job: Iot.Job
+			job: Job
 			jobDocument: FirmwareCIJobDocument
 		}>
 	> = {}
