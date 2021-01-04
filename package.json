@@ -3,7 +3,7 @@
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
   "scripts": {
-    "test:e2e:aws": "node --unhandled-rejections=strict dist/run-features.js ./features --print-results --progress"
+    "test:e2e:aws": "node --unhandled-rejections=strict dist/ci/feature-runner/run-features.js ./features --print-results --progress"
   },
   "repository": {
     "type": "git",
@@ -24,17 +24,17 @@
   "license": "BSD-5-Clause-Nordic",
   "dependencies": {},
   "devDependencies": {
-    "@bifravst/aws": "19.0.15",
-    "@bifravst/cloudformation-helpers": "4.0.34",
+    "@aws-sdk/client-iot-data-plane": "3.1.0",
+    "@bifravst/aws": "20.0.0",
+    "@bifravst/cloudformation-helpers": "5.0.0",
     "@bifravst/code-style": "8.0.134",
-    "@bifravst/e2e-bdd-test-runner": "4.0.53",
-    "@bifravst/firmware-ci-aws": "1.2.1",
+    "@bifravst/e2e-bdd-test-runner": "5.0.1",
+    "@bifravst/firmware-ci-aws": "2.0.0-aws-sdk-v3.1",
     "@bifravst/random-words": "4.2.1",
     "@commitlint/cli": "11.0.0",
     "@commitlint/config-angular": "11.0.0",
     "@semantic-release/commit-analyzer": "8.0.1",
     "@types/commander": "2.12.2",
-    "aws-sdk": "2.822.0",
     "chalk": "4.1.0",
     "commander": "6.2.1",
     "husky": "4.3.6",

@@ -1,7 +1,7 @@
 import { deviceFileLocations } from '@bifravst/aws'
 import { promises as fs } from 'fs'
 import * as chalk from 'chalk'
-import { Iot } from 'aws-sdk'
+import { IoTClient, GetJobDocumentCommand } from '@aws-sdk/client-iot'
 
 export const downloadDeviceCredentials = async ({
 	certsDir,
@@ -11,7 +11,7 @@ export const downloadDeviceCredentials = async ({
 }: {
 	certsDir: string
 	deviceId: string
-	iot: Iot
+	iot: IoTClient
 	brokerHostname: string
 }) => {
 	const deviceFiles = deviceFileLocations({
@@ -30,11 +30,11 @@ export const downloadDeviceCredentials = async ({
 		console.log(chalk.red('Device credentials do not exist locally.'))
 		console.log(chalk.magenta('Downloading from job...'))
 
-		const { document } = await iot
-			.getJobDocument({
+		const { document } = await iot.send(
+			new GetJobDocumentCommand({
 				jobId: deviceId,
-			})
-			.promise()
+			}),
+		)
 
 		const d = JSON.parse(document as string)
 
