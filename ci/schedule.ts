@@ -29,6 +29,7 @@ import fetch from 'node-fetch'
 import { v4 } from 'uuid'
 import { fromEnv } from './util/fromEnv'
 import { TextDecoder } from 'util'
+import { HttpRequest } from '@aws-sdk/protocol-http'
 
 const target = 'nrf9160dk_nrf9160ns'
 const network = 'ltem'
@@ -147,6 +148,15 @@ const e2e = async () => {
 	} catch {
 		console.error(chalk.magenta('Uploading firmware...'))
 		const s3 = new S3Client(firmwareCISDKConfig)
+		// FIXME: remove when https://github.com/aws/aws-sdk-js-v3/issues/1800 is fixed
+		s3.middlewareStack.add(
+			(next) => async (args) => {
+				delete (args.request as HttpRequest).headers['content-type']
+				return next(args)
+			},
+			{ step: 'build' },
+		)
+
 		const fotaFilename = `${jobId.substr(0, 8)}.bin`
 		await Promise.all([
 			s3.send(
@@ -227,7 +237,7 @@ const e2e = async () => {
 			network,
 			secTag,
 			region: firmwareCI.region,
-			s3,
+			s3: new S3Client(firmwareCISDKConfig),
 			target,
 			iot,
 			jobId,
@@ -254,7 +264,7 @@ const e2e = async () => {
 		// Inject behaviour once the device connects
 		const iotDataTestEnv = new IoTDataPlaneClient({
 			...testEnvSDKConfig,
-			endpoint: testEnv.endpoint,
+			endpoint: `https://${testEnv.endpoint}`,
 		})
 		const iotTestEnv = new IoTClient(testEnvSDKConfig)
 		let timeLeft = timeoutInMinutes * 60 - 60
