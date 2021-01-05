@@ -9,7 +9,7 @@ on:
       - Kconfig
       - .github/workflows/build-and-release.yaml
       - Dockerfile
-      - schedule.js
+      - ci/schedule.ts
       - west.yml
       - "*.conf"
 
