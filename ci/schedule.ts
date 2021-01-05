@@ -48,7 +48,7 @@ const firmwareCI = fromEnv({
 	accessKeyId: 'FIRMWARECI_AWS_ACCESS_KEY_ID',
 	secretAccessKey: 'FIRMWARECI_AWS_SECRET_ACCESS_KEY',
 	bucketName: 'FIRMWARECI_BUCKET_NAME',
-	region: 'FIRMWARECI_REGION',
+	region: 'FIRMWARECI_AWS_REGION',
 	deviceId: 'FIRMWARECI_DEVICE_ID',
 })(process.env)
 
@@ -227,6 +227,7 @@ const e2e = async () => {
 			network,
 			secTag,
 			region: firmwareCI.region,
+			s3,
 			target,
 			iot,
 			jobId,
