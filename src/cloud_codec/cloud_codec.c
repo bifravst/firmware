@@ -588,6 +588,7 @@ int cloud_codec_encode_data(struct cloud_codec_data *output,
 			err += cloud_codec_static_modem_data_add(rep_obj,
 								 modem_buf);
 				initial_encode = true;
+			LOG_DBG("<TEST:ENCODE_APPV> %s", modem_buf->appv);
 		}
 
 		err += cloud_codec_dynamic_modem_data_add(rep_obj, modem_buf,

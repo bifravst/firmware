@@ -244,10 +244,9 @@ const e2e = async () => {
 			timeoutInMinutes,
 			abortOn: [`aws_fota: Error (-7) when trying to start firmware download`],
 			endOn: [
-				`Version:     ${appVersion}-upgraded`,
 				// Wait for the shadow update
-				`"appV": "${appVersion}-upgraded"`,
-				'MQTT_EVT_SUBACK',
+				`<TEST:ENCODE_APPV> ${appVersion}-upgraded`,
+				'<TEST:DATA_SEND> OK',
 			],
 		})
 
