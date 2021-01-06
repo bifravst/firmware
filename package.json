@@ -3,7 +3,7 @@
   "version": "0.0.0-development",
   "description": "Cat Tracker application built using nRF Connect SDK",
   "scripts": {
-    "test:e2e:aws": "node --unhandled-rejections=strict dist/ci/feature-runner/run-features.js ./features --print-results --progress"
+    "test:e2e:aws": "node --unhandled-rejections=strict dist/feature-runner/run-features.js ./features --print-results --progress"
   },
   "repository": {
     "type": "git",
