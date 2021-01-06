@@ -28,7 +28,7 @@
     "@bifravst/aws": "20.0.1",
     "@bifravst/cloudformation-helpers": "5.0.0",
     "@bifravst/code-style": "8.0.134",
-    "@bifravst/e2e-bdd-test-runner": "5.0.2",
+    "@bifravst/e2e-bdd-test-runner": "5.0.3",
     "@bifravst/firmware-ci-aws": "2.1.1",
     "@bifravst/random-words": "4.2.1",
     "@commitlint/cli": "11.0.0",
