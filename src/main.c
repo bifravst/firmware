@@ -646,6 +646,7 @@ static void data_send(void)
 		LOG_ERR("Cloud send failed, err: %d", err);
 		return;
 	}
+	LOG_DBG("<TEST:DATA_SEND> OK");
 }
 
 static void buffered_data_send(void)
