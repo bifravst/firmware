@@ -23,7 +23,7 @@ import {
 	IoTDataPlaneClient,
 	GetThingShadowCommand,
 } from '@aws-sdk/client-iot-data-plane'
-import { schedule, wait } from '@bifravst/firmware-ci-aws'
+import { schedule, wait, cancel } from '@bifravst/firmware-ci-aws'
 import * as path from 'path'
 import fetch from 'node-fetch'
 import { v4 } from 'uuid'
@@ -354,13 +354,18 @@ const e2e = async () => {
 		}
 		setTimeout(scheduleFOTA, 60 * 1000)
 
-		// Wait for the job to complete
-		jobInfo = await wait({
-			iot,
-			jobId,
-			interval: 10,
-			timeoutInMinutes: timeoutInMinutes * 2,
-		})
+		try {
+			// Wait for the job to complete
+			jobInfo = await wait({
+				iot,
+				jobId,
+				interval: 10,
+				timeoutInMinutes: timeoutInMinutes * 2,
+			})
+		} catch {
+			console.error(chalk.red(`Timeout waiting for job to complete.`))
+			await cancel({ iot, jobId })
+		}
 
 		// Delete
 		await Promise.all([
@@ -379,27 +384,29 @@ const e2e = async () => {
 		])
 	}
 
-	const report = JSON.parse(
-		await (await fetch(jobInfo.jobDocument.reportUrl)).text(),
-	)
-	await fs.writeFile('report.json', JSON.stringify(report, null, 2), 'utf-8')
-	console.error(
-		chalk.magenta('Stored report in'),
-		chalk.blueBright('report.json'),
-	)
-	const { result, flashLog, deviceLog } = report
-	console.log()
-	console.log('** Result **')
-	console.log()
-	console.log(result)
-	console.log()
-	console.log('** Flash Log **')
-	console.log()
-	console.log(flashLog.join('\n'))
-	console.log()
-	console.log('** Device Log **')
-	console.log()
-	console.log(deviceLog.join('\n'))
+	if (jobInfo !== undefined) {
+		const report = JSON.parse(
+			await (await fetch(jobInfo.jobDocument.reportUrl)).text(),
+		)
+		await fs.writeFile('report.json', JSON.stringify(report, null, 2), 'utf-8')
+		console.error(
+			chalk.magenta('Stored report in'),
+			chalk.blueBright('report.json'),
+		)
+		const { result, flashLog, deviceLog } = report
+		console.log()
+		console.log('** Result **')
+		console.log()
+		console.log(result)
+		console.log()
+		console.log('** Flash Log **')
+		console.log()
+		console.log(flashLog.join('\n'))
+		console.log()
+		console.log('** Device Log **')
+		console.log()
+		console.log(deviceLog.join('\n'))
+	}
 }
 
 void e2e()
