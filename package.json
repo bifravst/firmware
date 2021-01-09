@@ -24,7 +24,7 @@
   "license": "BSD-5-Clause-Nordic",
   "dependencies": {},
   "devDependencies": {
-    "@aws-sdk/client-iot-data-plane": "3.1.0",
+    "@aws-sdk/client-iot-data-plane": "3.2.0",
     "@bifravst/aws": "20.0.2",
     "@bifravst/cloudformation-helpers": "5.0.0",
     "@bifravst/code-style": "8.0.134",
