@@ -17,21 +17,27 @@ import { fromEnv } from '../util/fromEnv'
 
 let ran = false
 
-const { stackName, testEnvRegion, mqttEndpoint } = fromEnv({
-	stackName: 'TESTENV_STACK_NAME',
-	testEnvRegion: 'TESTENV_AWS_REGION',
-	mqttEndpoint: 'TESTENV_BROKER_HOSTNAME',
+const {
+	stackName,
+	region,
+	mqttEndpoint,
+	accessKeyId,
+	secretAccessKey,
+} = fromEnv({
+	accessKeyId: 'AWS_ACCESS_KEY_ID',
+	secretAccessKey: 'AWS_SECRET_ACCESS_KEY',
+	stackName: 'STACK_NAME',
+	region: 'AWS_REGION',
+	mqttEndpoint: 'BROKER_HOSTNAME',
 })(process.env)
 
-const testEnvCredentials = fromEnv({
-	accessKeyId: 'TESTENV_AWS_ACCESS_KEY_ID',
-	secretAccessKey: 'TESTENV_AWS_SECRET_ACCESS_KEY',
-})(process.env)
-
-const firmwareCICredentials = fromEnv({
-	accessKeyId: 'FIRMWARECI_AWS_ACCESS_KEY_ID',
-	secretAccessKey: 'FIRMWARECI_AWS_SECRET_ACCESS_KEY',
-})(process.env)
+const testEnvSDKConfig = {
+	region,
+	credentials: {
+		accessKeyId,
+		secretAccessKey,
+	},
+}
 
 program
 	.arguments('<featureDir>')
@@ -49,23 +55,19 @@ program
 			ran = true
 			const { printResults, progress } = options
 
-			const { Account: accountId } = await new STSClient({
-				region: testEnvRegion,
-				credentials: testEnvCredentials,
-			}).send(new GetCallerIdentityCommand({}))
+			const { Account: accountId } = await new STSClient(testEnvSDKConfig).send(
+				new GetCallerIdentityCommand({}),
+			)
 
 			const c = await certsDir({
 				iotEndpoint: mqttEndpoint,
 				accountId: accountId as string,
 			})
 
-			const iot = new IoTClient({
-				region: testEnvRegion,
-				credentials: firmwareCICredentials,
-			})
+			const iot = new IoTClient(testEnvSDKConfig)
 
 			const world = {
-				region: testEnvRegion,
+				region: region,
 				accountId: accountId as string,
 				awsIotRootCA: await fs.readFile(
 					path.join(process.cwd(), 'ci', 'data', 'AmazonRootCA1.pem'),
@@ -76,8 +78,8 @@ program
 				stackName,
 				...fromEnv({
 					env__JOB_ID: 'JOB_ID',
-					env__TESTENV_AWS_ACCESS_KEY_ID: 'TESTENV_AWS_ACCESS_KEY_ID',
-					env__TESTENV_AWS_SECRET_ACCESS_KEY: 'TESTENV_AWS_SECRET_ACCESS_KEY',
+					env__AWS_ACCESS_KEY_ID: 'AWS_ACCESS_KEY_ID',
+					env__AWS_SECRET_ACCESS_KEY: 'AWS_SECRET_ACCESS_KEY',
 					env__CAT_TRACKER_APP_VERSION: 'CAT_TRACKER_APP_VERSION',
 				})(process.env),
 			}
@@ -141,6 +143,6 @@ program
 	.parse(process.argv)
 
 if (!ran) {
-	program.outputHelp(chalk.red)
+	program.outputHelp()
 	process.exit(1)
 }

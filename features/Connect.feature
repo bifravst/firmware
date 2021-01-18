@@ -6,7 +6,7 @@ Feature: Connect
         
         Given I am run after the "Run the firmware" feature
         Given I connect the cat tracker {env__JOB_ID}
-        Given I am authenticated with AWS key "{env__TESTENV_AWS_ACCESS_KEY_ID}" and secret "{env__TESTENV_AWS_SECRET_ACCESS_KEY}"
+        Given I am authenticated with AWS key "{env__AWS_ACCESS_KEY_ID}" and secret "{env__AWS_SECRET_ACCESS_KEY}"
 
     Scenario: Read reported state
 

@@ -30,6 +30,7 @@ import { v4 } from 'uuid'
 import { fromEnv } from './util/fromEnv'
 import { TextDecoder } from 'util'
 import { HttpRequest } from '@aws-sdk/protocol-http'
+import { stackOutput } from '@bifravst/cloudformation-helpers'
 
 const target = 'nrf9160dk_nrf9160ns'
 const network = 'ltem'
@@ -45,28 +46,13 @@ const hexFile = process.env.HEX_FILE ?? path.join(process.cwd(), 'firmware.hex')
 const fotaFile =
 	process.env.FOTA_FILE ?? path.join(process.cwd(), 'fota-upgrade.bin')
 
-const firmwareCI = fromEnv({
-	accessKeyId: 'FIRMWARECI_AWS_ACCESS_KEY_ID',
-	secretAccessKey: 'FIRMWARECI_AWS_SECRET_ACCESS_KEY',
-	bucketName: 'FIRMWARECI_BUCKET_NAME',
-	region: 'FIRMWARECI_AWS_REGION',
-	deviceId: 'FIRMWARECI_DEVICE_ID',
-})(process.env)
-
-const firmwareCISDKConfig = {
-	region: firmwareCI.region,
-	credentials: {
-		accessKeyId: firmwareCI.accessKeyId,
-		secretAccessKey: firmwareCI.secretAccessKey,
-	},
-}
-
 const testEnv = fromEnv({
-	accessKeyId: 'TESTENV_AWS_ACCESS_KEY_ID',
-	secretAccessKey: 'TESTENV_AWS_SECRET_ACCESS_KEY',
-	region: 'TESTENV_AWS_REGION',
-	endpoint: 'TESTENV_BROKER_HOSTNAME',
-	stackName: 'TESTENV_STACK_NAME',
+	accessKeyId: 'AWS_ACCESS_KEY_ID',
+	secretAccessKey: 'AWS_SECRET_ACCESS_KEY',
+	region: 'AWS_REGION',
+	endpoint: 'BROKER_HOSTNAME',
+	stackName: 'STACK_NAME',
+	deviceId: 'DEVICE_ID',
 })(process.env)
 
 const testEnvSDKConfig = {
@@ -78,64 +64,35 @@ const testEnvSDKConfig = {
 }
 
 const e2e = async () => {
-	const { Account: TestAccount } = await new STSClient(testEnvSDKConfig).send(
+	const { Account } = await new STSClient(testEnvSDKConfig).send(
 		new GetCallerIdentityCommand({}),
 	)
 
-	if (TestAccount === undefined)
+	const ciDeviceArn = `arn:aws:iot:${testEnv.region}:${Account}:thing/${testEnv.deviceId}`
+
+	const { bucketName } = await stackOutput(
+		new CloudFormationClient(testEnvSDKConfig),
+	)<{ bucketName: string }>(`${testEnv.stackName}-firmware-ci`)
+
+	if (Account === undefined)
 		throw new Error(`Could not authenticate against test environment!`)
 
 	const certsDir = await provideCertsDir({
-		accountId: TestAccount,
+		accountId: Account,
 		iotEndpoint: testEnv.endpoint,
 	})
 
-	console.error(
-		chalk.yellow('Test Env / Account:       '),
-		chalk.blue(TestAccount),
-	)
-	console.error(
-		chalk.yellow('Test Env / Region:        '),
-		chalk.blue(testEnv.region),
-	)
-	console.error(
-		chalk.yellow('Test Env / Stack:         '),
-		chalk.blue(testEnv.stackName),
-	)
-	console.error(
-		chalk.yellow('Test Env / IoT Endpoint:  '),
-		chalk.blue(testEnv.endpoint),
-	)
-	console.error(
-		chalk.yellow('Test Env / Certificates:  '),
-		chalk.blue(certsDir),
-	)
-
-	const { Account: CIAccount } = await new STSClient(firmwareCISDKConfig).send(
-		new GetCallerIdentityCommand({}),
-	)
-	const ciDeviceArn = `arn:aws:iot:${firmwareCI.region}:${CIAccount}:thing/${firmwareCI.deviceId}`
-
-	console.error(
-		chalk.yellow('Firmware CI / Account:    '),
-		chalk.blue(CIAccount),
-	)
-	console.error(
-		chalk.yellow('Firmware CI / Region:     '),
-		chalk.blue(firmwareCI.region),
-	)
-	console.error(
-		chalk.yellow('Firmware CI / Bucket:     '),
-		chalk.blue(firmwareCI.bucketName),
-	)
-	console.error(
-		chalk.yellow('Firmware CI / Device Arn: '),
-		chalk.blue(ciDeviceArn),
-	)
+	console.error(chalk.yellow('Account:       '), chalk.blue(Account))
+	console.error(chalk.yellow('Region:        '), chalk.blue(testEnv.region))
+	console.error(chalk.yellow('Stack:         '), chalk.blue(testEnv.stackName))
+	console.error(chalk.yellow('IoT Endpoint:  '), chalk.blue(testEnv.endpoint))
+	console.error(chalk.yellow('Certificates:  '), chalk.blue(certsDir))
+	console.error(chalk.yellow('Bucket:        '), chalk.blue(bucketName))
+	console.error(chalk.yellow('Device Arn:    '), chalk.blue(ciDeviceArn))
 
 	console.error(chalk.yellow('Job / ID:                 '), chalk.blue(jobId))
 
-	const iot = new IoTClient(firmwareCISDKConfig)
+	const iot = new IoTClient(testEnvSDKConfig)
 
 	let jobInfo
 	// Job exists?
@@ -147,7 +104,7 @@ const e2e = async () => {
 		})
 	} catch {
 		console.error(chalk.magenta('Uploading firmware...'))
-		const s3 = new S3Client(firmwareCISDKConfig)
+		const s3 = new S3Client(testEnvSDKConfig)
 		// FIXME: remove when https://github.com/aws/aws-sdk-js-v3/issues/1800 is fixed
 		s3.middlewareStack.add(
 			(next) => async (args) => {
@@ -161,7 +118,7 @@ const e2e = async () => {
 		await Promise.all([
 			s3.send(
 				new PutObjectCommand({
-					Bucket: firmwareCI.bucketName,
+					Bucket: testEnv.bucketName,
 					Key: `${jobId}.hex`,
 					Body: await fs.readFile(hexFile),
 					ContentType: 'text/octet-stream',
@@ -169,7 +126,7 @@ const e2e = async () => {
 			),
 			s3.send(
 				new PutObjectCommand({
-					Bucket: firmwareCI.bucketName,
+					Bucket: testEnv.bucketName,
 					Key: fotaFilename,
 					Body: await fs.readFile(fotaFile),
 					ContentType: 'text/octet-stream',
@@ -230,14 +187,14 @@ const e2e = async () => {
 		)
 
 		const jobDocument = await schedule({
-			bucketName: firmwareCI.bucketName,
+			bucketName: testEnv.bucketName,
 			certificateJSON: deviceCert.json,
 			ciDeviceArn,
-			firmwareUrl: `https://${firmwareCI.bucketName}.s3.${firmwareCI.region}.amazonaws.com/${jobId}.hex`,
+			firmwareUrl: `https://${testEnv.bucketName}.s3.${testEnv.region}.amazonaws.com/${jobId}.hex`,
 			network,
 			secTag,
-			region: firmwareCI.region,
-			s3: new S3Client(firmwareCISDKConfig),
+			region: testEnv.region,
+			s3: new S3Client(testEnvSDKConfig),
 			target,
 			iot,
 			jobId,
@@ -318,7 +275,7 @@ const e2e = async () => {
 					filename: fotaFilename,
 					location: {
 						protocol: 'https',
-						host: `${firmwareCI.bucketName}.s3-${firmwareCI.region}.amazonaws.com`,
+						host: `${testEnv.bucketName}.s3-${testEnv.region}.amazonaws.com`,
 						path: fotaFilename,
 					},
 					fwversion: `${appVersion}-upgraded`,
@@ -371,13 +328,13 @@ const e2e = async () => {
 		await Promise.all([
 			s3.send(
 				new DeleteObjectCommand({
-					Bucket: firmwareCI.bucketName,
+					Bucket: testEnv.bucketName,
 					Key: `${jobId}.hex`,
 				}),
 			),
 			s3.send(
 				new DeleteObjectCommand({
-					Bucket: firmwareCI.bucketName,
+					Bucket: testEnv.bucketName,
 					Key: fotaFilename,
 				}),
 			),
