@@ -118,7 +118,7 @@ const e2e = async () => {
 		await Promise.all([
 			s3.send(
 				new PutObjectCommand({
-					Bucket: testEnv.bucketName,
+					Bucket: bucketName,
 					Key: `${jobId}.hex`,
 					Body: await fs.readFile(hexFile),
 					ContentType: 'text/octet-stream',
@@ -126,7 +126,7 @@ const e2e = async () => {
 			),
 			s3.send(
 				new PutObjectCommand({
-					Bucket: testEnv.bucketName,
+					Bucket: bucketName,
 					Key: fotaFilename,
 					Body: await fs.readFile(fotaFile),
 					ContentType: 'text/octet-stream',
@@ -187,10 +187,10 @@ const e2e = async () => {
 		)
 
 		const jobDocument = await schedule({
-			bucketName: testEnv.bucketName,
+			bucketName: bucketName,
 			certificateJSON: deviceCert.json,
 			ciDeviceArn,
-			firmwareUrl: `https://${testEnv.bucketName}.s3.${testEnv.region}.amazonaws.com/${jobId}.hex`,
+			firmwareUrl: `https://${bucketName}.s3.${testEnv.region}.amazonaws.com/${jobId}.hex`,
 			network,
 			secTag,
 			region: testEnv.region,
@@ -275,7 +275,7 @@ const e2e = async () => {
 					filename: fotaFilename,
 					location: {
 						protocol: 'https',
-						host: `${testEnv.bucketName}.s3-${testEnv.region}.amazonaws.com`,
+						host: `${bucketName}.s3-${testEnv.region}.amazonaws.com`,
 						path: fotaFilename,
 					},
 					fwversion: `${appVersion}-upgraded`,
@@ -328,13 +328,13 @@ const e2e = async () => {
 		await Promise.all([
 			s3.send(
 				new DeleteObjectCommand({
-					Bucket: testEnv.bucketName,
+					Bucket: bucketName,
 					Key: `${jobId}.hex`,
 				}),
 			),
 			s3.send(
 				new DeleteObjectCommand({
-					Bucket: testEnv.bucketName,
+					Bucket: bucketName,
 					Key: fotaFilename,
 				}),
 			),
