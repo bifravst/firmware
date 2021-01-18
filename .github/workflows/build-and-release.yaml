@@ -32,6 +32,7 @@ jobs:
         run: |
           npm ci
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
+          echo ${NEXT_VERSION}
           echo ${NEXT_VERSION} > version.conf
 
       - uses: actions/upload-artifact@v2
@@ -40,7 +41,7 @@ jobs:
           path: version.conf
 
   broker:
-    name: Determine next release version
+    name: Determine broker hostname
 
     runs-on: ubuntu-latest
 
@@ -60,6 +61,7 @@ jobs:
 
         run: |
           BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.AWS_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
+          echo ${BROKER_HOSTNAME}
           echo ${BROKER_HOSTNAME} > broker.conf
 
       - uses: actions/upload-artifact@v2
