@@ -25,7 +25,7 @@
   "dependencies": {},
   "devDependencies": {
     "@aws-sdk/client-iot-data-plane": "3.3.0",
-    "@bifravst/aws": "20.1.2",
+    "@bifravst/aws": "20.1.3",
     "@bifravst/cloudformation-helpers": "5.0.0",
     "@bifravst/code-style": "8.0.134",
     "@bifravst/e2e-bdd-test-runner": "5.0.16",
