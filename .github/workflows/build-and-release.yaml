@@ -61,6 +61,7 @@ jobs:
         run: |
           BROKER_HOSTNAME=`AWS_ACCESS_KEY_ID=${{ env.AWS_ACCESS_KEY_ID }} AWS_SECRET_ACCESS_KEY=${{ env.AWS_SECRET_ACCESS_KEY }} AWS_DEFAULT_REGION=${{ env.AWS_REGION }} aws iot describe-endpoint --endpoint-type iot:Data-ATS | jq '.endpointAddress' -r | tr -d '\n'`
           echo ${BROKER_HOSTNAME}
+          if [ -z "$BROKER_HOSTNAME" ]; then echo "Failed to discover broker hostname."; exit 1; fi
           echo ${BROKER_HOSTNAME} > broker.conf
 
       - uses: actions/upload-artifact@v2
