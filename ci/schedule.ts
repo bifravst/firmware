@@ -151,6 +151,9 @@ const e2e = async () => {
 					subject: `firmware-ci-${v4()}`,
 					log: console.error,
 					debug: console.debug,
+					attributes: {
+						test: 'firmware'
+					}
 				})
 			}
 

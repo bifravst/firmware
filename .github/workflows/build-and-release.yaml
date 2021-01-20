@@ -264,7 +264,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ./certificates
-          key: certificates-2
+          key: certificates-2020-01-20
 
       - uses: actions/setup-node@v2
         with:
