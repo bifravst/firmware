@@ -24,14 +24,15 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-node@v2
-        with:
-          node-version: "14.x"
-
       - name: Determine next release version
-        run: |
-          npm i semantic-release @semantic-release/commit-analyzer stream-buffers
-          NEXT_VERSION=`node .github/workflows/get-next-version.js`
+        uses: bifravst/get-next-version-action@saga
+        id: version
+        with:
+          branch: saga
+          githubRepository: ${{ env.GITHUB_REPOSITORY }}
+
+      - run: |
+          NEXT_VERSION=${{ steps.version.outputs.nextRelease }}
           echo ${NEXT_VERSION}
           echo ${NEXT_VERSION} > version.conf
 
@@ -52,10 +53,6 @@ jobs:
       AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - uses: actions/setup-node@v2
-        with:
-          node-version: "14.x"
-
       - name: Determine the AWS IoT broker hostname
 
         run: |
