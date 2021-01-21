@@ -18,28 +18,6 @@ env:
   CR_PAT: ${{ secrets.CR_PAT }}
 
 jobs:
-  version:
-    name: Determine next release version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Determine next release version
-        uses: bifravst/get-next-version-action@saga
-        id: version
-        with:
-          branch: saga
-
-      - run: |
-          NEXT_VERSION=${{ steps.version.outputs.nextRelease }}
-          echo ${NEXT_VERSION}
-          echo ${NEXT_VERSION} > version.conf
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: version
-          path: version.conf
-
   broker:
     name: Determine broker hostname
 
@@ -106,7 +84,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    needs: [version, broker, docker]
+    needs: [broker, docker]
 
     strategy:
       matrix:
@@ -117,13 +95,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/download-artifact@v2
-        with:
-          name: version
-
       - name: Configure Version
         run: |
-          APP_VERSION=`cat version.conf`-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
+          APP_VERSION=${{ github.sha }}-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${APP_VERSION}\"" >> prj_${{ matrix.board }}.conf
 
       - name: Enable debug logs
@@ -173,7 +147,7 @@ jobs:
     name: End to End tests (AWS)
     runs-on: ubuntu-latest
 
-    needs: [version, broker, docker]
+    needs: [broker, docker]
 
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -188,10 +162,6 @@ jobs:
     steps:
       - uses: actions/checkout@v1
 
-      - uses: actions/download-artifact@v2
-        with:
-          name: version
-
       - name: Generate Job ID
         run: |
           JOB_ID=`uuidgen`
@@ -199,7 +169,7 @@ jobs:
 
       - name: Configure Version
         run: |
-          APP_VERSION=`cat version.conf`-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
+          APP_VERSION=${{ github.sha }}-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
           echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
           echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${APP_VERSION}-original\"" >> prj_nrf9160dk_nrf9160ns.conf
 
@@ -300,17 +270,3 @@ jobs:
 
       - name: Remove device certificates
         run: rm -v ./certificates/*/device-*
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-
-    needs: [build, e2e-aws]
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: actions/download-artifact@v2
-
-      - run: npx semantic-release
-        continue-on-error: true
