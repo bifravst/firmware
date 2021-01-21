@@ -29,7 +29,7 @@ jobs:
         id: version
         with:
           branch: saga
-          githubRepository: $GITHUB_REPOSITORY
+          githubRepository: ${{ github.repository }}
 
       - run: |
           NEXT_VERSION=${{ steps.version.outputs.nextRelease }}
