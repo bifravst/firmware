@@ -1,7 +1,0 @@
-{
-  "extends": "@bifravst/code-style/tsconfig.json",
-  "include": ["**/*.ts"],
-  "compilerOptions": {
-    "outDir": "dist/"
-  }
-}

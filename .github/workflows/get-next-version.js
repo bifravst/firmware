@@ -13,16 +13,16 @@ const main = async () => {
   const result = await semanticRelease(
     {
       // Core options
-      branch: pjson.release.branches[0],
-      repositoryUrl: pjson.repository.url,
+      branch: process.env.RELEASE_BRANCH ?? "saga",
+      repositoryUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}.git`,
       plugins: ["@semantic-release/commit-analyzer"],
       dryRun: true,
-      ci: false
+      ci: false,
     },
     {
       cwd: process.cwd(),
       stdout: stdoutBuffer,
-      stderr: stderrBuffer
+      stderr: stderrBuffer,
     }
   );
 
@@ -35,7 +35,7 @@ const main = async () => {
     if (stderrBuffer.size > 0) {
       process.stderr.write(stderrBuffer.getContentsAsString("utf8"));
     }
-    process.stdout.write(pjson.version);
+    process.stdout.write(process.env.DEFAULT_VERSION ?? "0.0.0-development");
   }
 };
 

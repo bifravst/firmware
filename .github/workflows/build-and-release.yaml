@@ -30,7 +30,7 @@ jobs:
 
       - name: Determine next release version
         run: |
-          npm ci
+          npm i semantic-release @semantic-release/commit-analyzer
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo ${NEXT_VERSION}
           echo ${NEXT_VERSION} > version.conf
@@ -88,8 +88,7 @@ jobs:
         continue-on-error: true
         env:
           DOCKER_CLI_EXPERIMENTAL: enabled
-        run:
-          docker manifest inspect ghcr.io/bifravst/firmware-builder:${{
+        run: docker manifest inspect ghcr.io/bifravst/firmware-builder:${{
           env.DOCKER_CHECKSUM }}
 
       - name: Build Docker image
@@ -128,8 +127,8 @@ jobs:
 
       - name: Configure Version
         run: |
-          CAT_TRACKER_APP_VERSION=`cat version.conf`-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}\"" >> prj_${{ matrix.board }}.conf
+          APP_VERSION=`cat version.conf`-${{ matrix.board }}-${{ matrix.network }}-${{ matrix.loglevel }}
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${APP_VERSION}\"" >> prj_${{ matrix.board }}.conf
 
       - name: Enable debug logs
         if: matrix.loglevel == 'debug'
@@ -204,9 +203,9 @@ jobs:
 
       - name: Configure Version
         run: |
-          CAT_TRACKER_APP_VERSION=`cat version.conf`-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
-          echo "CAT_TRACKER_APP_VERSION=${CAT_TRACKER_APP_VERSION}" >> $GITHUB_ENV
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}-original\"" >> prj_nrf9160dk_nrf9160ns.conf
+          APP_VERSION=`cat version.conf`-nrf9160dk_nrf9160ns-ltem-${JOB_ID}
+          echo "APP_VERSION=${APP_VERSION}" >> $GITHUB_ENV
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${APP_VERSION}-original\"" >> prj_nrf9160dk_nrf9160ns.conf
 
       - run: echo "# Firmware CI settings" >> prj_nrf9160dk_nrf9160ns.conf
 
@@ -255,7 +254,7 @@ jobs:
 
       - name: Build with changed version for FOTA test
         run: |
-          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${CAT_TRACKER_APP_VERSION}-upgraded\"" >> prj_nrf9160dk_nrf9160ns.conf
+          echo "CONFIG_CAT_TRACKER_APP_VERSION=\"${APP_VERSION}-upgraded\"" >> prj_nrf9160dk_nrf9160ns.conf
           docker run --rm -v ${PWD}:/workdir/ncs/firmware ghcr.io/bifravst/firmware-builder:${{ env.DOCKER_CHECKSUM }} /bin/bash -c 'cd ncs/firmware && west build -p always -b nrf9160dk_nrf9160ns'
           cp build/zephyr/app_update.bin fota-upgrade.bin
           cp prj_nrf9160dk_nrf9160ns.conf fota-upgrade.conf
@@ -276,12 +275,28 @@ jobs:
           npx tsc
 
       - name: Schedule Firmware CI job
-        run: node --unhandled-rejections=strict dist/schedule.js
+        uses: bifravst/firmware-ci-schedule-action-aws@saga
+        with:
+          job id: ${{ env.JOB_ID }}
+          app version: ${{ env.APP_VERSION }}
+          aws access key id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws secret access key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws region: ${{ secrets.AWS_REGION }}
+          broker hostname: ${{ env.BROKER_HOSTNAME }}
+          stack name: ${{ secrets.STACK_NAME }}
+          firmware ci device id: ${{ secrets.DEVICE_ID }}
+          hex file: firmware.hex
+          fota file: fota-upgrade.bin
+          abort on: |
+            aws_fota: Error (-7) when trying to start firmware download
+          end on: |
+            <TEST:ENCODE_APPV> ${{ env.APP_VERSION }}-upgraded
+					  <TEST:DATA_SEND> OK
 
-      - name: Verify run
-        run: npm run test:e2e:aws
-        # For now, ignore test failures until we get more experience running these tests
-        continue-on-error: true
+#      - name: Verify run
+#        uses: bifravst/firmware-ci-verify-action-aws@v1
+#        # For now, ignore test failures until we get more experience running these tests
+#        continue-on-error: true
 
       - uses: actions/upload-artifact@v2
         with:
