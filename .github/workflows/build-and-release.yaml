@@ -265,15 +265,6 @@ jobs:
           path: ./certificates
           key: certificates-2020-01-20
 
-      - uses: actions/setup-node@v2
-        with:
-          node-version: "14.x"
-
-      - name: Set up test runner
-        run: |
-          npm ci
-          npx tsc
-
       - name: Schedule Firmware CI job
         uses: bifravst/firmware-ci-schedule-action-aws@saga
         with:
@@ -293,10 +284,10 @@ jobs:
             <TEST:ENCODE_APPV> ${{ env.APP_VERSION }}-upgraded
             <TEST:DATA_SEND> OK
 
-#      - name: Verify run
-#        uses: bifravst/firmware-ci-verify-action-aws@v1
-#        # For now, ignore test failures until we get more experience running these tests
-#        continue-on-error: true
+      #      - name: Verify run
+      #        uses: bifravst/firmware-ci-verify-action-aws@v1
+      #        # For now, ignore test failures until we get more experience running these tests
+      #        continue-on-error: true
 
       - uses: actions/upload-artifact@v2
         with:
