@@ -30,7 +30,7 @@ jobs:
 
       - name: Determine next release version
         run: |
-          npm i semantic-release @semantic-release/commit-analyzer
+          npm i semantic-release @semantic-release/commit-analyzer stream-buffers
           NEXT_VERSION=`node .github/workflows/get-next-version.js`
           echo ${NEXT_VERSION}
           echo ${NEXT_VERSION} > version.conf
