@@ -291,7 +291,7 @@ jobs:
             aws_fota: Error (-7) when trying to start firmware download
           end on: |
             <TEST:ENCODE_APPV> ${{ env.APP_VERSION }}-upgraded
-					  <TEST:DATA_SEND> OK
+            <TEST:DATA_SEND> OK
 
 #      - name: Verify run
 #        uses: bifravst/firmware-ci-verify-action-aws@v1
