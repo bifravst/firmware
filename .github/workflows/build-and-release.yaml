@@ -250,10 +250,19 @@ jobs:
             <TEST:ENCODE_APPV> ${{ env.APP_VERSION }}-upgraded
             <TEST:DATA_SEND> OK
 
-      #      - name: Verify run
-      #        uses: bifravst/firmware-ci-verify-action-aws@v1
-      #        # For now, ignore test failures until we get more experience running these tests
-      #        continue-on-error: true
+      - name: Run feature tests
+        uses: bifravst/firmware-ci-feature-runner-action-aws@saga
+        # For now, ignore test failures until we get more experience running these tests
+        continue-on-error: true
+        with:
+          job id: ${{ env.JOB_ID }}
+          app version: ${{ env.APP_VERSION }}
+          aws access key id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws secret access key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws region: ${{ secrets.AWS_REGION }}
+          broker hostname: ${{ env.BROKER_HOSTNAME }}
+          stack name: ${{ secrets.STACK_NAME }}
+          feature dir: features
 
       - uses: actions/upload-artifact@v2
         with:

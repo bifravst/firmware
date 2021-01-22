@@ -5,14 +5,14 @@ Feature: Delete the Cat Tracker
 
   Background:
 
-    Given I am authenticated with AWS key "{env__AWS_ACCESS_KEY_ID}" and secret "{env__AWS_SECRET_ACCESS_KEY}"
+    Given I am authenticated with AWS key "{awsAccessKeyId}" and secret "{awsSecretAccessKey}"
 
   Scenario: Delete the cat
 
     When I execute "listThingPrincipals" of the AWS Iot SDK with
       """
       {
-        "thingName": "{env__JOB_ID}"
+        "thingName": "{jobId}"
       }
       """
     Then "$count(awsSdk.res.principals)" should equal 1
@@ -21,7 +21,7 @@ Feature: Delete the Cat Tracker
     Given I execute "detachThingPrincipal" of the AWS Iot SDK with
       """
       {
-        "thingName": "{env__JOB_ID}",
+        "thingName": "{jobId}",
         "principal": "{certificateArn}"
       }
       """
@@ -41,6 +41,6 @@ Feature: Delete the Cat Tracker
     And I execute "deleteThing" of the AWS Iot SDK with
       """
       {
-        "thingName": "{env__JOB_ID}"
+        "thingName": "{jobId}"
       }
       """
