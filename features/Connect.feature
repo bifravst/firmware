@@ -5,7 +5,6 @@ Feature: Connect
     Background:
         
         Given I am run after the "Run the firmware" feature
-        Given I connect the cat tracker {jobId}
         Given I am authenticated with AWS key "{awsAccessKeyId}" and secret "{awsSecretAccessKey}"
 
     Scenario: Read reported state
