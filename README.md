@@ -1,3 +1,6 @@
+> **:truck: moved to https://github.com/NordicSemiconductor/asset-tracker-cloud-firmware**  
+> :information_source: [more info](https://github.com/bifravst/bifravst/issues/56)
+
 # Cat Tracker Firmware
 
 ![Build and Release](https://github.com/bifravst/firmware/workflows/Build%20and%20Release/badge.svg?branch=saga)
