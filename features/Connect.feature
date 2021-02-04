@@ -33,7 +33,7 @@ Feature: Connect
                 "actwt": 60,
                 "mvres": 60,
                 "mvt": 3600,
-                "acct": 100
+                "acct": 19.6133
             }
         }
         """
